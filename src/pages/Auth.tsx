@@ -57,12 +57,12 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-border/50">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
             <Wrench className="h-7 w-7 text-primary-foreground" />
           </div>
-          <CardTitle className="font-display text-2xl">AutoTaller</CardTitle>
+          <CardTitle className="font-display text-2xl text-primary">Talleres de Futuro</CardTitle>
           <CardDescription>
             {isLogin ? "Inicia sesión para acceder al panel" : "Crea una cuenta nueva"}
           </CardDescription>
@@ -79,7 +79,7 @@ const Auth = () => {
                     placeholder="Tu nombre"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 bg-secondary border-border/50"
                   />
                 </div>
               </div>
@@ -95,7 +95,7 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="pl-9"
+                  className="pl-9 bg-secondary border-border/50"
                 />
               </div>
             </div>
@@ -111,7 +111,7 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="pl-9"
+                  className="pl-9 bg-secondary border-border/50"
                 />
               </div>
             </div>

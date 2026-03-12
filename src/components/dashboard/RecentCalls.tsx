@@ -1,18 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAllAppointments } from "@/hooks/useAppointments";
-import { Car, User, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import { Loader2 } from "lucide-react";
-
-function formatTime(dateStr: string | null): string {
-  if (!dateStr) return "--:--";
-  try {
-    const d = new Date(dateStr);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  } catch {
-    return "--:--";
-  }
-}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -24,31 +14,29 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  recepcionado: { label: "Recepcionado", variant: "secondary" },
-  en_proceso: { label: "En proceso", variant: "outline" },
-  reparado: { label: "Reparado", variant: "default" },
-  entregado: { label: "Entregado", variant: "secondary" },
-  cancelado: { label: "Cancelado", variant: "destructive" },
+const statusStyles: Record<string, string> = {
+  recepcionado: "bg-primary/20 text-primary border-primary/30",
+  en_proceso: "bg-info/20 text-info border-info/30",
+  reparado: "bg-success/20 text-success border-success/30",
+  entregado: "bg-muted text-muted-foreground border-border",
+  cancelado: "bg-destructive/20 text-destructive border-destructive/30",
 };
 
 export function RecentCalls() {
   const { data: appointments, isLoading } = useAllAppointments();
-
-  // Show latest 5 appointments as "recent activity"
-  const recent = (appointments ?? []).slice(-5).reverse();
+  const recent = (appointments ?? []).slice(-6).reverse();
 
   return (
-    <Card className="flex flex-col">
+    <Card className="border-border/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-base">Actividad reciente</CardTitle>
-          <Badge variant="outline" className="text-xs">
+          <CardTitle className="font-display text-base font-bold">Actividad reciente</CardTitle>
+          <Badge variant="outline" className="text-xs border-border/50">
             {(appointments ?? []).length} total
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 space-y-2">
+      <CardContent className="space-y-2">
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -57,9 +45,9 @@ export function RecentCalls() {
           <p className="py-8 text-center text-sm text-muted-foreground">No hay actividad</p>
         ) : (
           recent.map((apt) => {
-            const status = statusConfig[apt.status ?? "recepcionado"] ?? statusConfig.recepcionado;
+            const statusClass = statusStyles[apt.status ?? "recepcionado"] ?? statusStyles.recepcionado;
             return (
-              <div key={apt.id} className="flex items-center gap-3 rounded-xl border p-3 transition-all hover:bg-accent/50">
+              <div key={apt.id} className="flex items-center gap-3 rounded-lg border border-border/30 bg-secondary/30 p-3 transition-all hover:bg-secondary/60">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <Wrench className="h-4 w-4 text-primary" />
                 </div>
@@ -74,8 +62,8 @@ export function RecentCalls() {
                     <span className="text-xs text-muted-foreground truncate">
                       {[apt.license_plate, apt.problem].filter(Boolean).join(" · ")}
                     </span>
-                    <Badge variant={status.variant} className="text-[10px] ml-2 shrink-0">
-                      {status.label}
+                    <Badge variant="outline" className={`text-[10px] ml-2 shrink-0 border ${statusClass}`}>
+                      {apt.status ?? "recepcionado"}
                     </Badge>
                   </div>
                 </div>
