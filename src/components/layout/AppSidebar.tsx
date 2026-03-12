@@ -35,6 +35,7 @@ const mainItems = [
   { title: "Órdenes de Trabajo", url: "/appointments", icon: ClipboardList },
   { title: "Calendario", url: "/weekly", icon: Calendar },
   { title: "Llamadas", url: "/calls", icon: Bot },
+  { title: "Asistente IA", url: "/mechanic-ai", icon: Wrench },
 ];
 
 const configItems = [
