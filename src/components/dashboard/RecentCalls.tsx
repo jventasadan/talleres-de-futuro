@@ -1,73 +1,88 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PhoneIncoming, PhoneOff, Bot, Clock } from "lucide-react";
+import { useAllAppointments } from "@/hooks/useAppointments";
+import { Car, User, Wrench } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-const recentCalls = [
-  { id: 1, caller: "+34 612 345 678", client: "Carlos García", duration: "2:34", result: "Cita reservada", success: true, time: "08:45" },
-  { id: 2, caller: "+34 698 765 432", client: "Desconocido", duration: "1:12", result: "Sin disponibilidad", success: false, time: "09:12" },
-  { id: 3, caller: "+34 655 111 222", client: "Pedro Martín", duration: "3:01", result: "Cita reservada", success: true, time: "10:05" },
-  { id: 4, caller: "+34 677 333 444", client: "Ana Ruiz", duration: "1:45", result: "Cita reservada", success: true, time: "11:30" },
-  { id: 5, caller: "+34 644 555 666", client: "Desconocido", duration: "0:45", result: "Llamada cortada", success: false, time: "12:15" },
-];
+function formatTime(dateStr: string | null): string {
+  if (!dateStr) return "--:--";
+  try {
+    const d = new Date(dateStr);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  } catch {
+    return "--:--";
+  }
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+  } catch {
+    return "";
+  }
+}
+
+const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  recepcionado: { label: "Recepcionado", variant: "secondary" },
+  en_proceso: { label: "En proceso", variant: "outline" },
+  reparado: { label: "Reparado", variant: "default" },
+  entregado: { label: "Entregado", variant: "secondary" },
+  cancelado: { label: "Cancelado", variant: "destructive" },
+};
 
 export function RecentCalls() {
-  const successRate = Math.round(
-    (recentCalls.filter((c) => c.success).length / recentCalls.length) * 100
-  );
+  const { data: appointments, isLoading } = useAllAppointments();
+
+  // Show latest 5 appointments as "recent activity"
+  const recent = (appointments ?? []).slice(-5).reverse();
 
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bot className="h-4 w-4 text-primary" />
-            <CardTitle className="font-display text-base">Llamadas IA</CardTitle>
-          </div>
+          <CardTitle className="font-display text-base">Actividad reciente</CardTitle>
           <Badge variant="outline" className="text-xs">
-            {successRate}% éxito
+            {(appointments ?? []).length} total
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-2">
-        {recentCalls.map((call) => (
-          <div
-            key={call.id}
-            className="flex items-center gap-3 rounded-xl border p-3 transition-all hover:bg-accent/50 hover:shadow-sm"
-          >
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                call.success
-                  ? "bg-success/10"
-                  : "bg-destructive/10"
-              }`}
-            >
-              {call.success ? (
-                <PhoneIncoming className="h-4 w-4 text-success" />
-              ) : (
-                <PhoneOff className="h-4 w-4 text-destructive" />
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <p className="truncate text-sm font-medium">{call.client}</p>
-                <div className="ml-2 flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {call.time}
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : !recent.length ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No hay actividad</p>
+        ) : (
+          recent.map((apt) => {
+            const status = statusConfig[apt.status ?? "recepcionado"] ?? statusConfig.recepcionado;
+            return (
+              <div key={apt.id} className="flex items-center gap-3 rounded-xl border p-3 transition-all hover:bg-accent/50">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="truncate text-sm font-medium">{apt.name || "Sin nombre"}</p>
+                    <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">
+                      {formatDate(apt.appointment_start)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground truncate">
+                      {[apt.license_plate, apt.problem].filter(Boolean).join(" · ")}
+                    </span>
+                    <Badge variant={status.variant} className="text-[10px] ml-2 shrink-0">
+                      {status.label}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              <div className="mt-0.5 flex items-center justify-between">
-                <span className="font-mono text-xs text-muted-foreground">{call.caller}</span>
-                <Badge
-                  variant={call.success ? "default" : "secondary"}
-                  className="text-[10px]"
-                >
-                  {call.result}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        ))}
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );
