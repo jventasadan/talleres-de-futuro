@@ -2,12 +2,14 @@ import {
   Calendar,
   CalendarDays,
   Car,
+  ClipboardList,
+  FileText,
   LayoutDashboard,
   LogOut,
-  Phone,
   Settings,
   Users,
   Wrench,
+  Bot,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -28,11 +30,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const mainItems = [
-  { title: "Panel", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Citas", url: "/appointments", icon: Calendar },
-  { title: "Semana", url: "/weekly", icon: CalendarDays },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/clients", icon: Users },
-  { title: "Llamadas", url: "/calls", icon: Phone },
+  { title: "Órdenes de Trabajo", url: "/appointments", icon: ClipboardList },
+  { title: "Calendario", url: "/weekly", icon: Calendar },
+  { title: "Llamadas", url: "/calls", icon: Bot },
 ];
 
 const configItems = [
@@ -54,21 +56,15 @@ export function AppSidebar() {
             <Wrench className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-display text-sm font-bold text-sidebar-accent-foreground">
-                AutoTaller
-              </span>
-              <span className="text-[11px] text-sidebar-foreground">
-                AI Assistant
-              </span>
-            </div>
+            <span className="font-display text-base font-bold text-primary">
+              Talleres de Futuro
+            </span>
           )}
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
@@ -93,8 +89,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+        <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
               {configItems.map((item) => (
@@ -120,12 +115,18 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 space-y-3">
+      <SidebarFooter className="p-4 space-y-2">
         {!collapsed && user && (
-          <div className="rounded-lg bg-sidebar-accent p-3">
-            <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
-              {user.email}
-            </p>
+          <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent p-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+              {user.email?.[0]?.toUpperCase() ?? "U"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
+                {user.email}
+              </p>
+              <p className="text-[10px] text-sidebar-foreground">Admin</p>
+            </div>
           </div>
         )}
         <SidebarMenu>

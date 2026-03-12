@@ -1,59 +1,73 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Mail, ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { useClients } from "@/hooks/useClients";
+import { Wrench } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useAllAppointments } from "@/hooks/useAppointments";
 import { Loader2 } from "lucide-react";
 
-const avatarColors = [
-  "bg-primary/15 text-primary",
-  "bg-success/15 text-success",
-  "bg-warning/15 text-warning",
-  "bg-destructive/15 text-destructive",
-];
-
-function getInitials(name: string | null): string {
-  if (!name) return "??";
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-}
-
 export function RecentClients() {
-  const navigate = useNavigate();
-  const { data: clients, isLoading } = useClients();
-  const recent = (clients ?? []).slice(0, 4);
+  const { data: appointments, isLoading } = useAllAppointments();
+
+  // Group by mechanic to build a performance table
+  const mechanicMap = new Map<string, { orders: number; }>();
+  (appointments ?? []).forEach((apt) => {
+    const m = apt.mechanic || "Sin asignar";
+    const entry = mechanicMap.get(m) ?? { orders: 0 };
+    entry.orders++;
+    mechanicMap.set(m, entry);
+  });
+
+  const mechanics = Array.from(mechanicMap.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a, b) => b.orders - a.orders);
 
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-base">Clientes recientes</CardTitle>
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => navigate("/clients")}>
-            Ver todos<ArrowRight className="ml-1 h-3 w-3" />
-          </Button>
-        </div>
+        <CardTitle className="font-display text-base font-bold">
+          Rendimiento Mecánicos
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Desempeño basado en órdenes asignadas.
+        </p>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : !recent.length ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No hay clientes</p>
+        ) : !mechanics.length ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Sin datos</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {recent.map((client, i) => (
-              <div key={client.id} className="flex items-center gap-3 rounded-xl border p-3 transition-all hover:bg-accent/50 cursor-pointer">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-xs font-bold ${avatarColors[i % avatarColors.length]}`}>
-                  {getInitials(client.full_name)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{client.full_name || "Sin nombre"}</p>
-                  {client.phone && <p className="text-[11px] text-muted-foreground">{client.phone}</p>}
-                  {client.email && <p className="truncate text-[10px] text-muted-foreground">{client.email}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/50 hover:bg-transparent">
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Mecánico</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground text-center">Órdenes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mechanics.map((m) => (
+                <TableRow key={m.name} className="border-border/30 hover:bg-secondary/50">
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
+                        <Wrench className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium">{m.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center font-mono text-sm font-bold">{m.orders}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

@@ -1,26 +1,47 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle?: string;
+  showSearch?: boolean;
+  showRecepcionar?: boolean;
 }
 
-export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
+export function DashboardLayout({ children, title, subtitle, showSearch = true, showRecepcionar = true }: DashboardLayoutProps) {
+  const navigate = useNavigate();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-card/80 px-6 backdrop-blur-sm">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 px-6 backdrop-blur-sm">
             <SidebarTrigger className="-ml-2" />
-            <div>
-              <h1 className="font-display text-lg font-bold leading-tight">{title}</h1>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground">{subtitle}</p>
-              )}
-            </div>
+            {showSearch && (
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar cliente, matrícula, orden... (Ej: 1234-BCD)"
+                  className="pl-9 bg-secondary border-border/50"
+                />
+              </div>
+            )}
+            <div className="flex-1" />
+            {showRecepcionar && (
+              <Button
+                onClick={() => navigate("/appointments")}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Recepcionar Vehículo
+              </Button>
+            )}
           </header>
           <main className="flex-1 p-6 animate-fade-in">{children}</main>
         </div>
