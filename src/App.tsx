@@ -11,6 +11,7 @@ import Appointments from "./pages/Appointments";
 import WeeklyCalendar from "./pages/WeeklyCalendar";
 import Clients from "./pages/Clients";
 import CallHistory from "./pages/CallHistory";
+import MechanicChat from "./pages/MechanicChat";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
