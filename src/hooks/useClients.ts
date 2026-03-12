@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { ClientRow } from "@/types/database";
 
-export type Client = Tables<"clients">;
+export type Client = ClientRow;
 
 export function useClients() {
   return useQuery({
@@ -12,9 +12,8 @@ export function useClients() {
         .from("clients")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error) throw error;
-      return data as Client[];
+      return (data ?? []) as Client[];
     },
   });
 }
