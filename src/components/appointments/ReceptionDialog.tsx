@@ -17,7 +17,6 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import type { Appointment } from "@/hooks/useAppointments";
 
 const TIME_SLOTS = [
   "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30",
@@ -32,37 +31,22 @@ const SERVICES = [
   "Chapa y pintura","Otro",
 ];
 
-const STATUSES = [
-  { value: "recepcionado", label: "Recepcionado" },
-  { value: "en_reparacion", label: "En reparación" },
-  { value: "esperando_piezas", label: "Esperando piezas" },
-  { value: "listo", label: "Listo" },
-  { value: "cancelado", label: "Cancelado" },
-];
-
-interface AppointmentDialogProps {
+interface ReceptionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  appointment?: Appointment | null;
-  onSubmit: (data: Partial<Appointment>) => void;
+  onSubmit: (data: any) => void;
   isLoading?: boolean;
 }
 
-export function AppointmentDialog({ open, onOpenChange, appointment, onSubmit, isLoading }: AppointmentDialogProps) {
-  const isEditing = !!appointment;
-
+export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: ReceptionDialogProps) {
   const [form, setForm] = useState({
-    client_name: appointment?.client_name ?? "",
-    license_plate: appointment?.license_plate ?? "",
-    service: appointment?.service ?? "",
-    time_slot: appointment?.time_slot ?? "",
-    status: appointment?.status ?? "recepcionado",
-    notes: appointment?.notes ?? "",
+    client_name: "",
+    license_plate: "",
+    service: "",
+    time_slot: "",
+    notes: "",
   });
-
-  const [dateObj, setDateObj] = useState<Date>(
-    appointment?.date ? new Date(appointment.date) : new Date()
-  );
+  const [dateObj, setDateObj] = useState(new Date());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,32 +56,26 @@ export function AppointmentDialog({ open, onOpenChange, appointment, onSubmit, i
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
-      status: form.status,
+      status: "recepcionado",
       notes: form.notes || null,
+      created_by: "manual",
     });
   };
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({
-        client_name: appointment?.client_name ?? "",
-        license_plate: appointment?.license_plate ?? "",
-        service: appointment?.service ?? "",
-        time_slot: appointment?.time_slot ?? "",
-        status: appointment?.status ?? "recepcionado",
-        notes: appointment?.notes ?? "",
-      });
-      setDateObj(appointment?.date ? new Date(appointment.date) : new Date());
+      setForm({ client_name: "", license_plate: "", service: "", time_slot: "", notes: "" });
+      setDateObj(new Date());
     }
     onOpenChange(open);
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display">{isEditing ? "Editar orden" : "Nueva orden"}</DialogTitle>
-          <DialogDescription>{isEditing ? "Modifica los datos de la orden" : "Rellena los datos para crear una nueva orden"}</DialogDescription>
+          <DialogTitle className="font-display">Recepcionar Vehículo</DialogTitle>
+          <DialogDescription>Registra un nuevo vehículo en el taller</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -145,22 +123,13 @@ export function AppointmentDialog({ open, onOpenChange, appointment, onSubmit, i
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Estado</Label>
-            <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
             <Label>Notas (opcional)</Label>
             <Textarea placeholder="Notas adicionales..." value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear orden"}
+              {isLoading ? "Guardando..." : "Recepcionar"}
             </Button>
           </DialogFooter>
         </form>

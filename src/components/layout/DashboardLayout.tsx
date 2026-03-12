@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
+import { useCreateAppointment } from "@/hooks/useAppointments";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -14,7 +16,14 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, subtitle, showSearch = true, showRecepcionar = true }: DashboardLayoutProps) {
-  const navigate = useNavigate();
+  const [receptionOpen, setReceptionOpen] = useState(false);
+  const createMutation = useCreateAppointment();
+
+  const handleCreate = (data: any) => {
+    createMutation.mutate(data, {
+      onSuccess: () => setReceptionOpen(false),
+    });
+  };
 
   return (
     <SidebarProvider>
@@ -35,7 +44,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
             <div className="flex-1" />
             {showRecepcionar && (
               <Button
-                onClick={() => navigate("/appointments")}
+                onClick={() => setReceptionOpen(true)}
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -46,6 +55,13 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           <main className="flex-1 p-6 animate-fade-in">{children}</main>
         </div>
       </div>
+
+      <ReceptionDialog
+        open={receptionOpen}
+        onOpenChange={setReceptionOpen}
+        onSubmit={handleCreate}
+        isLoading={createMutation.isPending}
+      />
     </SidebarProvider>
   );
 }

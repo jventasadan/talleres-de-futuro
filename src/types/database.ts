@@ -1,33 +1,52 @@
-// Custom types matching external Supabase schema
+// Types matching Cloud Supabase schema
 export interface AppointmentRow {
   id: string;
+  user_id: string;
   client_id: string | null;
-  vehicle_id: string | null;
-  appointment_date: string | null;
-  service_type: string | null;
-  status: string | null;
+  date: string;
+  time_slot: string;
+  client_name: string;
+  license_plate: string;
+  service: string;
+  status: string;
   notes: string | null;
+  created_by: string;
   created_at: string;
-  name: string | null;
-  brand: string | null;
-  model: string | null;
-  license_plate: string | null;
-  problem: string | null;
-  phone: string | null;
-  appointment_start: string | null;
-  appointment_end: string | null;
-  mechanic: string | null;
+  updated_at: string;
 }
 
 export interface ClientRow {
   id: string;
-  full_name: string | null;
+  user_id: string;
+  name: string;
   phone: string | null;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-  postal_code: string | null;
-  province: string | null;
-  nif: string | null;
+  license_plate: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderPartRow {
+  id: string;
+  appointment_id: string;
+  user_id: string;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  created_at: string;
+}
+
+export interface InvoiceRow {
+  id: string;
+  appointment_id: string;
+  user_id: string;
+  invoice_number: string;
+  client_name: string;
+  license_plate: string;
+  service: string;
+  parts_total: number;
+  labor_cost: number;
+  tax_rate: number;
+  total: number;
+  status: string;
   created_at: string;
 }

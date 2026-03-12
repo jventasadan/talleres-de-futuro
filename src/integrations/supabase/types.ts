@@ -100,6 +100,100 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          appointment_id: string
+          client_name: string
+          created_at: string
+          id: string
+          invoice_number: string
+          labor_cost: number
+          license_plate: string
+          parts_total: number
+          service: string
+          status: string
+          tax_rate: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          client_name: string
+          created_at?: string
+          id?: string
+          invoice_number: string
+          labor_cost?: number
+          license_plate: string
+          parts_total?: number
+          service: string
+          status?: string
+          tax_rate?: number
+          total?: number
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          invoice_number?: string
+          labor_cost?: number
+          license_plate?: string
+          parts_total?: number
+          service?: string
+          status?: string
+          tax_rate?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_parts: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          name: string
+          quantity: number
+          unit_price: number
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          name: string
+          quantity?: number
+          unit_price?: number
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          quantity?: number
+          unit_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_parts_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
