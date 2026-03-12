@@ -1,23 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAllAppointments } from "@/hooks/useAppointments";
-import { Wrench } from "lucide-react";
-import { Loader2 } from "lucide-react";
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-  } catch {
-    return "";
-  }
-}
+import { Wrench, Loader2 } from "lucide-react";
 
 const statusStyles: Record<string, string> = {
   recepcionado: "bg-primary/20 text-primary border-primary/30",
-  en_proceso: "bg-info/20 text-info border-info/30",
-  reparado: "bg-success/20 text-success border-success/30",
+  en_reparacion: "bg-info/20 text-info border-info/30",
+  listo: "bg-success/20 text-success border-success/30",
   entregado: "bg-muted text-muted-foreground border-border",
   cancelado: "bg-destructive/20 text-destructive border-destructive/30",
 };
@@ -53,14 +42,12 @@ export function RecentCalls() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
-                    <p className="truncate text-sm font-medium">{apt.name || "Sin nombre"}</p>
-                    <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">
-                      {formatDate(apt.appointment_start)}
-                    </span>
+                    <p className="truncate text-sm font-medium">{apt.client_name || "Sin nombre"}</p>
+                    <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">{apt.date}</span>
                   </div>
                   <div className="mt-0.5 flex items-center justify-between">
                     <span className="text-xs text-muted-foreground truncate">
-                      {[apt.license_plate, apt.problem].filter(Boolean).join(" · ")}
+                      {[apt.license_plate, apt.service].filter(Boolean).join(" · ")}
                     </span>
                     <Badge variant="outline" className={`text-[10px] ml-2 shrink-0 border ${statusClass}`}>
                       {apt.status ?? "recepcionado"}

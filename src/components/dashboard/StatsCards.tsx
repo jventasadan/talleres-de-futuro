@@ -1,59 +1,37 @@
 import { Calendar, Clock, TrendingUp, Euro } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAllAppointments } from "@/hooks/useAppointments";
-import { useClients } from "@/hooks/useClients";
-import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { useInvoices } from "@/hooks/useInvoices";
+import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 export function StatsCards() {
   const { data: appointments } = useAllAppointments();
-  const { data: clients } = useClients();
+  const { data: invoices } = useInvoices();
 
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
   const activeOrders = (appointments ?? []).filter(
-    (a) => a.status === "recepcionado" || a.status === "en_proceso"
+    (a) => a.status === "recepcionado" || a.status === "en_reparacion"
   ).length;
 
   const monthRepairs = (appointments ?? []).filter((a) => {
-    if (!a.appointment_start) return false;
-    const d = new Date(a.appointment_start);
-    return (a.status === "reparado" || a.status === "entregado") &&
+    const d = new Date(a.date);
+    return (a.status === "listo" || a.status === "entregado") &&
       isWithinInterval(d, { start: monthStart, end: monthEnd });
   }).length;
 
+  const monthBilling = (invoices ?? []).filter((inv) => {
+    const d = new Date(inv.created_at);
+    return isWithinInterval(d, { start: monthStart, end: monthEnd });
+  }).reduce((sum, inv) => sum + Number(inv.total), 0);
+
   const stats = [
-    {
-      title: "Órdenes Activas",
-      value: String(activeOrders),
-      subtitle: "En Taller",
-      icon: Calendar,
-      iconBg: "bg-warning/80",
-    },
-    {
-      title: "Reparaciones (Mes)",
-      value: String(monthRepairs),
-      subtitle: "Completadas",
-      subtitleColor: "text-success",
-      icon: TrendingUp,
-      iconBg: "bg-info/80",
-    },
-    {
-      title: "Tiempo Medio",
-      value: "0h",
-      subtitle: "Por reparación",
-      icon: Clock,
-      iconBg: "bg-muted-foreground/60",
-    },
-    {
-      title: "Facturación Mes",
-      value: "0 €",
-      subtitle: "Taller",
-      subtitleColor: "text-primary",
-      icon: Euro,
-      iconBg: "bg-info/80",
-    },
+    { title: "Órdenes Activas", value: String(activeOrders), subtitle: "En Taller", icon: Calendar, iconBg: "bg-warning/80" },
+    { title: "Reparaciones (Mes)", value: String(monthRepairs), subtitle: "Completadas", subtitleColor: "text-success", icon: TrendingUp, iconBg: "bg-info/80" },
+    { title: "Tiempo Medio", value: "0h", subtitle: "Por reparación", icon: Clock, iconBg: "bg-muted-foreground/60" },
+    { title: "Facturación Mes", value: `${monthBilling.toFixed(0)} €`, subtitle: "Taller", subtitleColor: "text-primary", icon: Euro, iconBg: "bg-info/80" },
   ];
 
   return (
@@ -68,9 +46,7 @@ export function StatsCards() {
               <div>
                 <p className="text-xs text-muted-foreground">{stat.title}</p>
                 <p className="font-display text-3xl font-bold tracking-tight mt-0.5">{stat.value}</p>
-                <p className={`text-xs mt-0.5 ${stat.subtitleColor ?? "text-muted-foreground"}`}>
-                  {stat.subtitle}
-                </p>
+                <p className={`text-xs mt-0.5 ${stat.subtitleColor ?? "text-muted-foreground"}`}>{stat.subtitle}</p>
               </div>
             </div>
           </CardContent>
