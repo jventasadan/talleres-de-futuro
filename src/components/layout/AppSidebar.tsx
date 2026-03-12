@@ -1,7 +1,9 @@
 import {
   Calendar,
+  CalendarDays,
   Car,
   LayoutDashboard,
+  LogOut,
   Phone,
   Settings,
   Users,
@@ -9,6 +11,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   Sidebar,
@@ -27,6 +30,7 @@ import {
 const mainItems = [
   { title: "Panel", url: "/dashboard", icon: LayoutDashboard },
   { title: "Citas", url: "/appointments", icon: Calendar },
+  { title: "Semana", url: "/weekly", icon: CalendarDays },
   { title: "Clientes", url: "/clients", icon: Users },
   { title: "Llamadas", url: "/calls", icon: Phone },
 ];
@@ -40,6 +44,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
+  const { user, signOut } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -115,20 +120,22 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
-        {!collapsed && (
+      <SidebarFooter className="p-4 space-y-3">
+        {!collapsed && user && (
           <div className="rounded-lg bg-sidebar-accent p-3">
-            <div className="flex items-center gap-2">
-              <Car className="h-4 w-4 text-sidebar-primary" />
-              <span className="text-xs font-medium text-sidebar-accent-foreground">
-                Plan Pro
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-sidebar-foreground">
-              142 llamadas este mes
+            <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
+              {user.email}
             </p>
           </div>
         )}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Cerrar sesión" onClick={signOut}>
+              <LogOut className="h-4 w-4" />
+              {!collapsed && <span>Cerrar sesión</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
