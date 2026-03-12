@@ -13,7 +13,7 @@ export function useClients() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as unknown as Client[];
     },
   });
 }
