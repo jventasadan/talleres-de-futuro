@@ -1,7 +1,5 @@
 import {
   Calendar,
-  CalendarDays,
-  Car,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -9,7 +7,6 @@ import {
   Settings,
   Users,
   Wrench,
-  Bot,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -20,7 +17,6 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -34,8 +30,8 @@ const mainItems = [
   { title: "Clientes", url: "/clients", icon: Users },
   { title: "Órdenes de Trabajo", url: "/appointments", icon: ClipboardList },
   { title: "Calendario", url: "/weekly", icon: Calendar },
-  { title: "Llamadas", url: "/calls", icon: Bot },
-  { title: "Asistente IA", url: "/mechanic-ai", icon: Wrench },
+  { title: "Facturas", url: "/invoices", icon: FileText },
+  { title: "IA del Taller", url: "/mechanic-ai", icon: Wrench },
 ];
 
 const configItems = [
@@ -70,16 +66,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <NavLink
-                      to={item.url}
-                      end
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                    >
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -95,16 +83,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {configItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <NavLink
-                      to={item.url}
-                      end
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                    >
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -123,9 +103,7 @@ export function AppSidebar() {
               {user.email?.[0]?.toUpperCase() ?? "U"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
-                {user.email}
-              </p>
+              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">{user.email}</p>
               <p className="text-[10px] text-sidebar-foreground">Admin</p>
             </div>
           </div>

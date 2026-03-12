@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AppointmentRow } from "@/types/database";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type Appointment = AppointmentRow;
 
@@ -12,19 +13,15 @@ export function useAppointments(dateFilter?: string) {
       let query = supabase
         .from("appointments")
         .select("*")
-        .order("appointment_start", { ascending: true });
+        .order("time_slot", { ascending: true });
 
       if (dateFilter) {
-        const nextDay = new Date(dateFilter);
-        nextDay.setDate(nextDay.getDate() + 1);
-        query = query
-          .gte("appointment_start", `${dateFilter}T00:00:00`)
-          .lt("appointment_start", `${nextDay.toISOString().split("T")[0]}T00:00:00`);
+        query = query.eq("date", dateFilter);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as Appointment[];
+      return (data ?? []) as Appointment[];
     },
   });
 }
@@ -36,20 +33,21 @@ export function useAllAppointments() {
       const { data, error } = await supabase
         .from("appointments")
         .select("*")
-        .order("appointment_start", { ascending: true });
+        .order("date", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as Appointment[];
+      return (data ?? []) as Appointment[];
     },
   });
 }
 
 export function useCreateAppointment() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (appointment: Partial<Appointment>) => {
       const { data, error } = await supabase
         .from("appointments")
-        .insert(appointment as any)
+        .insert({ ...appointment, user_id: user?.id } as any)
         .select()
         .single();
       if (error) throw error;
@@ -57,10 +55,10 @@ export function useCreateAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      toast.success("Cita creada correctamente");
+      toast.success("Orden creada correctamente");
     },
     onError: (error) => {
-      toast.error("Error al crear cita: " + error.message);
+      toast.error("Error al crear orden: " + error.message);
     },
   });
 }
@@ -80,7 +78,7 @@ export function useUpdateAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      toast.success("Cita actualizada");
+      toast.success("Orden actualizada");
     },
     onError: (error) => {
       toast.error("Error al actualizar: " + error.message);
@@ -100,10 +98,32 @@ export function useCancelAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      toast.success("Cita cancelada");
+      toast.success("Orden cancelada");
     },
     onError: (error) => {
       toast.error("Error al cancelar: " + error.message);
+    },
+  });
+}
+
+export function useUpdateAppointmentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { data, error } = await supabase
+        .from("appointments")
+        .update({ status } as any)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar estado: " + error.message);
     },
   });
 }
