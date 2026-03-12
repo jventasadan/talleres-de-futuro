@@ -14,14 +14,33 @@ export function useAppointments(dateFilter?: string) {
       let query = supabase
         .from("appointments")
         .select("*")
-        .order("date", { ascending: true })
-        .order("time_slot", { ascending: true });
+        .order("appointment_start", { ascending: true });
 
       if (dateFilter) {
-        query = query.eq("date", dateFilter);
+        // Filter by date: appointment_start >= date 00:00 and < next day
+        const nextDay = new Date(dateFilter);
+        nextDay.setDate(nextDay.getDate() + 1);
+        query = query
+          .gte("appointment_start", `${dateFilter}T00:00:00`)
+          .lt("appointment_start", `${nextDay.toISOString().split("T")[0]}T00:00:00`);
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data as Appointment[];
+    },
+  });
+}
+
+export function useAllAppointments() {
+  return useQuery({
+    queryKey: ["appointments", "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*")
+        .order("appointment_start", { ascending: true });
+
       if (error) throw error;
       return data as Appointment[];
     },
@@ -32,13 +51,10 @@ export function useCreateAppointment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (appointment: Omit<AppointmentInsert, "user_id">) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autenticado");
-
+    mutationFn: async (appointment: AppointmentInsert) => {
       const { data, error } = await supabase
         .from("appointments")
-        .insert({ ...appointment, user_id: user.id })
+        .insert(appointment)
         .select()
         .single();
 
@@ -87,7 +103,7 @@ export function useCancelAppointment() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("appointments")
-        .update({ status: "cancelled" })
+        .update({ status: "cancelado" })
         .eq("id", id);
 
       if (error) throw error;
