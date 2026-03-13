@@ -67,14 +67,14 @@ const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> 
   let lastError: any;
 
   for (const attempt of attempts) {
-    let query = supabase.from("appointments").select("*");
+    let query: any = supabase.from("appointments").select("*");
 
     for (const column of attempt.orderColumns) {
-      query = query.order(column as any);
+      query = query.order(column);
     }
 
     if (dateFilter && attempt.dateColumn) {
-      query = query.eq(attempt.dateColumn as any, dateFilter);
+      query = query.eq(attempt.dateColumn, dateFilter);
     }
 
     const { data, error } = await query;
