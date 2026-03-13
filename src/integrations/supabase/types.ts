@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_photos: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          photo_url: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          photo_url: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          photo_url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           client_id: string | null
@@ -23,6 +47,7 @@ export type Database = {
           date: string
           id: string
           license_plate: string
+          mechanic_id: string | null
           notes: string | null
           service: string
           status: string
@@ -38,6 +63,7 @@ export type Database = {
           date: string
           id?: string
           license_plate: string
+          mechanic_id?: string | null
           notes?: string | null
           service: string
           status?: string
@@ -53,6 +79,7 @@ export type Database = {
           date?: string
           id?: string
           license_plate?: string
+          mechanic_id?: string | null
           notes?: string | null
           service?: string
           status?: string
@@ -66,6 +93,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_mechanic_id_fkey"
+            columns: ["mechanic_id"]
+            isOneToOne: false
+            referencedRelation: "mechanics"
             referencedColumns: ["id"]
           },
         ]
@@ -162,6 +196,30 @@ export type Database = {
           },
         ]
       }
+      mechanics: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       order_parts: {
         Row: {
           appointment_id: string
@@ -199,6 +257,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workshop_settings: {
+        Row: {
+          address: string | null
+          cif: string | null
+          created_at: string
+          email: string | null
+          id: string
+          labor_rate: number | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+          workshop_name: string | null
+        }
+        Insert: {
+          address?: string | null
+          cif?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          labor_rate?: number | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+          workshop_name?: string | null
+        }
+        Update: {
+          address?: string | null
+          cif?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          labor_rate?: number | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+          workshop_name?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
