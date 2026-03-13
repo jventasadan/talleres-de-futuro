@@ -50,6 +50,9 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.service) {
+      return;
+    }
     onSubmit({
       client_name: form.client_name,
       license_plate: form.license_plate.toUpperCase(),
