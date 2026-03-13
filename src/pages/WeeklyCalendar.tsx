@@ -8,13 +8,16 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useAllAppointments, type Appointment } from "@/hooks/useAppointments";
+import { AppointmentDetailDialog } from "@/components/appointments/AppointmentDetailDialog";
 import { cn } from "@/lib/utils";
 
 const WeeklyCalendar = () => {
   const [viewMode, setViewMode] = useState<"week" | "month">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { data: allAppointments, isLoading } = useAllAppointments();
   const today = new Date();
 
@@ -22,16 +25,10 @@ const WeeklyCalendar = () => {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
 
-  // For month view, get all days from monday of first week to sunday of last week
   const monthDays = useMemo(() => {
     const start = startOfWeek(monthStart, { weekStartsOn: 1 });
     const end = addDays(startOfWeek(addDays(monthEnd, 6), { weekStartsOn: 1 }), -1);
-    // Make sure we get full weeks
-    const days = eachDayOfInterval({
-      start,
-      end: addDays(end, end.getDay() === 0 ? 0 : 7 - end.getDay()),
-    });
-    // Ensure we have complete weeks (multiple of 7)
+    const days = eachDayOfInterval({ start, end: addDays(end, end.getDay() === 0 ? 0 : 7 - end.getDay()) });
     const fullWeeks = eachDayOfInterval({ start, end: addDays(start, Math.ceil(days.length / 7) * 7 - 1) });
     return fullWeeks;
   }, [monthStart, monthEnd]);
@@ -73,6 +70,11 @@ const WeeklyCalendar = () => {
 
   const goToday = () => setCurrentDate(new Date());
 
+  const handleAppointmentClick = (apt: Appointment) => {
+    setSelectedApt(apt);
+    setDetailOpen(true);
+  };
+
   const headerLabel = viewMode === "week"
     ? `${format(weekStart, "d MMM", { locale: es })} — ${format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}`
     : format(currentDate, "MMMM yyyy", { locale: es });
@@ -80,7 +82,6 @@ const WeeklyCalendar = () => {
   return (
     <DashboardLayout title="Calendario" subtitle="Vista de citas del taller">
       <div className="space-y-4">
-        {/* Navigation */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
@@ -92,17 +93,13 @@ const WeeklyCalendar = () => {
             <Button variant="outline" size="icon" onClick={() => navigate(1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={goToday} className="text-xs">
+            <Button variant="default" size="sm" onClick={goToday} className="text-xs">
               Hoy
             </Button>
           </div>
           <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-            <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="text-xs">
-              SEMANA
-            </Button>
-            <Button variant={viewMode === "month" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("month")} className="text-xs">
-              MES
-            </Button>
+            <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="text-xs">SEMANA</Button>
+            <Button variant={viewMode === "month" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("month")} className="text-xs">MES</Button>
           </div>
         </div>
 
@@ -111,7 +108,6 @@ const WeeklyCalendar = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : viewMode === "week" ? (
-          /* WEEK VIEW */
           <div className="grid grid-cols-7 gap-2">
             {weekDays.map((day) => {
               const key = format(day, "yyyy-MM-dd");
@@ -127,7 +123,11 @@ const WeeklyCalendar = () => {
                     {dayAppts.length === 0 ? (
                       <p className="text-[11px] text-muted-foreground text-center py-4">Sin citas</p>
                     ) : dayAppts.map((apt) => (
-                      <div key={apt.id} className="rounded-md border bg-secondary/50 p-2 text-[11px] leading-tight">
+                      <div
+                        key={apt.id}
+                        onClick={() => handleAppointmentClick(apt)}
+                        className="rounded-md border bg-secondary/50 p-2 text-[11px] leading-tight cursor-pointer hover:bg-secondary transition-colors"
+                      >
                         <div className="flex items-center gap-1 font-semibold">
                           <div className={cn("h-2 w-2 rounded-full", statusDot[apt.status] ?? "bg-muted-foreground")} />
                           {apt.time_slot || "--:--"}
@@ -142,9 +142,7 @@ const WeeklyCalendar = () => {
             })}
           </div>
         ) : (
-          /* MONTH VIEW */
           <div>
-            {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
                 <div key={d} className="text-center text-[11px] font-medium text-muted-foreground py-1">{d}</div>
@@ -166,15 +164,16 @@ const WeeklyCalendar = () => {
                       "bg-card"
                     )}
                   >
-                    <p className={cn(
-                      "text-xs font-medium mb-1",
-                      isToday ? "text-primary font-bold" : "text-muted-foreground"
-                    )}>
+                    <p className={cn("text-xs font-medium mb-1", isToday ? "text-primary font-bold" : "text-muted-foreground")}>
                       {format(day, "d")}
                     </p>
                     <div className="space-y-0.5">
                       {dayAppts.slice(0, 3).map((apt) => (
-                        <div key={apt.id} className="flex items-center gap-1 text-[10px] truncate">
+                        <div
+                          key={apt.id}
+                          onClick={() => handleAppointmentClick(apt)}
+                          className="flex items-center gap-1 text-[10px] truncate cursor-pointer hover:text-primary transition-colors"
+                        >
                           <div className={cn("h-1.5 w-1.5 rounded-full shrink-0", statusDot[apt.status] ?? "bg-muted-foreground")} />
                           <span className="truncate">{apt.time_slot} {apt.client_name}</span>
                         </div>
@@ -190,6 +189,12 @@ const WeeklyCalendar = () => {
           </div>
         )}
       </div>
+
+      <AppointmentDetailDialog
+        appointment={selectedApt}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
     </DashboardLayout>
   );
 };

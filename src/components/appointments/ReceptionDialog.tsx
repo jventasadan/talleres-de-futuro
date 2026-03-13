@@ -17,18 +17,12 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import { SERVICES, getEstimatedMinutes, formatDuration } from "@/lib/serviceEstimates";
 
 const TIME_SLOTS = [
   "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30",
   "11:00","11:30","12:00","12:30","13:00","13:30",
   "14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00",
-];
-
-const SERVICES = [
-  "Cambio de aceite","Cambio de correas","Cambiar correa de distribución",
-  "Cambio de filtros","Frenos","Neumáticos","Revisión general",
-  "ITV Pre-inspección","Diagnóstico","Electricidad","Aire acondicionado",
-  "Chapa y pintura","Otro",
 ];
 
 interface ReceptionDialogProps {
@@ -43,16 +37,17 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
     client_name: "",
     license_plate: "",
     service: "",
+    problem: "",
     time_slot: "",
     notes: "",
   });
   const [dateObj, setDateObj] = useState(new Date());
 
+  const estimatedTime = form.service ? formatDuration(getEstimatedMinutes(form.service)) : null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.service) {
-      return;
-    }
+    if (!form.service) return;
     onSubmit({
       client_name: form.client_name,
       license_plate: form.license_plate.toUpperCase(),
@@ -60,14 +55,14 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
       status: "recepcionado",
-      notes: form.notes || null,
+      notes: [form.problem, form.notes].filter(Boolean).join(" | ") || null,
       created_by: "manual",
     });
   };
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({ client_name: "", license_plate: "", service: "", time_slot: "", notes: "" });
+      setForm({ client_name: "", license_plate: "", service: "", problem: "", time_slot: "", notes: "" });
       setDateObj(new Date());
     }
     onOpenChange(open);
@@ -75,7 +70,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display">Recepcionar Vehículo</DialogTitle>
           <DialogDescription>Registra un nuevo vehículo en el taller</DialogDescription>
@@ -96,9 +91,19 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
             <Select value={form.service} onValueChange={(v) => setForm(f => ({ ...f, service: v }))}>
               <SelectTrigger><SelectValue placeholder="Selecciona servicio" /></SelectTrigger>
               <SelectContent>
-                {SERVICES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {SERVICES.map(s => <SelectItem key={s} value={s}>{s} ({formatDuration(getEstimatedMinutes(s))})</SelectItem>)}
               </SelectContent>
             </Select>
+            {estimatedTime && <p className="text-[10px] text-muted-foreground">Tiempo estimado: {estimatedTime}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label>Descripción del problema</Label>
+            <Textarea
+              placeholder="Describe qué le pasa al vehículo..."
+              value={form.problem}
+              onChange={(e) => setForm(f => ({ ...f, problem: e.target.value }))}
+              rows={2}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -126,14 +131,12 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Notas (opcional)</Label>
+            <Label>Notas adicionales (opcional)</Label>
             <Textarea placeholder="Notas adicionales..." value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Guardando..." : "Recepcionar"}
-            </Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Recepcionar"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
