@@ -8,9 +8,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -36,11 +33,66 @@ const KANBAN_COLUMNS = [
 ] as const;
 
 type StatusKey = (typeof KANBAN_COLUMNS)[number]["key"];
+type AnyRecord = Record<string, any>;
 
 const NEXT_STATUS: Record<string, StatusKey> = {
   recepcionado: "en_reparacion",
   en_reparacion: "esperando_piezas",
   esperando_piezas: "listo",
+};
+
+const isSchemaMismatchError = (error: any) => {
+  const code = String(error?.code ?? "");
+  const message = String(error?.message ?? "").toLowerCase();
+  return code === "42703" || code === "PGRST204" || message.includes("does not exist") || message.includes("schema cache");
+};
+
+const extractMissingColumn = (error: any): string | null => {
+  const message = String(error?.message ?? "");
+  const pgrstMatch = message.match(/Could not find the '([^']+)' column/i);
+  if (pgrstMatch?.[1]) return pgrstMatch[1];
+
+  const pgMatch = message.match(/column\s+[\w.]+\.([a-zA-Z0-9_]+)\s+does not exist/i);
+  if (pgMatch?.[1]) return pgMatch[1];
+
+  return null;
+};
+
+const insertClientWithFallback = async (payload: AnyRecord) => {
+  let attemptPayload: AnyRecord = { ...payload };
+
+  for (let i = 0; i < 10; i += 1) {
+    const { error } = await supabase
+      .from("clients")
+      .insert(attemptPayload as any)
+      .select("id")
+      .maybeSingle();
+
+    if (!error) return;
+
+    const missingColumn = extractMissingColumn(error);
+    if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) throw error;
+
+    delete attemptPayload[missingColumn];
+  }
+};
+
+const updateAppointmentWithFallback = async (appointmentId: string, payload: AnyRecord) => {
+  let attemptPayload: AnyRecord = { ...payload };
+
+  for (let i = 0; i < 10; i += 1) {
+    const { error } = await supabase
+      .from("appointments")
+      .update(attemptPayload as any)
+      .eq("id", appointmentId);
+
+    if (!error) return;
+
+    const missingColumn = extractMissingColumn(error);
+    if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) throw error;
+
+    delete attemptPayload[missingColumn];
+  }
 };
 
 const Appointments = () => {
@@ -127,37 +179,39 @@ const Appointments = () => {
     setDeleteConfirm(null);
   };
 
-  const handleAssignMechanic = async (appointmentId: string, mechanicId: string) => {
-    const { error } = await supabase
-      .from("appointments")
-      .update({ mechanic_id: mechanicId } as any)
-      .eq("id", appointmentId);
-    if (error) toast.error("Error al asignar mecánico");
-    else toast.success("Mecánico asignado");
+  const handleAssignMechanic = async (appointmentId: string, mechanic: { id: string; name: string }) => {
+    try {
+      await updateAppointmentWithFallback(appointmentId, {
+        mechanic_id: mechanic.id,
+        mechanic: mechanic.name,
+      });
+      toast.success("Mecánico asignado");
+    } catch (error: any) {
+      toast.error("Error al asignar mecánico: " + (error?.message ?? "Error desconocido"));
+    }
   };
 
   const { user } = useAuth();
 
-  const handleCreate = async (data: any) => {
-    // Auto-create client with brand/model if provided
+  const handleCreate = async (data: AnyRecord) => {
+    // Auto-create client (best effort)
     if (user && data.client_name && data.license_plate) {
       try {
-        await supabase.from("clients").upsert(
-          {
-            name: data.client_name,
-            license_plate: data.license_plate.toUpperCase(),
-            brand: data.brand || null,
-            model: data.model || null,
-            user_id: user.id,
-          } as any,
-          { onConflict: "user_id,license_plate", ignoreDuplicates: true }
-        );
+        await insertClientWithFallback({
+          full_name: data.client_name,
+          name: data.client_name,
+          phone: data.phone ?? null,
+          license_plate: data.license_plate.toUpperCase(),
+          brand: data.brand ?? null,
+          model: data.model ?? null,
+          user_id: user.id,
+        });
       } catch (_) {
-        // Client creation is best-effort
+        // Best effort: never block appointment creation
       }
     }
-    const { brand, model, ...appointmentData } = data;
-    createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
+
+    createMutation.mutate(data, { onSuccess: () => setReceptionOpen(false) });
   };
 
   const orderNumber = (id: string) => `ORD-${id.slice(0, 4).toUpperCase()}`;
@@ -216,7 +270,7 @@ const Appointments = () => {
                                   <>
                                     <DropdownMenuSeparator />
                                     {(mechanics ?? []).map((m) => (
-                                      <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m.id)}>
+                                      <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m)}>
                                         <UserCog className="mr-2 h-3 w-3" />{m.name}
                                       </DropdownMenuItem>
                                     ))}
