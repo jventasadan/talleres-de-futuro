@@ -91,6 +91,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
               <Label>Marca</Label>
               <Input placeholder="Ej: Volkswagen" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
             </div>
