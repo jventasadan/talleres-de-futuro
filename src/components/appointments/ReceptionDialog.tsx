@@ -36,6 +36,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
   const [form, setForm] = useState({
     client_name: "",
     license_plate: "",
+    brand: "",
+    model: "",
     service: "",
     problem: "",
     time_slot: "",
@@ -51,6 +53,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
     onSubmit({
       client_name: form.client_name,
       license_plate: form.license_plate.toUpperCase(),
+      brand: form.brand || null,
+      model: form.model || null,
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
@@ -62,7 +66,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({ client_name: "", license_plate: "", service: "", problem: "", time_slot: "", notes: "" });
+      setForm({ client_name: "", license_plate: "", brand: "", model: "", service: "", problem: "", time_slot: "", notes: "" });
       setDateObj(new Date());
     }
     onOpenChange(open);
@@ -84,6 +88,16 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
             <div className="space-y-2">
               <Label>Matrícula</Label>
               <Input placeholder="Ej: 5454TRT" value={form.license_plate} onChange={(e) => setForm(f => ({ ...f, license_plate: e.target.value.toUpperCase() }))} required />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Marca</Label>
+              <Input placeholder="Ej: Volkswagen" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Modelo</Label>
+              <Input placeholder="Ej: Golf GTI" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
             </div>
           </div>
           <div className="space-y-2">

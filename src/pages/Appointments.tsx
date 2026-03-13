@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -135,8 +136,28 @@ const Appointments = () => {
     else toast.success("Mecánico asignado");
   };
 
-  const handleCreate = (data: any) => {
-    createMutation.mutate(data, { onSuccess: () => setReceptionOpen(false) });
+  const { user } = useAuth();
+
+  const handleCreate = async (data: any) => {
+    // Auto-create client with brand/model if provided
+    if (user && data.client_name && data.license_plate) {
+      try {
+        await supabase.from("clients").upsert(
+          {
+            name: data.client_name,
+            license_plate: data.license_plate.toUpperCase(),
+            brand: data.brand || null,
+            model: data.model || null,
+            user_id: user.id,
+          } as any,
+          { onConflict: "user_id,license_plate", ignoreDuplicates: true }
+        );
+      } catch (_) {
+        // Client creation is best-effort
+      }
+    }
+    const { brand, model, ...appointmentData } = data;
+    createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
   };
 
   const orderNumber = (id: string) => `ORD-${id.slice(0, 4).toUpperCase()}`;
