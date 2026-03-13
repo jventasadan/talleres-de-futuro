@@ -66,7 +66,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({ client_name: "", license_plate: "", service: "", problem: "", time_slot: "", notes: "" });
+      setForm({ client_name: "", license_plate: "", brand: "", model: "", service: "", problem: "", time_slot: "", notes: "" });
       setDateObj(new Date());
     }
     onOpenChange(open);
