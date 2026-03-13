@@ -229,7 +229,7 @@ export function useCreateAppointment() {
 
   return useMutation({
     mutationFn: async (appointment: Partial<Appointment> & AnyRecord) => {
-      const appointmentDate = appointment.date ?? normalizeDate(appointment.appointment_date) || new Date().toISOString().slice(0, 10);
+      const appointmentDate = appointment.date ?? (normalizeDate(appointment.appointment_date) || new Date().toISOString().slice(0, 10));
       const timeSlot = appointment.time_slot ?? normalizeTime(appointment.appointment_start) ?? "09:00";
       const appointmentStart = appointment.appointment_start ?? `${appointmentDate}T${timeSlot}:00`;
 
