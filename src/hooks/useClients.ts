@@ -86,15 +86,23 @@ export function useUpdateClient() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Client> & { id: string }) => {
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined) payload.full_name = updates.name;
+      if (updates.phone !== undefined) payload.phone = updates.phone;
+      if (updates.license_plate !== undefined) payload.license_plate = updates.license_plate;
+      if (updates.brand !== undefined) payload.brand = updates.brand;
+      if (updates.model !== undefined) payload.model = updates.model;
+      if (updates.email !== undefined) payload.email = updates.email;
+
       const { data, error } = await supabase
         .from("clients")
-        .update(updates as any)
+        .update(payload as any)
         .eq("id", id)
         .select("*")
         .single();
 
       if (error) throw error;
-      return data as unknown as Client;
+      return mapRow(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
