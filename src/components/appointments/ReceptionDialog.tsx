@@ -53,6 +53,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
     onSubmit({
       client_name: form.client_name,
       license_plate: form.license_plate.toUpperCase(),
+      brand: form.brand || null,
+      model: form.model || null,
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
