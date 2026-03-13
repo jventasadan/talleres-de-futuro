@@ -72,27 +72,33 @@ export type Database = {
       }
       clients: {
         Row: {
+          brand: string | null
           created_at: string
           id: string
           license_plate: string
+          model: string | null
           name: string
           phone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          brand?: string | null
           created_at?: string
           id?: string
           license_plate: string
+          model?: string | null
           name: string
           phone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          brand?: string | null
           created_at?: string
           id?: string
           license_plate?: string
+          model?: string | null
           name?: string
           phone?: string | null
           updated_at?: string
