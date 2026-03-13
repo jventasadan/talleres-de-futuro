@@ -36,6 +36,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
   const [form, setForm] = useState({
     client_name: "",
     license_plate: "",
+    brand: "",
+    model: "",
     service: "",
     problem: "",
     time_slot: "",
