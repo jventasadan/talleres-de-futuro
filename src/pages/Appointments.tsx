@@ -94,6 +94,8 @@ const Appointments = () => {
 
         createInvoice.mutate({
           appointment_id: appointment.id,
+          work_order_id: appointment.id,
+          client_id: appointment.client_id ?? null,
           invoice_number: invoiceNumber,
           client_name: appointment.client_name,
           license_plate: appointment.license_plate,
