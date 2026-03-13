@@ -4,42 +4,227 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Download } from "lucide-react";
 import { useInvoices, type Invoice } from "@/hooks/useInvoices";
+import { supabase } from "@/integrations/supabase/client";
+import { jsPDF } from "jspdf";
 
-function generatePdfDownload(invoice: Invoice) {
-  // Generate a simple text-based invoice for download
-  const lines = [
-    `FACTURA: ${invoice.invoice_number}`,
-    `Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES")}`,
-    ``,
-    `Cliente: ${invoice.client_name}`,
-    `Matrícula: ${invoice.license_plate}`,
-    `Servicio: ${invoice.service}`,
-    ``,
-    `--- DETALLE ---`,
-    `Piezas: ${Number(invoice.parts_total).toFixed(2)} €`,
-    `Mano de obra: ${Number(invoice.labor_cost).toFixed(2)} €`,
-    `Subtotal: ${(Number(invoice.parts_total) + Number(invoice.labor_cost)).toFixed(2)} €`,
-    `IVA (${Number(invoice.tax_rate)}%): ${((Number(invoice.parts_total) + Number(invoice.labor_cost)) * Number(invoice.tax_rate) / 100).toFixed(2)} €`,
-    ``,
-    `TOTAL: ${Number(invoice.total).toFixed(2)} €`,
-    ``,
-    `--- Talleres de Futuro ---`,
-  ];
+async function generateProfessionalPdf(invoice: Invoice) {
+  // Fetch parts for this invoice's appointment
+  const { data: parts } = await supabase
+    .from("order_parts")
+    .select("*")
+    .eq("appointment_id", invoice.appointment_id);
 
-  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${invoice.invoice_number}.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  // ── Header bar ──
+  doc.setFillColor(34, 197, 94); // green accent
+  doc.rect(0, 0, pageWidth, 40, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Talleres de Futuro", margin, 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(220, 255, 220);
+  doc.text(
+    "Tlf: 910 123 456 | Email: info@talleresdefuturo.es",
+    margin,
+    27
+  );
+  doc.text("Dirección: Calle Ejemplo 123, 28001 Madrid", margin, 33);
+
+  y = 50;
+
+  // ── Invoice title ──
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(30, 30, 30);
+  doc.text(`FACTURA ${invoice.invoice_number}`, margin, y);
+
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    `Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })}`,
+    margin,
+    y
+  );
+
+  // ── Client info box ──
+  y += 12;
+  doc.setFillColor(245, 245, 245);
+  doc.roundedRect(margin, y, contentWidth, 28, 3, 3, "F");
+
+  y += 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(30, 30, 30);
+  doc.text("DATOS DEL CLIENTE", margin + 5, y);
+
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Cliente: ${invoice.client_name}`, margin + 5, y);
+
+  y += 5;
+  doc.text(`Matrícula: ${invoice.license_plate}`, margin + 5, y);
+
+  y += 5;
+  doc.text(`Servicio: ${invoice.service}`, margin + 5, y);
+
+  // ── Parts table ──
+  y += 15;
+  const tableHeaderY = y;
+  const colX = {
+    name: margin,
+    qty: margin + contentWidth * 0.55,
+    price: margin + contentWidth * 0.7,
+    total: margin + contentWidth * 0.85,
+  };
+
+  // Table header
+  doc.setFillColor(34, 197, 94);
+  doc.rect(margin, y - 5, contentWidth, 8, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text("DESCRIPCIÓN", colX.name + 3, y);
+  doc.text("CANT.", colX.qty, y);
+  doc.text("P. UNIT.", colX.price, y);
+  doc.text("TOTAL", colX.total, y);
+
+  y += 6;
+
+  // Table rows
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(50, 50, 50);
+  const partsList = parts ?? [];
+
+  if (partsList.length === 0) {
+    doc.setFontSize(9);
+    doc.text("Sin piezas registradas", colX.name + 3, y + 4);
+    y += 10;
+  } else {
+    partsList.forEach((part: any, index: number) => {
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(margin, y - 3, contentWidth, 7, "F");
+      }
+      doc.setFontSize(9);
+      doc.text(part.name, colX.name + 3, y + 1);
+      doc.text(String(part.quantity), colX.qty + 5, y + 1);
+      doc.text(`${Number(part.unit_price).toFixed(2)} €`, colX.price, y + 1);
+      doc.text(
+        `${(part.quantity * Number(part.unit_price)).toFixed(2)} €`,
+        colX.total,
+        y + 1
+      );
+      y += 7;
+    });
+  }
+
+  // Labor row
+  if (Number(invoice.labor_cost) > 0) {
+    doc.setFillColor(250, 250, 250);
+    doc.rect(margin, y - 3, contentWidth, 7, "F");
+    doc.setFontSize(9);
+    doc.text("Mano de obra", colX.name + 3, y + 1);
+    doc.text("1", colX.qty + 5, y + 1);
+    doc.text(
+      `${Number(invoice.labor_cost).toFixed(2)} €`,
+      colX.price,
+      y + 1
+    );
+    doc.text(
+      `${Number(invoice.labor_cost).toFixed(2)} €`,
+      colX.total,
+      y + 1
+    );
+    y += 7;
+  }
+
+  // ── Separator line ──
+  y += 3;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, y, margin + contentWidth, y);
+
+  // ── Totals ──
+  y += 8;
+  const totalsX = margin + contentWidth * 0.6;
+  const valuesX = margin + contentWidth * 0.85;
+
+  const subtotal = Number(invoice.parts_total) + Number(invoice.labor_cost);
+  const taxAmount = subtotal * (Number(invoice.tax_rate) / 100);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text("Subtotal:", totalsX, y);
+  doc.text(`${subtotal.toFixed(2)} €`, valuesX, y);
+
+  y += 6;
+  doc.text(`IVA (${Number(invoice.tax_rate)}%):`, totalsX, y);
+  doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
+
+  y += 8;
+  doc.setFillColor(34, 197, 94);
+  doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text("TOTAL:", totalsX, y + 3);
+  doc.text(`${Number(invoice.total).toFixed(2)} €`, valuesX, y + 3);
+
+  // ── Footer ──
+  const footerY = doc.internal.pageSize.getHeight() - 20;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(
+    "Talleres de Futuro · CIF: B12345678 · Calle Ejemplo 123, 28001 Madrid",
+    pageWidth / 2,
+    footerY,
+    { align: "center" }
+  );
+  doc.text(
+    "Gracias por confiar en nosotros",
+    pageWidth / 2,
+    footerY + 5,
+    { align: "center" }
+  );
+
+  // Save
+  doc.save(`${invoice.invoice_number}.pdf`);
 }
 
 const Invoices = () => {
   const { data: invoices, isLoading } = useInvoices();
 
   return (
-    <DashboardLayout title="Facturas" subtitle="Facturas generadas automáticamente">
+    <DashboardLayout
+      title="Facturas"
+      subtitle="Facturas generadas automáticamente"
+    >
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -52,7 +237,8 @@ const Invoices = () => {
               No hay facturas todavía
             </p>
             <p className="text-xs text-muted-foreground">
-              Las facturas se generan automáticamente cuando una orden pasa a "Listo"
+              Las facturas se generan automáticamente cuando una orden pasa a
+              "Listo"
             </p>
           </div>
         ) : (
@@ -62,33 +248,58 @@ const Invoices = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nº Factura</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Fecha</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cliente</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Matrícula</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Servicio</th>
-                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Estado</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Nº Factura
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Fecha
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Cliente
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Matrícula
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Servicio
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        Estado
+                      </th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-b last:border-0 transition-colors hover:bg-accent/50">
+                      <tr
+                        key={inv.id}
+                        className="border-b last:border-0 transition-colors hover:bg-accent/50"
+                      >
                         <td className="px-4 py-3 font-mono text-xs font-semibold text-primary">
                           {inv.invoice_number}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {new Date(inv.created_at).toLocaleDateString("es-ES")}
                         </td>
-                        <td className="px-4 py-3 font-medium">{inv.client_name}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{inv.license_plate}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {inv.client_name}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {inv.license_plate}
+                        </td>
                         <td className="px-4 py-3 text-xs">{inv.service}</td>
                         <td className="px-4 py-3 text-right font-mono font-semibold">
                           {Number(inv.total).toFixed(2)} €
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={inv.status === "pagada" ? "default" : "secondary"}>
+                          <Badge
+                            variant={
+                              inv.status === "pagada" ? "default" : "secondary"
+                            }
+                          >
                             {inv.status === "pagada" ? "Pagada" : "Emitida"}
                           </Badge>
                         </td>
@@ -97,8 +308,8 @@ const Invoices = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => generatePdfDownload(inv)}
-                            title="Descargar factura"
+                            onClick={() => generateProfessionalPdf(inv)}
+                            title="Descargar factura PDF"
                           >
                             <Download className="h-3.5 w-3.5" />
                           </Button>

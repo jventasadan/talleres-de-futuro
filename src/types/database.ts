@@ -21,6 +21,8 @@ export interface ClientRow {
   name: string;
   phone: string | null;
   license_plate: string;
+  brand: string | null;
+  model: string | null;
   created_at: string;
   updated_at: string;
 }
