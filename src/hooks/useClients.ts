@@ -11,8 +11,24 @@ export interface Client {
   license_plate: string;
   brand: string | null;
   model: string | null;
+  email: string | null;
   created_at: string;
   updated_at: string;
+}
+
+function mapRow(row: any): Client {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.full_name ?? row.name ?? "",
+    phone: row.phone ?? null,
+    license_plate: row.license_plate ?? "",
+    brand: row.brand ?? null,
+    model: row.model ?? null,
+    email: row.email ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
+  };
 }
 
 export function useClients() {
@@ -25,7 +41,7 @@ export function useClients() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data ?? []) as unknown as Client[];
+      return (data ?? []).map(mapRow);
     },
   });
 }
