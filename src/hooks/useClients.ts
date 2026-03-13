@@ -52,21 +52,24 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: async (client: Partial<Client>) => {
+      const payload: Record<string, any> = {
+        full_name: (client.name ?? "").trim(),
+        phone: client.phone ?? null,
+        user_id: user?.id ?? "",
+      };
+      if (client.license_plate) payload.license_plate = client.license_plate;
+      if (client.brand) payload.brand = client.brand;
+      if (client.model) payload.model = client.model;
+      if (client.email) payload.email = client.email;
+
       const { data, error } = await supabase
         .from("clients")
-        .insert({
-          name: (client.name ?? "").trim(),
-          phone: client.phone ?? null,
-          license_plate: client.license_plate ?? "",
-          brand: client.brand ?? null,
-          model: client.model ?? null,
-          user_id: user?.id ?? "",
-        } as any)
+        .insert(payload as any)
         .select("*")
         .single();
 
       if (error) throw error;
-      return data as unknown as Client;
+      return mapRow(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
