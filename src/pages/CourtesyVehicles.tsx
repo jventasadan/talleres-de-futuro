@@ -281,13 +281,23 @@ const CourtesyVehicles = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Fecha de devolución</Label>
-              <Input
-                type="date"
-                value={form.return_date}
-                onChange={(e) => setForm((prev) => ({ ...prev, return_date: e.target.value }))}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Fecha de entrega</Label>
+                <Input
+                  type="date"
+                  value={form.delivery_date}
+                  onChange={(e) => setForm((prev) => ({ ...prev, delivery_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de devolución</Label>
+                <Input
+                  type="date"
+                  value={form.return_date}
+                  onChange={(e) => setForm((prev) => ({ ...prev, return_date: e.target.value }))}
+                />
+              </div>
             </div>
 
             <DialogFooter>
