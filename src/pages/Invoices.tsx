@@ -1,44 +1,61 @@
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Download } from "lucide-react";
-import { useInvoices, type Invoice } from "@/hooks/useInvoices";
-import { useWorkshopSettings } from "@/hooks/useWorkshopSettings";
+import { Loader2, FileText, Download, CheckCircle } from "lucide-react";
+import { useInvoices, useInvoiceLines, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 
+async function fetchInvoiceLines(invoiceId: string) {
+  const { data, error } = await (supabase as any)
+    .from("invoice_lines")
+    .select("*")
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: true });
+
+  if (!error && data?.length) return data;
+
+  // Fallback: fetch from order_parts via appointment
+  return [];
+}
+
 async function fetchInvoiceParts(appointmentId: string) {
-  // Try order_parts first
-  const { data: orderParts, error } = await supabase
+  const { data: orderParts } = await supabase
     .from("order_parts")
     .select("*")
     .eq("appointment_id", appointmentId) as any;
 
-  if (!error && orderParts?.length) return orderParts;
-
-  // Fallback: work_orders JSONB parts
-  const { data: wo } = await (supabase as any)
-    .from("work_orders")
-    .select("id, parts")
-    .eq("appointment_id", appointmentId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (wo?.parts && Array.isArray(wo.parts) && wo.parts.length > 0) return wo.parts;
-
-  // Fallback: parts table
-  const { data: partsData } = await (supabase as any)
-    .from("parts")
-    .select("*")
-    .eq("appointment_id", appointmentId);
-
-  return partsData ?? [];
+  return orderParts ?? [];
 }
 
-async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, workshopCif?: string, workshopAddress?: string, workshopPhone?: string, workshopEmail?: string) {
-  const parts = await fetchInvoiceParts(invoice.appointment_id);
+async function generateProfessionalPdf(
+  invoice: Invoice,
+  settings: any,
+) {
+  // Try invoice_lines first, fallback to order_parts
+  let lines = await fetchInvoiceLines(invoice.id);
+  if (!lines.length) {
+    const parts = await fetchInvoiceParts(invoice.appointment_id);
+    lines = parts.map((p: any) => ({
+      description: p.name ?? "Pieza",
+      quantity: p.quantity ?? 1,
+      unit_price: Number(p.unit_price ?? 0),
+      total: (p.quantity ?? 1) * Number(p.unit_price ?? 0),
+      line_type: "part",
+    }));
+    if (Number(invoice.labor_cost) > 0) {
+      lines.push({
+        description: "Mano de obra",
+        quantity: 1,
+        unit_price: Number(invoice.labor_cost),
+        total: Number(invoice.labor_cost),
+        line_type: "labor",
+      });
+    }
+  }
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -46,11 +63,11 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
   const contentWidth = pageWidth - margin * 2;
   let y = margin;
 
-  const wName = workshopName || "Talleres de Futuro";
-  const wCif = workshopCif || "B12345678";
-  const wAddress = workshopAddress || "Calle Ejemplo 123, 28001 Madrid";
-  const wPhone = workshopPhone || "910 123 456";
-  const wEmail = workshopEmail || "info@talleresdefuturo.es";
+  const wName = settings?.company_name || "Mi Taller";
+  const wCif = settings?.cif || "";
+  const wAddress = [settings?.address, settings?.city, settings?.postal_code, settings?.province].filter(Boolean).join(", ") || "";
+  const wPhone = settings?.phone || "";
+  const wEmail = settings?.email || "";
 
   // Header bar
   doc.setFillColor(34, 197, 94);
@@ -62,8 +79,9 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(220, 255, 220);
-  doc.text(`CIF: ${wCif} | Tlf: ${wPhone} | ${wEmail}`, margin, 27);
-  doc.text(wAddress, margin, 33);
+  const headerLine = [wCif ? `CIF: ${wCif}` : "", wPhone ? `Tlf: ${wPhone}` : "", wEmail].filter(Boolean).join(" | ");
+  doc.text(headerLine, margin, 27);
+  if (wAddress) doc.text(wAddress, margin, 33);
 
   y = 50;
 
@@ -98,7 +116,7 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
   y += 5;
   doc.text(`Servicio: ${invoice.service}`, margin + 5, y);
 
-  // Parts table
+  // Lines table
   y += 15;
   const colX = {
     name: margin,
@@ -120,37 +138,24 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(50, 50, 50);
-  const partsList = parts ?? [];
 
-  if (partsList.length === 0 && Number(invoice.parts_total) === 0) {
+  if (!lines.length) {
     doc.setFontSize(9);
-    doc.text("Sin piezas registradas", colX.name + 3, y + 4);
+    doc.text("Sin conceptos registrados", colX.name + 3, y + 4);
     y += 10;
   } else {
-    partsList.forEach((part: any, index: number) => {
+    lines.forEach((line: any, index: number) => {
       if (index % 2 === 0) {
         doc.setFillColor(250, 250, 250);
         doc.rect(margin, y - 3, contentWidth, 7, "F");
       }
       doc.setFontSize(9);
-      doc.text(String(part.name ?? "Pieza"), colX.name + 3, y + 1);
-      doc.text(String(part.quantity ?? 1), colX.qty + 5, y + 1);
-      doc.text(`${Number(part.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${((part.quantity ?? 1) * Number(part.unit_price ?? 0)).toFixed(2)} €`, colX.total, y + 1);
+      doc.text(String(line.description ?? "Concepto"), colX.name + 3, y + 1);
+      doc.text(String(line.quantity ?? 1), colX.qty + 5, y + 1);
+      doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
+      doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
       y += 7;
     });
-  }
-
-  // Labor row
-  if (Number(invoice.labor_cost) > 0) {
-    doc.setFillColor(250, 250, 250);
-    doc.rect(margin, y - 3, contentWidth, 7, "F");
-    doc.setFontSize(9);
-    doc.text("Mano de obra", colX.name + 3, y + 1);
-    doc.text("1", colX.qty + 5, y + 1);
-    doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.price, y + 1);
-    doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.total, y + 1);
-    y += 7;
   }
 
   // Separator
@@ -189,7 +194,8 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text(`${wName} · CIF: ${wCif} · ${wAddress}`, pageWidth / 2, footerY, { align: "center" });
+  const footerParts = [wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · ");
+  doc.text(footerParts, pageWidth / 2, footerY, { align: "center" });
   doc.text("Gracias por confiar en nosotros", pageWidth / 2, footerY + 5, { align: "center" });
 
   doc.save(`${invoice.invoice_number}.pdf`);
@@ -197,17 +203,15 @@ async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, 
 
 const Invoices = () => {
   const { data: invoices, isLoading } = useInvoices();
-  const { data: settings } = useWorkshopSettings();
+  const { data: settings } = useCompanySettings();
+  const updateStatus = useUpdateInvoiceStatus();
 
   const handleDownload = (inv: Invoice) => {
-    generateProfessionalPdf(
-      inv,
-      settings?.workshop_name || undefined,
-      settings?.cif || undefined,
-      settings?.address || undefined,
-      settings?.phone || undefined,
-      settings?.email || undefined,
-    );
+    generateProfessionalPdf(inv, settings);
+  };
+
+  const handleMarkPaid = (inv: Invoice) => {
+    updateStatus.mutate({ id: inv.id, status: "pagada" });
   };
 
   return (
@@ -255,9 +259,16 @@ const Invoices = () => {
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownload(inv)} title="Descargar factura PDF">
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {inv.status !== "pagada" && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleMarkPaid(inv)} title="Marcar como pagada">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownload(inv)} title="Descargar factura PDF">
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

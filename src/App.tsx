@@ -13,6 +13,7 @@ import Clients from "./pages/Clients";
 import Invoices from "./pages/Invoices";
 import MechanicChat from "./pages/MechanicChat";
 import CourtesyVehicles from "./pages/CourtesyVehicles";
+import VehicleHistory from "./pages/VehicleHistory";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
             <Route path="/mechanic-ai" element={<ProtectedRoute><MechanicChat /></ProtectedRoute>} />
             <Route path="/courtesy-vehicles" element={<ProtectedRoute><CourtesyVehicles /></ProtectedRoute>} />
+            <Route path="/vehicle-history" element={<ProtectedRoute><VehicleHistory /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -17,6 +17,7 @@ import {
   type Appointment,
 } from "@/hooks/useAppointments";
 import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -51,46 +52,36 @@ const extractMissingColumn = (error: any): string | null => {
   const message = String(error?.message ?? "");
   const pgrstMatch = message.match(/Could not find the '([^']+)' column/i);
   if (pgrstMatch?.[1]) return pgrstMatch[1];
-
   const pgMatch = message.match(/column\s+[\w.]+\.([a-zA-Z0-9_]+)\s+does not exist/i);
   if (pgMatch?.[1]) return pgMatch[1];
-
   return null;
 };
 
 const insertClientWithFallback = async (payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
-
   for (let i = 0; i < 10; i += 1) {
     const { error } = await supabase
       .from("clients")
       .insert(attemptPayload as any)
       .select("id")
       .maybeSingle();
-
     if (!error) return;
-
     const missingColumn = extractMissingColumn(error);
     if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) throw error;
-
     delete attemptPayload[missingColumn];
   }
 };
 
 const updateAppointmentWithFallback = async (appointmentId: string, payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
-
   for (let i = 0; i < 10; i += 1) {
     const { error } = await supabase
       .from("appointments")
       .update(attemptPayload as any)
       .eq("id", appointmentId);
-
     if (!error) return;
-
     const missingColumn = extractMissingColumn(error);
     if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) throw error;
-
     delete attemptPayload[missingColumn];
   }
 };
@@ -99,15 +90,17 @@ const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialogId, setPartsDialogId] = useState<string | null>(null);
-  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number } | null>(null);
+  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
 
   const { data: appointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
+  const { data: companySettings } = useCompanySettings();
   const updateStatus = useUpdateAppointmentStatus();
   const createMutation = useCreateAppointment();
   const createInvoice = useCreateInvoice();
+  const { user } = useAuth();
 
   const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
@@ -116,7 +109,6 @@ const Appointments = () => {
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
   const fetchPartsTotal = async (appointmentId: string): Promise<{ parts: any[]; total: number }> => {
-    // Try order_parts first
     const { data: orderParts, error: orderError } = await supabase
       .from("order_parts")
       .select("*")
@@ -127,60 +119,104 @@ const Appointments = () => {
       return { parts: orderParts, total };
     }
 
-    // Fallback: try work_orders.parts (JSONB)
-    const { data: wo } = await (supabase as any)
-      .from("work_orders")
-      .select("id, parts")
-      .eq("appointment_id", appointmentId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (wo?.parts && Array.isArray(wo.parts) && wo.parts.length > 0) {
-      const total = wo.parts.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? p.price ?? 0)), 0);
-      return { parts: wo.parts, total };
-    }
-
-    // Fallback: try parts table
-    const { data: partsData } = await (supabase as any)
-      .from("parts")
-      .select("*")
-      .eq("appointment_id", appointmentId);
-
-    if (partsData?.length) {
-      const total = partsData.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? p.price ?? 0)), 0);
-      return { parts: partsData, total };
-    }
-
     return { parts: [], total: 0 };
   };
 
-  const handleMoveToListo = async (appointment: Appointment) => {
-    const { total: partsTotal } = await fetchPartsTotal(appointment.id);
-    setLaborDialogData({ appointment, partsTotal });
-  };
-
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
-    if (newStatus === "listo") {
-      await handleMoveToListo(appointment);
+    if (newStatus === "en_reparacion") {
+      // Create work order with repair_start_time
+      try {
+        await (supabase as any)
+          .from("work_orders")
+          .insert({
+            appointment_id: appointment.id,
+            user_id: user?.id ?? "",
+            status: "in_progress",
+            repair_start_time: new Date().toISOString(),
+            labor_rate: companySettings?.labor_rate ?? 35,
+          });
+      } catch (_) { /* best effort */ }
+      updateStatus.mutate({ id: appointment.id, status: newStatus });
       return;
     }
+
+    if (newStatus === "listo") {
+      // Complete work order and get auto hours
+      let autoHours: number | null = null;
+      try {
+        const { data: wo } = await (supabase as any)
+          .from("work_orders")
+          .select("*")
+          .eq("appointment_id", appointment.id)
+          .eq("status", "in_progress")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (wo) {
+          const startTime = wo.repair_start_time ? new Date(wo.repair_start_time) : new Date(wo.created_at);
+          const endTime = new Date();
+          const diffMs = endTime.getTime() - startTime.getTime();
+          autoHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+
+          await (supabase as any)
+            .from("work_orders")
+            .update({
+              status: "completed",
+              repair_end_time: endTime.toISOString(),
+              repair_time_hours: autoHours,
+              labor_cost: autoHours * (companySettings?.labor_rate ?? 35),
+            })
+            .eq("id", wo.id);
+        }
+      } catch (_) { /* best effort */ }
+
+      const { total: partsTotal } = await fetchPartsTotal(appointment.id);
+      setLaborDialogData({ appointment, partsTotal, autoHours });
+      return;
+    }
+
     updateStatus.mutate({ id: appointment.id, status: newStatus });
   };
 
-  const handleLaborConfirm = async (laborCost: number, discount: number) => {
+  const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
     if (!laborDialogData) return;
-    const { appointment, partsTotal } = laborDialogData;
+    const { appointment } = laborDialogData;
+    const partsTotal = laborDialogData.partsTotal;
 
-    // Update status first
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
+    const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
     const discountAmount = subtotal * (discount / 100);
     const beforeTax = subtotal - discountAmount;
-    const taxRate = 21;
-    const total = Number((beforeTax * (1 + taxRate / 100)).toFixed(2));
-    const invoiceNumber = await generateInvoiceNumber();
+    const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
+
+    // Build invoice lines
+    const { parts } = await fetchPartsTotal(appointment.id);
+    const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
+
+    parts.forEach((p: any) => {
+      lines.push({
+        description: p.name ?? "Pieza",
+        quantity: p.quantity ?? 1,
+        unit_price: Number(p.unit_price ?? 0),
+        total: (p.quantity ?? 1) * Number(p.unit_price ?? 0),
+        line_type: "part",
+      });
+    });
+
+    if (laborCost > 0) {
+      lines.push({
+        description: `Mano de obra (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
+        quantity: hours,
+        unit_price: companySettings?.labor_rate ?? 35,
+        total: laborCost,
+        line_type: "labor",
+      });
+    }
+
+    const invoiceNumber = await generateInvoiceNumber(user?.id ?? "");
 
     createInvoice.mutate({
       appointment_id: appointment.id,
@@ -190,8 +226,9 @@ const Appointments = () => {
       service: appointment.service,
       parts_total: partsTotal,
       labor_cost: laborCost,
-      tax_rate: taxRate,
+      tax_rate: vatRate,
       total,
+      lines,
     });
 
     setLaborDialogData(null);
@@ -203,7 +240,6 @@ const Appointments = () => {
       toast.error("Error al eliminar: " + error.message);
     } else {
       toast.success("Orden eliminada");
-      // Refresh
       window.location.reload();
     }
     setDeleteConfirm(null);
@@ -221,10 +257,7 @@ const Appointments = () => {
     }
   };
 
-  const { user } = useAuth();
-
   const handleCreate = async (data: AnyRecord) => {
-    // Auto-create client (best effort)
     if (user && data.client_name && data.license_plate) {
       try {
         await insertClientWithFallback({
@@ -236,11 +269,8 @@ const Appointments = () => {
           model: data.model ?? null,
           user_id: user.id,
         });
-      } catch (_) {
-        // Best effort: never block appointment creation
-      }
+      } catch (_) { /* best effort */ }
     }
-
     createMutation.mutate(data, { onSuccess: () => setReceptionOpen(false) });
   };
 
@@ -352,6 +382,7 @@ const Appointments = () => {
           open={!!laborDialogData}
           onOpenChange={(open) => !open && setLaborDialogData(null)}
           partsTotal={laborDialogData.partsTotal}
+          autoHours={laborDialogData.autoHours}
           onConfirm={handleLaborConfirm}
         />
       )}

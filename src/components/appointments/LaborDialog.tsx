@@ -5,30 +5,32 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { useWorkshopSettings } from "@/hooks/useWorkshopSettings";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 
 interface LaborDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   partsTotal: number;
-  onConfirm: (laborCost: number, discount: number) => void;
+  autoHours?: number | null;
+  onConfirm: (laborCost: number, discount: number, hours: number) => void;
 }
 
-export function LaborDialog({ open, onOpenChange, partsTotal, onConfirm }: LaborDialogProps) {
-  const [hours, setHours] = useState("1");
+export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, onConfirm }: LaborDialogProps) {
+  const [hours, setHours] = useState(autoHours ? String(autoHours) : "1");
   const [discount, setDiscount] = useState("0");
-  const { data: settings } = useWorkshopSettings();
+  const { data: settings } = useCompanySettings();
 
   const laborRate = settings?.labor_rate ?? 35;
+  const vatRate = settings?.default_vat ?? 21;
   const laborCost = Number(hours) * laborRate;
   const subtotal = partsTotal + laborCost;
   const discountAmount = subtotal * (Number(discount) / 100);
   const beforeTax = subtotal - discountAmount;
-  const tax = beforeTax * 0.21;
+  const tax = beforeTax * (vatRate / 100);
   const total = beforeTax + tax;
 
   const handleConfirm = () => {
-    onConfirm(laborCost, Number(discount));
+    onConfirm(laborCost, Number(discount), Number(hours));
     onOpenChange(false);
   };
 
@@ -46,6 +48,9 @@ export function LaborDialog({ open, onOpenChange, partsTotal, onConfirm }: Labor
               <Label>Horas de mano de obra</Label>
               <Input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} />
               <p className="text-[10px] text-muted-foreground">Tarifa: {laborRate}€/h</p>
+              {autoHours != null && autoHours > 0 && (
+                <p className="text-[10px] text-primary">Tiempo auto: {autoHours.toFixed(2)}h</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Descuento (%)</Label>
@@ -69,7 +74,7 @@ export function LaborDialog({ open, onOpenChange, partsTotal, onConfirm }: Labor
               </div>
             )}
             <div className="flex justify-between text-muted-foreground">
-              <span>IVA (21%)</span>
+              <span>IVA ({vatRate}%)</span>
               <span>{tax.toFixed(2)}€</span>
             </div>
             <div className="flex justify-between font-bold text-base border-t border-border pt-1 mt-1">
