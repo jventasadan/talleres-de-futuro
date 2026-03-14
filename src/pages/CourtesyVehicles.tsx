@@ -178,10 +178,11 @@ const CourtesyVehicles = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Matrícula</TableHead>
+                      <TableHead>Marca</TableHead>
                       <TableHead>Modelo</TableHead>
-                      <TableHead>Km</TableHead>
                       <TableHead>Cliente</TableHead>
-                      <TableHead>Devolución</TableHead>
+                      <TableHead>F. Entrega</TableHead>
+                      <TableHead>F. Devolución</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
