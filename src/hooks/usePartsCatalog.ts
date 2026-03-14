@@ -10,6 +10,7 @@ export interface PartsCatalogItem {
   price: number;
 }
 
+const db = supabase as any;
 const isMissingTableError = (error: any) => String(error?.code ?? "") === "PGRST205";
 
 const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
@@ -20,37 +21,37 @@ const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
 });
 
 const fetchPartsCatalogRows = async (): Promise<PartsCatalogItem[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("parts_catalog")
     .select("*")
     .order("name", { ascending: true });
 
   if (!error) {
-    return (data ?? []).map((row) => mapCatalogRow(row as Record<string, any>));
+    return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
   }
 
   if (!isMissingTableError(error)) throw error;
 
-  const fallback = await supabase
+  const fallback = await db
     .from("parts")
     .select("*")
     .order("description", { ascending: true });
 
   if (fallback.error) throw fallback.error;
 
-  return (fallback.data ?? []).map((row) => mapCatalogRow(row as Record<string, any>));
+  return (fallback.data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
 };
 
 const upsertPartsCatalogRows = async (rows: ParsedPartRow[]) => {
-  const { error } = await supabase
+  const { error } = await db
     .from("parts_catalog")
-    .upsert(rows.map((part) => ({ name: part.name, ref: part.ref, price: part.price })) as any, { onConflict: "ref" });
+    .upsert(rows.map((part) => ({ name: part.name, ref: part.ref, price: part.price })), { onConflict: "ref" });
 
   if (!error) return;
   if (!isMissingTableError(error)) throw error;
 
   for (const part of rows) {
-    const { data: existing, error: findError } = await supabase
+    const { data: existing, error: findError } = await db
       .from("parts")
       .select("id")
       .eq("reference", part.ref)
@@ -59,13 +60,13 @@ const upsertPartsCatalogRows = async (rows: ParsedPartRow[]) => {
     if (findError) throw findError;
 
     if (existing?.id) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from("parts")
-        .update({ description: part.name, sale_price: part.price } as any)
+        .update({ description: part.name, sale_price: part.price })
         .eq("id", existing.id);
       if (updateError) throw updateError;
     } else {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await db
         .from("parts")
         .insert({
           reference: part.ref,
@@ -74,7 +75,7 @@ const upsertPartsCatalogRows = async (rows: ParsedPartRow[]) => {
           sale_price: part.price,
           stock: 0,
           minimum_stock: 0,
-        } as any);
+        });
       if (insertError) throw insertError;
     }
   }

@@ -12,6 +12,8 @@ export interface CourtesyVehicle {
   status: string;
 }
 
+const db = supabase as any;
+
 const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => ({
   id: String(row.id),
   plate: String(row.plate ?? ""),
@@ -26,13 +28,13 @@ export function useCourtesyVehicles() {
   return useQuery({
     queryKey: ["substitution_vehicles"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("substitution_vehicles")
         .select("*")
         .order("plate", { ascending: true });
 
       if (error) throw error;
-      return (data ?? []).map((row) => normalizeCourtesyVehicle(row as Record<string, any>));
+      return (data ?? []).map((row: Record<string, any>) => normalizeCourtesyVehicle(row));
     },
   });
 }
@@ -42,9 +44,9 @@ export function useCreateCourtesyVehicle() {
 
   return useMutation({
     mutationFn: async (payload: Omit<CourtesyVehicle, "id">) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("substitution_vehicles")
-        .insert(payload as any)
+        .insert(payload)
         .select("*")
         .maybeSingle();
 
@@ -66,9 +68,9 @@ export function useUpdateCourtesyVehicle() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: CourtesyVehicle) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("substitution_vehicles")
-        .update(updates as any)
+        .update(updates)
         .eq("id", id)
         .select("*")
         .maybeSingle();
@@ -91,7 +93,7 @@ export function useDeleteCourtesyVehicle() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("substitution_vehicles").delete().eq("id", id);
+      const { error } = await db.from("substitution_vehicles").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
