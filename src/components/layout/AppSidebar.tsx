@@ -34,7 +34,8 @@ const mainItems = [
   { title: "Órdenes de Trabajo", url: "/appointments", icon: ClipboardList },
   { title: "Calendario", url: "/weekly", icon: Calendar },
   { title: "Facturas", url: "/invoices", icon: FileText },
-  { title: "IA del Taller", url: "/mechanic-ai", icon: Wrench },
+  { title: "Diagnóstico IA", url: "/mechanic-ai", icon: Stethoscope },
+  { title: "Historial Vehículo", url: "/vehicle-history", icon: History },
   { title: "Vehículos Cortesía", url: "/courtesy-vehicles", icon: Car },
 ];
 
