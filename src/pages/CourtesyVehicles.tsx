@@ -44,6 +44,8 @@ const defaultForm = {
   assigned_client: "",
   return_date: "",
   status: "disponible",
+  brand: "",
+  delivery_date: "",
 };
 
 const statusLabel: Record<string, string> = {
