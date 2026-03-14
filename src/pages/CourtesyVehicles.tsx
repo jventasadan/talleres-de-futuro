@@ -247,15 +247,15 @@ const CourtesyVehicles = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Modelo</Label>
-                <Input value={form.model} onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))} required />
+                <Label>Marca</Label>
+                <Input value={form.brand} onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Ej: Toyota" />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Kilómetros</Label>
-                <Input value={form.km} onChange={(e) => setForm((prev) => ({ ...prev, km: e.target.value }))} placeholder="Ej: 12.450" />
+                <Label>Modelo</Label>
+                <Input value={form.model} onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))} required />
               </div>
               <div className="space-y-2">
                 <Label>Estado</Label>
