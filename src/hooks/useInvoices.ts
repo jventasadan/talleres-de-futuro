@@ -40,11 +40,6 @@ export function useCreateInvoice() {
 
   return useMutation({
     mutationFn: async (invoice: Partial<Invoice>) => {
-      const partsTotal = Number(invoice.parts_total ?? 0);
-      const laborCost = Number(invoice.labor_cost ?? 0);
-      const subtotal = partsTotal + laborCost;
-      const taxRate = Number(invoice.tax_rate ?? 21);
-      const total = Number((subtotal * (1 + taxRate / 100)).toFixed(2));
       const invoiceNumber = invoice.invoice_number ?? await generateInvoiceNumber();
 
       const { data, error } = await supabase
@@ -55,10 +50,10 @@ export function useCreateInvoice() {
           client_name: invoice.client_name ?? "",
           license_plate: invoice.license_plate ?? "",
           service: invoice.service ?? "",
-          parts_total: partsTotal,
-          labor_cost: laborCost,
-          tax_rate: taxRate,
-          total,
+          parts_total: Number(invoice.parts_total ?? 0),
+          labor_cost: Number(invoice.labor_cost ?? 0),
+          tax_rate: Number(invoice.tax_rate ?? 21),
+          total: Number(invoice.total ?? 0),
           status: invoice.status ?? "emitida",
           user_id: user?.id ?? "",
         } as any)
@@ -70,7 +65,7 @@ export function useCreateInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success("Factura generada");
+      toast.success("Factura generada correctamente");
     },
     onError: (error: any) => {
       toast.error("Error al crear factura: " + (error?.message ?? "Error desconocido"));

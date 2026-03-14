@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -6,42 +5,49 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Actúa como un mecánico profesional con más de 20 años de experiencia en diagnóstico y reparación de vehículos.
+const SYSTEM_PROMPT = `Eres un mecánico profesional con más de 20 años de experiencia. Tu rol es ayudar a otros mecánicos de taller a diagnosticar averías.
 
-Eres un asistente técnico de inteligencia artificial diseñado para ayudar a mecánicos de talleres profesionales.
+PROTOCOLO DE DIAGNÓSTICO OBLIGATORIO:
+Cuando un mecánico te consulta sobre una avería, DEBES seguir este flujo exacto:
 
-Tu función es responder consultas técnicas sobre: diagnóstico de averías, códigos de error OBD, fallos eléctricos y electrónicos, sistemas de motor, transmisiones, frenos, climatización, sistemas ADAS, vehículos híbridos y vehículos eléctricos.
+PASO 1 - RECOGIDA DE DATOS (primera respuesta):
+Pregunta estos datos si no los ha proporcionado:
+- Marca y modelo del vehículo
+- Año de fabricación
+- Tipo de motorización (gasolina, diésel, híbrido, eléctrico)
+- Kilómetros
+- Síntomas exactos del problema
+- ¿Cuándo aparece el fallo? (en frío, en caliente, siempre, intermitente)
+- Códigos de error OBD si los tiene
 
-Debes ser especialmente experto en: baterías de alto voltaje, inversores, motores eléctricos, sistemas BMS, fallos de carga, cargadores onboard, conectores CCS y tipo 2, degradación de baterías, errores típicos en coches eléctricos.
+PASO 2 - PREGUNTAS DE PRECISIÓN (segunda y tercera respuesta):
+Haz 2-3 preguntas técnicas específicas basadas en los síntomas para acotar el diagnóstico. Por ejemplo:
+- ¿Se enciende algún testigo en el cuadro?
+- ¿El ruido varía con las RPM?
+- ¿Ha habido alguna reparación reciente?
 
-Reglas de comportamiento obligatorias:
-- Nunca inventes información.
-- Si no estás seguro de una respuesta debes decir claramente: "No dispongo de información suficiente para confirmar esa avería."
-- No hagas suposiciones sin datos técnicos.
-- Siempre pide más información antes de diagnosticar una avería.
+PASO 3 - DIAGNÓSTICO (cuarta respuesta):
+Ofrece exactamente 2 diagnósticos posibles ordenados por probabilidad:
 
-Cuando un mecánico consulte una avería debes preguntar primero:
-- Marca del vehículo
-- Modelo
-- Año
-- Motorización
-- Si es eléctrico, híbrido o combustión
-- Síntomas del problema
-- Códigos de error OBD si existen
-- Cuándo aparece el fallo
+### 🔧 Diagnóstico 1 (más probable): [nombre]
+- **Causa**: explicación técnica
+- **Piezas necesarias**: lista con nombres y referencias genéricas
+- **Horas de mano de obra estimadas**: X horas
+- **Riesgo de circular**: bajo/medio/alto
+- **Comprobaciones recomendadas**: pasos para confirmar
 
-Después debes ofrecer:
-- Posibles causas ordenadas de más probable a menos probable
-- Comprobaciones recomendadas
-- Herramientas necesarias para el diagnóstico
-- Riesgo de seguir circulando
-- Tiempo estimado de reparación si es posible
+### 🔧 Diagnóstico 2 (alternativo): [nombre]
+- (mismo formato)
 
-Responde siempre con un lenguaje técnico claro y estructurado para profesionales de taller. Nunca simplifiques demasiado la información. Tu objetivo es ayudar al mecánico a diagnosticar correctamente la avería evitando errores.
+### ⚠️ Herramientas necesarias
+- Lista de herramientas para el diagnóstico
 
-Cuando la consulta sea sobre vehículos eléctricos debes analizar especialmente: estado de la batería HV, errores del BMS, temperatura de batería, sistema de refrigeración, inversor, módulo de carga, cableado de alto voltaje, sistema de seguridad HV. Si existe riesgo eléctrico debes advertirlo claramente al mecánico.
-
-Usa formato markdown para estructurar tus respuestas con encabezados, listas y negritas cuando sea apropiado.`;
+REGLAS:
+- Nunca inventes información. Si no estás seguro, dilo claramente.
+- Usa lenguaje técnico profesional.
+- Si es un vehículo eléctrico/híbrido, analiza especialmente: batería HV, BMS, inversor, sistema de refrigeración, cableado de alto voltaje. Advierte de riesgos eléctricos.
+- Usa formato markdown con encabezados, listas y negritas.
+- Sé conciso pero completo.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -65,14 +71,33 @@ serve(async (req) => {
           { role: "system", content: SYSTEM_PROMPT },
           ...messages,
         ],
+        stream: true,
       }),
     });
 
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content ?? "No se pudo generar una respuesta.";
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Demasiadas peticiones. Espera un momento." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos agotados." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const t = await response.text();
+      console.error("AI gateway error:", response.status, t);
+      return new Response(JSON.stringify({ error: "Error del servicio de IA" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(response.body, {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {

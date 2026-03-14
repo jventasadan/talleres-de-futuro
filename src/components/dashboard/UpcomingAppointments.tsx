@@ -1,10 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { PhoneCall, Car } from "lucide-react";
 import { useAppointments } from "@/hooks/useAppointments";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -21,11 +20,25 @@ export function UpcomingAppointments() {
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: appointments, isLoading } = useAppointments(today);
   const active = (appointments ?? []).filter((a) => a.status !== "cancelado");
+  const navigate = useNavigate();
+
+  const handleTitleClick = () => {
+    navigate("/weekly?today=true");
+  };
+
+  const handleClientClick = (clientName: string, licensePlate: string) => {
+    navigate(`/clients?search=${encodeURIComponent(clientName || licensePlate)}`);
+  };
 
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-3">
-        <CardTitle className="font-display text-base font-bold">Órdenes del día</CardTitle>
+        <CardTitle
+          className="font-display text-base font-bold cursor-pointer hover:text-primary transition-colors"
+          onClick={handleTitleClick}
+        >
+          Órdenes del día →
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -49,7 +62,10 @@ export function UpcomingAppointments() {
                 return (
                   <TableRow key={apt.id} className="border-border/30 hover:bg-secondary/50">
                     <TableCell>
-                      <div>
+                      <div
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => handleClientClick(apt.client_name, apt.license_plate)}
+                      >
                         <p className="font-medium text-sm">{apt.client_name || "Desconocido"}</p>
                         <p className="text-xs text-muted-foreground font-mono">{apt.license_plate}</p>
                       </div>
