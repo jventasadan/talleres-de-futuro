@@ -8,11 +8,37 @@ import { useWorkshopSettings } from "@/hooks/useWorkshopSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 
-async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, workshopCif?: string, workshopAddress?: string, workshopPhone?: string, workshopEmail?: string) {
-  const { data: parts } = await supabase
+async function fetchInvoiceParts(appointmentId: string) {
+  // Try order_parts first
+  const { data: orderParts, error } = await supabase
     .from("order_parts")
     .select("*")
-    .eq("appointment_id", invoice.appointment_id) as any;
+    .eq("appointment_id", appointmentId) as any;
+
+  if (!error && orderParts?.length) return orderParts;
+
+  // Fallback: work_orders JSONB parts
+  const { data: wo } = await (supabase as any)
+    .from("work_orders")
+    .select("id, parts")
+    .eq("appointment_id", appointmentId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (wo?.parts && Array.isArray(wo.parts) && wo.parts.length > 0) return wo.parts;
+
+  // Fallback: parts table
+  const { data: partsData } = await (supabase as any)
+    .from("parts")
+    .select("*")
+    .eq("appointment_id", appointmentId);
+
+  return partsData ?? [];
+}
+
+async function generateProfessionalPdf(invoice: Invoice, workshopName?: string, workshopCif?: string, workshopAddress?: string, workshopPhone?: string, workshopEmail?: string) {
+  const parts = await fetchInvoiceParts(invoice.appointment_id);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
