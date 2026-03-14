@@ -7,10 +7,14 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, User, Phone, Loader2, Car } from "lucide-react";
+import { Plus, Search, User, Phone, Loader2, Car, List, LayoutGrid } from "lucide-react";
 import { useClients, useCreateClient, type Client } from "@/hooks/useClients";
 import { ClientDetailDialog } from "@/components/clients/ClientDetailDialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 
 const avatarColors = [
   "bg-primary/15 text-primary",
@@ -25,13 +29,21 @@ function getInitials(name: string | null): string {
 }
 
 const Clients = () => {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
   const { data: clients, isLoading } = useClients();
   const createClient = useCreateClient();
+
+  // Handle ?search= query param from dashboard navigation
+  useEffect(() => {
+    const q = searchParams.get("search");
+    if (q) setSearch(q);
+  }, [searchParams]);
 
   const filtered = (clients ?? []).filter(
     (c) =>
@@ -63,10 +75,20 @@ const Clients = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Buscar por nombre, teléfono, matrícula, marca..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo cliente
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
+              <Button variant={viewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("grid")} className="h-7 w-7 p-0">
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")} className="h-7 w-7 p-0">
+                <List className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo cliente
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -78,7 +100,7 @@ const Clients = () => {
             <User className="h-10 w-10 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">No se encontraron clientes</p>
           </div>
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((client, i) => (
               <Card key={client.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => handleClientClick(client)}>
@@ -108,6 +130,37 @@ const Clients = () => {
               </Card>
             ))}
           </div>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-xs uppercase">Nombre</TableHead>
+                    <TableHead className="text-xs uppercase">Teléfono</TableHead>
+                    <TableHead className="text-xs uppercase">Matrícula</TableHead>
+                    <TableHead className="text-xs uppercase">Marca</TableHead>
+                    <TableHead className="text-xs uppercase">Modelo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((client) => (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer hover:bg-accent/50"
+                      onClick={() => handleClientClick(client)}
+                    >
+                      <TableCell className="font-medium">{client.name || "Sin nombre"}</TableCell>
+                      <TableCell className="text-muted-foreground">{client.phone || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{client.license_plate || "—"}</TableCell>
+                      <TableCell>{client.brand || "—"}</TableCell>
+                      <TableCell>{client.model || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </div>
 

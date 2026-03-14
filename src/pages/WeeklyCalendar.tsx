@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   format, startOfWeek, startOfMonth, endOfMonth, addDays, subWeeks, addWeeks,
   subMonths, addMonths, isSameDay, isSameMonth, eachDayOfInterval,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +15,22 @@ import { AppointmentDetailDialog } from "@/components/appointments/AppointmentDe
 import { cn } from "@/lib/utils";
 
 const WeeklyCalendar = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<"week" | "month">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { data: allAppointments, isLoading } = useAllAppointments();
   const today = new Date();
+
+  // Handle ?today=true query param
+  useEffect(() => {
+    if (searchParams.get("today") === "true") {
+      setCurrentDate(new Date());
+      setViewMode("week");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const monthStart = startOfMonth(currentDate);
@@ -68,7 +79,10 @@ const WeeklyCalendar = () => {
     }
   };
 
-  const goToday = () => setCurrentDate(new Date());
+  const goToday = () => {
+    setCurrentDate(new Date());
+    setViewMode("week");
+  };
 
   const handleAppointmentClick = (apt: Appointment) => {
     setSelectedApt(apt);
