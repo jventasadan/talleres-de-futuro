@@ -94,6 +94,8 @@ const CourtesyVehicles = () => {
       assigned_client: vehicle.assigned_client,
       return_date: vehicle.return_date,
       status: vehicle.status,
+      brand: (vehicle as any).brand ?? "",
+      delivery_date: (vehicle as any).delivery_date ?? "",
     });
     setDialogOpen(true);
   };
