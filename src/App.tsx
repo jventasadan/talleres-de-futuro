@@ -13,6 +13,7 @@ import Clients from "./pages/Clients";
 import Invoices from "./pages/Invoices";
 import MechanicChat from "./pages/MechanicChat";
 import CourtesyVehicles from "./pages/CourtesyVehicles";
+import VehicleHistory from "./pages/VehicleHistory";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
