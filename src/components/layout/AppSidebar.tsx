@@ -1,5 +1,6 @@
 import {
   Calendar,
+  Car,
   ClipboardList,
   FileText,
   LayoutDashboard,
