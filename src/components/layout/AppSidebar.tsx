@@ -1,5 +1,6 @@
 import {
   Calendar,
+  Car,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -32,6 +33,7 @@ const mainItems = [
   { title: "Calendario", url: "/weekly", icon: Calendar },
   { title: "Facturas", url: "/invoices", icon: FileText },
   { title: "IA del Taller", url: "/mechanic-ai", icon: Wrench },
+  { title: "Vehículos Cortesía", url: "/courtesy-vehicles", icon: Car },
 ];
 
 const configItems = [

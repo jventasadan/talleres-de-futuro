@@ -44,6 +44,8 @@ const defaultForm = {
   assigned_client: "",
   return_date: "",
   status: "disponible",
+  brand: "",
+  delivery_date: "",
 };
 
 const statusLabel: Record<string, string> = {
@@ -92,6 +94,8 @@ const CourtesyVehicles = () => {
       assigned_client: vehicle.assigned_client,
       return_date: vehicle.return_date,
       status: vehicle.status,
+      brand: (vehicle as any).brand ?? "",
+      delivery_date: (vehicle as any).delivery_date ?? "",
     });
     setDialogOpen(true);
   };
@@ -106,6 +110,8 @@ const CourtesyVehicles = () => {
       assigned_client: form.assigned_client.trim(),
       return_date: form.return_date,
       status: form.status,
+      brand: form.brand.trim(),
+      delivery_date: form.delivery_date,
     };
 
     if (editing) {
@@ -172,10 +178,11 @@ const CourtesyVehicles = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Matrícula</TableHead>
+                      <TableHead>Marca</TableHead>
                       <TableHead>Modelo</TableHead>
-                      <TableHead>Km</TableHead>
                       <TableHead>Cliente</TableHead>
-                      <TableHead>Devolución</TableHead>
+                      <TableHead>F. Entrega</TableHead>
+                      <TableHead>F. Devolución</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
@@ -184,9 +191,10 @@ const CourtesyVehicles = () => {
                     {(data ?? []).map((vehicle) => (
                       <TableRow key={vehicle.id}>
                         <TableCell className="font-mono text-xs font-semibold">{vehicle.plate || "-"}</TableCell>
+                        <TableCell>{(vehicle as any).brand || "-"}</TableCell>
                         <TableCell>{vehicle.model || "-"}</TableCell>
-                        <TableCell>{vehicle.km || "-"}</TableCell>
                         <TableCell>{vehicle.assigned_client || "Sin asignar"}</TableCell>
+                        <TableCell>{(vehicle as any).delivery_date || "-"}</TableCell>
                         <TableCell>{vehicle.return_date || "-"}</TableCell>
                         <TableCell>
                           <Badge
@@ -239,15 +247,15 @@ const CourtesyVehicles = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Modelo</Label>
-                <Input value={form.model} onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))} required />
+                <Label>Marca</Label>
+                <Input value={form.brand} onChange={(e) => setForm((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Ej: Toyota" />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Kilómetros</Label>
-                <Input value={form.km} onChange={(e) => setForm((prev) => ({ ...prev, km: e.target.value }))} placeholder="Ej: 12.450" />
+                <Label>Modelo</Label>
+                <Input value={form.model} onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))} required />
               </div>
               <div className="space-y-2">
                 <Label>Estado</Label>
@@ -273,13 +281,23 @@ const CourtesyVehicles = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Fecha de devolución</Label>
-              <Input
-                type="date"
-                value={form.return_date}
-                onChange={(e) => setForm((prev) => ({ ...prev, return_date: e.target.value }))}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Fecha de entrega</Label>
+                <Input
+                  type="date"
+                  value={form.delivery_date}
+                  onChange={(e) => setForm((prev) => ({ ...prev, delivery_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de devolución</Label>
+                <Input
+                  type="date"
+                  value={form.return_date}
+                  onChange={(e) => setForm((prev) => ({ ...prev, return_date: e.target.value }))}
+                />
+              </div>
             </div>
 
             <DialogFooter>

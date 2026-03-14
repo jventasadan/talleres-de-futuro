@@ -12,6 +12,7 @@ import WeeklyCalendar from "./pages/WeeklyCalendar";
 import Clients from "./pages/Clients";
 import Invoices from "./pages/Invoices";
 import MechanicChat from "./pages/MechanicChat";
+import CourtesyVehicles from "./pages/CourtesyVehicles";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
             <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
             <Route path="/mechanic-ai" element={<ProtectedRoute><MechanicChat /></ProtectedRoute>} />
+            <Route path="/courtesy-vehicles" element={<ProtectedRoute><CourtesyVehicles /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

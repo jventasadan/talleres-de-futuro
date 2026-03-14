@@ -115,18 +115,48 @@ const Appointments = () => {
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
-  const handleMoveToListo = async (appointment: Appointment) => {
-    // Get parts total first
-    const { data: parts } = await supabase
+  const fetchPartsTotal = async (appointmentId: string): Promise<{ parts: any[]; total: number }> => {
+    // Try order_parts first
+    const { data: orderParts, error: orderError } = await supabase
       .from("order_parts")
       .select("*")
-      .eq("appointment_id", appointment.id) as any;
+      .eq("appointment_id", appointmentId) as any;
 
-    const partsTotal = (parts ?? []).reduce(
-      (sum: number, p: any) => sum + (p.quantity * p.unit_price), 0
-    );
+    if (!orderError && orderParts?.length) {
+      const total = orderParts.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
+      return { parts: orderParts, total };
+    }
 
-    // Open labor dialog instead of auto-generating invoice
+    // Fallback: try work_orders.parts (JSONB)
+    const { data: wo } = await (supabase as any)
+      .from("work_orders")
+      .select("id, parts")
+      .eq("appointment_id", appointmentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (wo?.parts && Array.isArray(wo.parts) && wo.parts.length > 0) {
+      const total = wo.parts.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? p.price ?? 0)), 0);
+      return { parts: wo.parts, total };
+    }
+
+    // Fallback: try parts table
+    const { data: partsData } = await (supabase as any)
+      .from("parts")
+      .select("*")
+      .eq("appointment_id", appointmentId);
+
+    if (partsData?.length) {
+      const total = partsData.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? p.price ?? 0)), 0);
+      return { parts: partsData, total };
+    }
+
+    return { parts: [], total: 0 };
+  };
+
+  const handleMoveToListo = async (appointment: Appointment) => {
+    const { total: partsTotal } = await fetchPartsTotal(appointment.id);
     setLaborDialogData({ appointment, partsTotal });
   };
 
