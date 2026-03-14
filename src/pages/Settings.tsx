@@ -6,45 +6,56 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Save, Wrench, Phone, Clock, DollarSign, Loader2 } from "lucide-react";
-import { useWorkshopSettings, useSaveWorkshopSettings } from "@/hooks/useWorkshopSettings";
+import { Save, Wrench, Phone, DollarSign, Loader2 } from "lucide-react";
+import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
-import { toast } from "sonner";
 
 const SettingsPage = () => {
-  const { data: settings, isLoading } = useWorkshopSettings();
-  const saveSettings = useSaveWorkshopSettings();
+  const { data: settings, isLoading } = useCompanySettings();
+  const saveSettings = useSaveCompanySettings();
 
   const [form, setForm] = useState({
-    workshop_name: "",
+    company_name: "",
     cif: "",
     phone: "",
     email: "",
     address: "",
+    city: "",
+    postal_code: "",
+    province: "",
     labor_rate: "35",
+    default_vat: "21",
   });
 
   useEffect(() => {
     if (settings) {
       setForm({
-        workshop_name: settings.workshop_name ?? "",
+        company_name: settings.company_name ?? "",
         cif: settings.cif ?? "",
         phone: settings.phone ?? "",
         email: settings.email ?? "",
         address: settings.address ?? "",
+        city: settings.city ?? "",
+        postal_code: settings.postal_code ?? "",
+        province: settings.province ?? "",
         labor_rate: String(settings.labor_rate ?? 35),
+        default_vat: String(settings.default_vat ?? 21),
       });
     }
   }, [settings]);
 
   const handleSave = () => {
     saveSettings.mutate({
-      workshop_name: form.workshop_name,
+      company_name: form.company_name,
       cif: form.cif,
       phone: form.phone,
       email: form.email,
       address: form.address,
+      city: form.city,
+      postal_code: form.postal_code,
+      province: form.province,
       labor_rate: Number(form.labor_rate) || 35,
+      default_vat: Number(form.default_vat) || 21,
     });
   };
 
@@ -76,7 +87,7 @@ const SettingsPage = () => {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Nombre del taller</Label>
-                <Input value={form.workshop_name} onChange={(e) => setForm(f => ({ ...f, workshop_name: e.target.value }))} placeholder="Taller García e Hijos" />
+                <Input value={form.company_name} onChange={(e) => setForm(f => ({ ...f, company_name: e.target.value }))} placeholder="Taller García e Hijos" />
               </div>
               <div className="space-y-2">
                 <Label>CIF / NIF</Label>
@@ -92,34 +103,65 @@ const SettingsPage = () => {
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Dirección</Label>
-                <Input value={form.address} onChange={(e) => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Calle del Motor 42, Madrid" />
+                <Input value={form.address} onChange={(e) => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Calle del Motor 42" />
+              </div>
+              <div className="space-y-2">
+                <Label>Ciudad</Label>
+                <Input value={form.city} onChange={(e) => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Madrid" />
+              </div>
+              <div className="space-y-2">
+                <Label>Código Postal</Label>
+                <Input value={form.postal_code} onChange={(e) => setForm(f => ({ ...f, postal_code: e.target.value }))} placeholder="28001" />
+              </div>
+              <div className="space-y-2">
+                <Label>Provincia</Label>
+                <Input value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} placeholder="Madrid" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Labor Rate */}
+        {/* Rates */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
               <div>
-                <CardTitle className="font-display text-base">Tarifa de mano de obra</CardTitle>
-                <CardDescription>Precio por hora usado en facturación</CardDescription>
+                <CardTitle className="font-display text-base">Tarifas</CardTitle>
+                <CardDescription>Mano de obra e IVA por defecto</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3">
-              <Input
-                type="number"
-                min="0"
-                step="0.5"
-                value={form.labor_rate}
-                onChange={(e) => setForm(f => ({ ...f, labor_rate: e.target.value }))}
-                className="max-w-[120px]"
-              />
-              <span className="text-sm text-muted-foreground">€ / hora</span>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Tarifa mano de obra</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={form.labor_rate}
+                    onChange={(e) => setForm(f => ({ ...f, labor_rate: e.target.value }))}
+                    className="max-w-[120px]"
+                  />
+                  <span className="text-sm text-muted-foreground">€ / hora</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>IVA por defecto</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={form.default_vat}
+                    onChange={(e) => setForm(f => ({ ...f, default_vat: e.target.value }))}
+                    className="max-w-[120px]"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -149,7 +191,7 @@ const SettingsPage = () => {
             <Separator />
             <div className="space-y-2">
               <Label>Mensaje de bienvenida</Label>
-              <Input defaultValue="Hola, bienvenido a Taller García e Hijos. ¿En qué puedo ayudarle?" />
+              <Input defaultValue="Hola, bienvenido a nuestro taller. ¿En qué puedo ayudarle?" />
             </div>
             <div className="space-y-2">
               <Label>VAPI API Key</Label>
