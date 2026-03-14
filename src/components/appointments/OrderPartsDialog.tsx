@@ -55,7 +55,12 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
                     <span className="flex-1 truncate">{part.name}</span>
                     <span className="text-xs text-muted-foreground">x{part.quantity}</span>
                     <span className="font-mono text-xs">{(part.unit_price * part.quantity).toFixed(2)}€</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deletePart.mutate(part.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => deletePart.mutate({ id: part.id, appointmentId })}
+                    >
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </div>
