@@ -3,9 +3,11 @@ import {
   Car,
   ClipboardList,
   FileText,
+  History,
   LayoutDashboard,
   LogOut,
   Settings,
+  Stethoscope,
   Users,
   Wrench,
 } from "lucide-react";
