@@ -191,9 +191,10 @@ const CourtesyVehicles = () => {
                     {(data ?? []).map((vehicle) => (
                       <TableRow key={vehicle.id}>
                         <TableCell className="font-mono text-xs font-semibold">{vehicle.plate || "-"}</TableCell>
+                        <TableCell>{(vehicle as any).brand || "-"}</TableCell>
                         <TableCell>{vehicle.model || "-"}</TableCell>
-                        <TableCell>{vehicle.km || "-"}</TableCell>
                         <TableCell>{vehicle.assigned_client || "Sin asignar"}</TableCell>
+                        <TableCell>{(vehicle as any).delivery_date || "-"}</TableCell>
                         <TableCell>{vehicle.return_date || "-"}</TableCell>
                         <TableCell>
                           <Badge
