@@ -110,6 +110,8 @@ const CourtesyVehicles = () => {
       assigned_client: form.assigned_client.trim(),
       return_date: form.return_date,
       status: form.status,
+      brand: form.brand.trim(),
+      delivery_date: form.delivery_date,
     };
 
     if (editing) {
