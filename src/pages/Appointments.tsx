@@ -106,7 +106,7 @@ const Appointments = () => {
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
 
-  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
+  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo", "entregado"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
   const historyAppointments = (appointments ?? []).filter((a) => ["listo", "cancelado", "entregado"].includes(a.status));
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
