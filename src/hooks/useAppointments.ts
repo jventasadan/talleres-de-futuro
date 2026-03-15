@@ -123,8 +123,8 @@ const applyDateFilter = (query: any, dateColumn: string | null, dateFilter?: str
 
 const fetchAppointmentsRows = async (workshopId: string, dateFilter?: string): Promise<AnyRecord[]> => {
   const attempts: Array<{ dateColumn: "date" | "appointment_date" | "appointment_start" | null; orderColumns: string[] }> = [
-    { dateColumn: "date", orderColumns: ["date", "time_slot"] },
     { dateColumn: "appointment_date", orderColumns: ["appointment_date", "appointment_start"] },
+    { dateColumn: "date", orderColumns: ["date", "time_slot"] },
     { dateColumn: "appointment_start", orderColumns: ["appointment_start"] },
     { dateColumn: null, orderColumns: ["created_at"] },
     { dateColumn: null, orderColumns: [] },
