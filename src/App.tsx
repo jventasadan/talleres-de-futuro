@@ -12,6 +12,7 @@ import Appointments from "./pages/Appointments";
 import WeeklyCalendar from "./pages/WeeklyCalendar";
 import Clients from "./pages/Clients";
 import Invoices from "./pages/Invoices";
+import Quotes from "./pages/Quotes";
 import MechanicChat from "./pages/MechanicChat";
 import CourtesyVehicles from "./pages/CourtesyVehicles";
 import VehicleHistory from "./pages/VehicleHistory";
