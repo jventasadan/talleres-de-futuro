@@ -95,6 +95,13 @@ const SettingsPage = () => {
   return (
     <DashboardLayout title="Configuración" subtitle="Ajustes del taller y asistente de voz">
       <div className="max-w-2xl space-y-6">
+        {!workshopComplete && (
+          <Alert className="border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+            <AlertDescription className="text-orange-800 dark:text-orange-200 font-medium">
+              ⚠️ Completa todos los datos del taller (nombre, CIF, teléfono, email, dirección, ciudad, código postal y provincia) para poder utilizar la aplicación.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Workshop Info */}
         <Card>
           <CardHeader>
