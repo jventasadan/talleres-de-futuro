@@ -40,12 +40,12 @@ const mapMechanicRow = (row: AnyRecord): Mechanic => ({
   created_at: row.created_at ?? new Date().toISOString(),
 });
 
-const fetchMechanicsRows = async (): Promise<AnyRecord[]> => {
+const fetchMechanicsRows = async (userId: string): Promise<AnyRecord[]> => {
   const attempts = [
-    () => supabase.from("mechanics").select("*").eq("active", true).order("name"),
-    () => supabase.from("mechanics").select("*").order("name"),
-    () => supabase.from("mechanics").select("*").order("created_at", { ascending: false }),
-    () => supabase.from("mechanics").select("*"),
+    () => supabase.from("mechanics").select("*").eq("user_id", userId).eq("active", true).order("name"),
+    () => supabase.from("mechanics").select("*").eq("user_id", userId).order("name"),
+    () => supabase.from("mechanics").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    () => supabase.from("mechanics").select("*").eq("user_id", userId),
   ];
 
   let lastError: any;
@@ -88,12 +88,16 @@ const insertMechanicWithFallback = async (payload: AnyRecord) => {
 };
 
 export function useMechanics() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["mechanics"],
+    queryKey: ["mechanics", user?.id],
     queryFn: async () => {
-      const rows = await fetchMechanicsRows();
+      if (!user?.id) return [];
+      const rows = await fetchMechanicsRows(user.id);
       return rows.map(mapMechanicRow);
     },
+    enabled: !!user?.id,
   });
 }
 

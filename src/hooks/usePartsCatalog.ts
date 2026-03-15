@@ -21,17 +21,22 @@ const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
 });
 
 export function usePartsCatalog() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["parts_catalog"],
+    queryKey: ["parts_catalog", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data, error } = await db
         .from("parts_catalog")
         .select("*")
+        .eq("user_id", user.id)
         .order("name", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
     },
+    enabled: !!user?.id,
   });
 }
 

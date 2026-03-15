@@ -30,17 +30,22 @@ const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => 
 });
 
 export function useCourtesyVehicles() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["substitution_vehicles"],
+    queryKey: ["substitution_vehicles", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data, error } = await db
         .from("substitution_vehicles")
         .select("*")
+        .eq("user_id", user.id)
         .order("plate", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => normalizeCourtesyVehicle(row));
     },
+    enabled: !!user?.id,
   });
 }
 

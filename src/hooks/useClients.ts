@@ -102,17 +102,22 @@ const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
 };
 
 export function useClients() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["clients"],
+    queryKey: ["clients", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data, error } = await supabase
         .from("clients")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []).map(mapRow);
     },
+    enabled: !!user?.id,
   });
 }
 

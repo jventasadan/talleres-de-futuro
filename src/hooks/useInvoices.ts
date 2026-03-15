@@ -32,17 +32,22 @@ export interface InvoiceLine {
 }
 
 export function useInvoices() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data, error } = await supabase
         .from("invoices")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []) as unknown as Invoice[];
     },
+    enabled: !!user?.id,
   });
 }
 
