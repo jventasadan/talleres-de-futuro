@@ -104,11 +104,13 @@ export function useOrderParts(appointmentId: string) {
 
 export function useAddPart() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (part: Partial<OrderPart>) => {
       const appointmentId = String(part.appointment_id ?? "");
       if (!appointmentId) throw new Error("appointment_id es obligatorio");
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
       const payload = {
         appointment_id: appointmentId,
@@ -122,7 +124,7 @@ export function useAddPart() {
       if (!error) return normalizePart((data ?? payload) as Record<string, any>, appointmentId);
       if (!isMissingTableError(error)) throw error;
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentParts = Array.isArray(workOrder?.parts) ? workOrder.parts : [];
       const nextPart = { id: crypto.randomUUID(), ...payload, created_at: new Date().toISOString() };
 
@@ -146,14 +148,16 @@ export function useAddPart() {
 
 export function useDeletePart() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ id, appointmentId }: { id: string; appointmentId: string }) => {
       const { error } = await db.from("order_parts").delete().eq("id", id);
       if (!error) return;
       if (!isMissingTableError(error)) throw error;
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentParts = Array.isArray(workOrder?.parts) ? workOrder.parts : [];
       const nextParts = currentParts.filter((part: Record<string, any>) => String(part.id) !== id);
 
