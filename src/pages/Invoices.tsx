@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Download, CheckCircle } from "lucide-react";
-import { useInvoices, useInvoiceLines, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
+import { useInvoices, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
