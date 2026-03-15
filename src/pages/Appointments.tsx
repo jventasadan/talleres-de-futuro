@@ -111,10 +111,13 @@ const Appointments = () => {
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
   const fetchPartsTotal = async (appointmentId: string): Promise<{ parts: any[]; total: number }> => {
+    if (!workshopId) return { parts: [], total: 0 };
+
     const { data: orderParts, error: orderError } = await supabase
       .from("order_parts")
       .select("*")
-      .eq("appointment_id", appointmentId) as any;
+      .eq("appointment_id", appointmentId)
+      .eq("workshop_id", workshopId) as any;
 
     if (!orderError && orderParts?.length) {
       const total = orderParts.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
