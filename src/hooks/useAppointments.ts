@@ -204,22 +204,30 @@ const updateAppointmentWithFallback = async (id: string, payload: AnyRecord) => 
 };
 
 export function useAppointments(dateFilter?: string) {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["appointments", dateFilter],
+    queryKey: ["appointments", dateFilter, user?.id],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows(dateFilter);
+      if (!user?.id) return [];
+      const rows = await fetchAppointmentsRows(user.id, dateFilter);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!user?.id,
   });
 }
 
 export function useAllAppointments() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["appointments", "all"],
+    queryKey: ["appointments", "all", user?.id],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows();
+      if (!user?.id) return [];
+      const rows = await fetchAppointmentsRows(user.id);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!user?.id,
   });
 }
 

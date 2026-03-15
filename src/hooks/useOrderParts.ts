@@ -102,11 +102,14 @@ export function useAddPart() {
       const appointmentId = String(part.appointment_id ?? "");
       if (!appointmentId) throw new Error("appointment_id es obligatorio");
 
+      // Get the current user for user_id
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       const payload = {
         appointment_id: appointmentId,
         name: String(part.name ?? "").trim(),
         quantity: Number(part.quantity ?? 1),
         unit_price: Number(part.unit_price ?? 0),
+        user_id: currentUser?.id ?? "",
       };
 
       const { data, error } = await db.from("order_parts").insert(payload).select("*").maybeSingle();

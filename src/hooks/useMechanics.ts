@@ -88,12 +88,16 @@ const insertMechanicWithFallback = async (payload: AnyRecord) => {
 };
 
 export function useMechanics() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ["mechanics"],
+    queryKey: ["mechanics", user?.id],
     queryFn: async () => {
-      const rows = await fetchMechanicsRows();
+      if (!user?.id) return [];
+      const rows = await fetchMechanicsRows(user.id);
       return rows.map(mapMechanicRow);
     },
+    enabled: !!user?.id,
   });
 }
 
