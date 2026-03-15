@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface CourtesyVehicle {
   id: string;
@@ -30,34 +29,30 @@ const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => 
 });
 
 export function useCourtesyVehicles() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["substitution_vehicles", user?.id],
+    queryKey: ["substitution_vehicles"],
     queryFn: async () => {
-      if (!user?.id) return [];
+      // RLS filters by workshop_id automatically
       const { data, error } = await db
         .from("substitution_vehicles")
         .select("*")
-        .eq("user_id", user.id)
         .order("plate", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => normalizeCourtesyVehicle(row));
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useCreateCourtesyVehicle() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (payload: Omit<CourtesyVehicle, "id">) => {
+      // workshop_id is set automatically by DB trigger
       const { data, error } = await db
         .from("substitution_vehicles")
-        .insert({ ...payload, user_id: user?.id ?? "" })
+        .insert({ ...payload })
         .select("*")
         .maybeSingle();
 

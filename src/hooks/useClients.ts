@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Client {
   id: string;
@@ -102,28 +101,23 @@ const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
 };
 
 export function useClients() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["clients", user?.id],
+    queryKey: ["clients"],
     queryFn: async () => {
-      if (!user?.id) return [];
+      // RLS filters by workshop_id automatically
       const { data, error } = await supabase
         .from("clients")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []).map(mapRow);
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useCreateClient() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (client: Partial<Client>) => {
@@ -135,9 +129,8 @@ export function useCreateClient() {
         email: client.email ?? null,
         brand: client.brand ?? null,
         model: client.model ?? null,
+        // workshop_id is set automatically by DB trigger
       };
-
-      if (user?.id) payload.user_id = user.id;
 
       const data = await insertClientWithFallback(payload);
       return mapRow(data ?? payload);

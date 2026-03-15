@@ -1,7 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface WorkOrder {
   id: string;
@@ -23,6 +21,7 @@ export function useWorkOrder(appointmentId: string | null) {
     queryKey: ["work_orders", appointmentId],
     queryFn: async () => {
       if (!appointmentId) return null;
+      // RLS filters by workshop_id automatically
       const { data, error } = await (supabase as any)
         .from("work_orders")
         .select("*")
@@ -39,10 +38,10 @@ export function useWorkOrder(appointmentId: string | null) {
 
 export function useCreateWorkOrder() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (params: { appointment_id: string; labor_rate: number }) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await (supabase as any)
         .from("work_orders")
         .insert({
@@ -51,6 +50,7 @@ export function useCreateWorkOrder() {
           status: "in_progress",
           repair_start_time: new Date().toISOString(),
           labor_rate: params.labor_rate,
+          // workshop_id is set automatically by DB trigger
         })
         .select("*")
         .single();
@@ -68,7 +68,6 @@ export function useCompleteWorkOrder() {
 
   return useMutation({
     mutationFn: async (params: { id: string; labor_rate: number }) => {
-      // Get current work order to calculate hours
       const { data: wo, error: fetchError } = await (supabase as any)
         .from("work_orders")
         .select("*")

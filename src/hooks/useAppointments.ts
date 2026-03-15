@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Appointment {
   id: string;
@@ -121,7 +120,8 @@ const applyDateFilter = (query: any, dateColumn: string | null, dateFilter?: str
   return query.gte(dateColumn, start).lte(dateColumn, end);
 };
 
-const fetchAppointmentsRows = async (userId: string, dateFilter?: string): Promise<AnyRecord[]> => {
+// RLS handles workshop isolation — no user_id filter needed
+const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> => {
   const attempts: Array<{ dateColumn: "date" | "appointment_date" | "appointment_start" | null; orderColumns: string[] }> = [
     { dateColumn: "date", orderColumns: ["date", "time_slot"] },
     { dateColumn: "appointment_date", orderColumns: ["appointment_date", "appointment_start"] },
@@ -133,7 +133,7 @@ const fetchAppointmentsRows = async (userId: string, dateFilter?: string): Promi
   let lastError: any;
 
   for (const attempt of attempts) {
-    let query: any = supabase.from("appointments").select("*").eq("user_id", userId);
+    let query: any = supabase.from("appointments").select("*");
 
     for (const column of attempt.orderColumns) {
       query = query.order(column);
@@ -204,36 +204,27 @@ const updateAppointmentWithFallback = async (id: string, payload: AnyRecord) => 
 };
 
 export function useAppointments(dateFilter?: string) {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["appointments", dateFilter, user?.id],
+    queryKey: ["appointments", dateFilter],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const rows = await fetchAppointmentsRows(user.id, dateFilter);
+      const rows = await fetchAppointmentsRows(dateFilter);
       return rows.map(mapAppointmentRow);
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useAllAppointments() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["appointments", "all", user?.id],
+    queryKey: ["appointments", "all"],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const rows = await fetchAppointmentsRows(user.id);
+      const rows = await fetchAppointmentsRows();
       return rows.map(mapAppointmentRow);
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useCreateAppointment() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (appointment: Partial<Appointment> & AnyRecord) => {
@@ -263,9 +254,8 @@ export function useCreateAppointment() {
         brand: appointment.brand ?? null,
         model: appointment.model ?? null,
         vehicle_id: appointment.vehicle_id ?? null,
+        // workshop_id is set automatically by DB trigger
       };
-
-      if (user?.id) payload.user_id = user.id;
 
       const data = await insertAppointmentWithFallback(payload);
       return mapAppointmentRow((data ?? payload) as AnyRecord);

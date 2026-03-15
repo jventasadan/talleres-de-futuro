@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Mechanic {
   id: string;
@@ -40,12 +39,13 @@ const mapMechanicRow = (row: AnyRecord): Mechanic => ({
   created_at: row.created_at ?? new Date().toISOString(),
 });
 
-const fetchMechanicsRows = async (userId: string): Promise<AnyRecord[]> => {
+// RLS handles workshop isolation
+const fetchMechanicsRows = async (): Promise<AnyRecord[]> => {
   const attempts = [
-    () => supabase.from("mechanics").select("*").eq("user_id", userId).eq("active", true).order("name"),
-    () => supabase.from("mechanics").select("*").eq("user_id", userId).order("name"),
-    () => supabase.from("mechanics").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-    () => supabase.from("mechanics").select("*").eq("user_id", userId),
+    () => supabase.from("mechanics").select("*").eq("active", true).order("name"),
+    () => supabase.from("mechanics").select("*").order("name"),
+    () => supabase.from("mechanics").select("*").order("created_at", { ascending: false }),
+    () => supabase.from("mechanics").select("*"),
   ];
 
   let lastError: any;
@@ -88,31 +88,25 @@ const insertMechanicWithFallback = async (payload: AnyRecord) => {
 };
 
 export function useMechanics() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["mechanics", user?.id],
+    queryKey: ["mechanics"],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const rows = await fetchMechanicsRows(user.id);
+      const rows = await fetchMechanicsRows();
       return rows.map(mapMechanicRow);
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useCreateMechanic() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (name: string) => {
       const payload: AnyRecord = {
         name,
         active: true,
+        // workshop_id is set automatically by DB trigger
       };
-
-      if (user?.id) payload.user_id = user.id;
 
       const data = await insertMechanicWithFallback(payload);
       return mapMechanicRow(data ?? payload);
