@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { toast } from "sonner";
 
 export interface Mechanic {
@@ -39,13 +40,12 @@ const mapMechanicRow = (row: AnyRecord): Mechanic => ({
   created_at: row.created_at ?? new Date().toISOString(),
 });
 
-// RLS handles workshop isolation
-const fetchMechanicsRows = async (): Promise<AnyRecord[]> => {
+const fetchMechanicsRows = async (workshopId: string): Promise<AnyRecord[]> => {
   const attempts = [
-    () => supabase.from("mechanics").select("*").eq("active", true).order("name"),
-    () => supabase.from("mechanics").select("*").order("name"),
-    () => supabase.from("mechanics").select("*").order("created_at", { ascending: false }),
-    () => supabase.from("mechanics").select("*"),
+    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).eq("active", true).order("name"),
+    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).order("name"),
+    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).order("created_at", { ascending: false }),
+    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId),
   ];
 
   let lastError: any;
@@ -88,12 +88,16 @@ const insertMechanicWithFallback = async (payload: AnyRecord) => {
 };
 
 export function useMechanics() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["mechanics"],
+    queryKey: ["mechanics", workshopId],
     queryFn: async () => {
-      const rows = await fetchMechanicsRows();
+      if (!workshopId) return [];
+      const rows = await fetchMechanicsRows(workshopId);
       return rows.map(mapMechanicRow);
     },
+    enabled: !!workshopId,
   });
 }
 
