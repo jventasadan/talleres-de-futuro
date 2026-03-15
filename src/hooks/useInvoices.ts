@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { toast } from "sonner";
 
 export interface Invoice {
@@ -31,35 +32,44 @@ export interface InvoiceLine {
 }
 
 export function useInvoices() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!workshopId) return [];
+
       const { data, error } = await supabase
         .from("invoices")
         .select("*")
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []) as unknown as Invoice[];
     },
+    enabled: !!workshopId,
   });
 }
 
 export function useInvoiceLines(invoiceId: string | null) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["invoice_lines", invoiceId],
+    queryKey: ["invoice_lines", invoiceId, workshopId],
     queryFn: async () => {
-      if (!invoiceId) return [];
+      if (!invoiceId || !workshopId) return [];
+
       const { data, error } = await (supabase as any)
         .from("invoice_lines")
         .select("*")
         .eq("invoice_id", invoiceId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as InvoiceLine[];
     },
-    enabled: !!invoiceId,
+    enabled: !!invoiceId && !!workshopId,
   });
 }
 

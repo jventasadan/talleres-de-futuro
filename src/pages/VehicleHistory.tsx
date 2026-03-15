@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, Car, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -27,9 +28,10 @@ const VehicleHistory = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const { workshopId } = useWorkshop();
 
   const handleSearch = async () => {
-    if (!plate.trim()) return;
+    if (!plate.trim() || !workshopId) return;
     setLoading(true);
     setSearched(true);
 
@@ -38,6 +40,7 @@ const VehicleHistory = () => {
       const { data: appointments } = await supabase
         .from("appointments")
         .select("*")
+        .eq("workshop_id", workshopId)
         .ilike("license_plate", plate.trim().toUpperCase())
         .order("created_at", { ascending: false }) as any;
 
@@ -52,6 +55,7 @@ const VehicleHistory = () => {
       const { data: invoices } = await supabase
         .from("invoices")
         .select("*")
+        .eq("workshop_id", workshopId)
         .in("appointment_id", appointmentIds) as any;
 
       const invoiceMap: Record<string, any> = {};

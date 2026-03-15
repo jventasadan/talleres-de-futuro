@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 
 export interface CourtesyVehicle {
   id: string;
@@ -29,18 +30,23 @@ const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => 
 });
 
 export function useCourtesyVehicles() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["substitution_vehicles"],
+    queryKey: ["substitution_vehicles", workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!workshopId) return [];
+
       const { data, error } = await db
         .from("substitution_vehicles")
         .select("*")
+        .eq("workshop_id", workshopId)
         .order("plate", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => normalizeCourtesyVehicle(row));
     },
+    enabled: !!workshopId,
   });
 }
 

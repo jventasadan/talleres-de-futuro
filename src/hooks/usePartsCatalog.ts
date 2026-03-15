@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import type { ParsedPartRow } from "@/lib/partsImport";
 
 export interface PartsCatalogItem {
@@ -20,18 +21,23 @@ const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
 });
 
 export function usePartsCatalog() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["parts_catalog"],
+    queryKey: ["parts_catalog", workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!workshopId) return [];
+
       const { data, error } = await db
         .from("parts_catalog")
         .select("*")
+        .eq("workshop_id", workshopId)
         .order("name", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
     },
+    enabled: !!workshopId,
   });
 }
 

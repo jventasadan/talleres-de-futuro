@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { toast } from "sonner";
 
 export interface Appointment {
@@ -120,8 +121,7 @@ const applyDateFilter = (query: any, dateColumn: string | null, dateFilter?: str
   return query.gte(dateColumn, start).lte(dateColumn, end);
 };
 
-// RLS handles workshop isolation — no user_id filter needed
-const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> => {
+const fetchAppointmentsRows = async (workshopId: string, dateFilter?: string): Promise<AnyRecord[]> => {
   const attempts: Array<{ dateColumn: "date" | "appointment_date" | "appointment_start" | null; orderColumns: string[] }> = [
     { dateColumn: "date", orderColumns: ["date", "time_slot"] },
     { dateColumn: "appointment_date", orderColumns: ["appointment_date", "appointment_start"] },
@@ -133,7 +133,7 @@ const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> 
   let lastError: any;
 
   for (const attempt of attempts) {
-    let query: any = supabase.from("appointments").select("*");
+    let query: any = supabase.from("appointments").select("*").eq("workshop_id", workshopId);
 
     for (const column of attempt.orderColumns) {
       query = query.order(column);
@@ -204,22 +204,30 @@ const updateAppointmentWithFallback = async (id: string, payload: AnyRecord) => 
 };
 
 export function useAppointments(dateFilter?: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointments", dateFilter],
+    queryKey: ["appointments", workshopId, dateFilter],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows(dateFilter);
+      if (!workshopId) return [];
+      const rows = await fetchAppointmentsRows(workshopId, dateFilter);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!workshopId,
   });
 }
 
 export function useAllAppointments() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointments", "all"],
+    queryKey: ["appointments", "all", workshopId],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows();
+      if (!workshopId) return [];
+      const rows = await fetchAppointmentsRows(workshopId);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!workshopId,
   });
 }
 

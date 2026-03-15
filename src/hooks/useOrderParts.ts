@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 
 export interface OrderPart {
   id: string;
@@ -24,11 +25,12 @@ const normalizePart = (row: Record<string, any>, appointmentId: string): OrderPa
   created_at: row.created_at ? String(row.created_at) : undefined,
 });
 
-const ensureWorkOrder = async (appointmentId: string) => {
+const ensureWorkOrder = async (appointmentId: string, workshopId: string) => {
   const { data: existing, error: existingError } = await db
     .from("work_orders")
     .select("id, parts")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -58,11 +60,12 @@ const ensureWorkOrder = async (appointmentId: string) => {
   return data;
 };
 
-const getPartsFromWorkOrder = async (appointmentId: string): Promise<OrderPart[]> => {
+const getPartsFromWorkOrder = async (appointmentId: string, workshopId: string): Promise<OrderPart[]> => {
   const { data, error } = await db
     .from("work_orders")
     .select("id, parts")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -74,14 +77,18 @@ const getPartsFromWorkOrder = async (appointmentId: string): Promise<OrderPart[]
 };
 
 export function useOrderParts(appointmentId: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["order_parts", appointmentId],
+    queryKey: ["order_parts", appointmentId, workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!appointmentId || !workshopId) return [];
+
       const { data, error } = await db
         .from("order_parts")
         .select("*")
         .eq("appointment_id", appointmentId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: true });
 
       if (!error) {
@@ -89,19 +96,21 @@ export function useOrderParts(appointmentId: string) {
       }
 
       if (!isMissingTableError(error)) throw error;
-      return getPartsFromWorkOrder(appointmentId);
+      return getPartsFromWorkOrder(appointmentId, workshopId);
     },
-    enabled: !!appointmentId,
+    enabled: !!appointmentId && !!workshopId,
   });
 }
 
 export function useAddPart() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (part: Partial<OrderPart>) => {
       const appointmentId = String(part.appointment_id ?? "");
       if (!appointmentId) throw new Error("appointment_id es obligatorio");
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
       const payload = {
         appointment_id: appointmentId,
@@ -115,7 +124,7 @@ export function useAddPart() {
       if (!error) return normalizePart((data ?? payload) as Record<string, any>, appointmentId);
       if (!isMissingTableError(error)) throw error;
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentParts = Array.isArray(workOrder?.parts) ? workOrder.parts : [];
       const nextPart = { id: crypto.randomUUID(), ...payload, created_at: new Date().toISOString() };
 
@@ -139,14 +148,16 @@ export function useAddPart() {
 
 export function useDeletePart() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ id, appointmentId }: { id: string; appointmentId: string }) => {
       const { error } = await db.from("order_parts").delete().eq("id", id);
       if (!error) return;
       if (!isMissingTableError(error)) throw error;
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentParts = Array.isArray(workOrder?.parts) ? workOrder.parts : [];
       const nextParts = currentParts.filter((part: Record<string, any>) => String(part.id) !== id);
 

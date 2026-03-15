@@ -4,16 +4,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Download, CheckCircle } from "lucide-react";
-import { useInvoices, useInvoiceLines, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
+import { useInvoices, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 
-async function fetchInvoiceLines(invoiceId: string) {
+async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
+  if (!workshopId) return [];
+
   const { data, error } = await (supabase as any)
     .from("invoice_lines")
     .select("*")
     .eq("invoice_id", invoiceId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: true });
 
   if (!error && data?.length) return data;
@@ -22,11 +26,14 @@ async function fetchInvoiceLines(invoiceId: string) {
   return [];
 }
 
-async function fetchInvoiceParts(appointmentId: string) {
+async function fetchInvoiceParts(appointmentId: string, workshopId: string | null) {
+  if (!workshopId) return [];
+
   const { data: orderParts } = await supabase
     .from("order_parts")
     .select("*")
-    .eq("appointment_id", appointmentId) as any;
+    .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId) as any;
 
   return orderParts ?? [];
 }
@@ -34,11 +41,12 @@ async function fetchInvoiceParts(appointmentId: string) {
 async function generateProfessionalPdf(
   invoice: Invoice,
   settings: any,
+  workshopId: string | null,
 ) {
   // Try invoice_lines first, fallback to order_parts
-  let lines = await fetchInvoiceLines(invoice.id);
+  let lines = await fetchInvoiceLines(invoice.id, workshopId);
   if (!lines.length) {
-    const parts = await fetchInvoiceParts(invoice.appointment_id);
+    const parts = await fetchInvoiceParts(invoice.appointment_id, workshopId);
     lines = parts.map((p: any) => ({
       description: p.name ?? "Pieza",
       quantity: p.quantity ?? 1,
@@ -204,10 +212,11 @@ async function generateProfessionalPdf(
 const Invoices = () => {
   const { data: invoices, isLoading } = useInvoices();
   const { data: settings } = useCompanySettings();
+  const { workshopId } = useWorkshop();
   const updateStatus = useUpdateInvoiceStatus();
 
   const handleDownload = (inv: Invoice) => {
-    generateProfessionalPdf(inv, settings);
+    generateProfessionalPdf(inv, settings, workshopId);
   };
 
   const handleMarkPaid = (inv: Invoice) => {

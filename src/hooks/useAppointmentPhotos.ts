@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { toast } from "sonner";
 
 export interface AppointmentPhoto {
@@ -30,11 +31,12 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const ensureWorkOrder = async (appointmentId: string) => {
+const ensureWorkOrder = async (appointmentId: string, workshopId: string) => {
   const { data: existing, error: findError } = await db
     .from("work_orders")
     .select("id, photos")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -62,11 +64,12 @@ const ensureWorkOrder = async (appointmentId: string) => {
   return data;
 };
 
-const getWorkOrderPhotos = async (appointmentId: string): Promise<AppointmentPhoto[]> => {
+const getWorkOrderPhotos = async (appointmentId: string, workshopId: string): Promise<AppointmentPhoto[]> => {
   const { data, error } = await db
     .from("work_orders")
     .select("photos")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -77,13 +80,18 @@ const getWorkOrderPhotos = async (appointmentId: string): Promise<AppointmentPho
 };
 
 export function useAppointmentPhotos(appointmentId: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointment_photos", appointmentId],
+    queryKey: ["appointment_photos", appointmentId, workshopId],
     queryFn: async () => {
+      if (!appointmentId || !workshopId) return [];
+
       const { data, error } = await db
         .from("appointment_photos")
         .select("*")
         .eq("appointment_id", appointmentId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
       if (!error) {
@@ -91,17 +99,20 @@ export function useAppointmentPhotos(appointmentId: string) {
       }
 
       if (!isMissingTableError(error)) throw error;
-      return getWorkOrderPhotos(appointmentId);
+      return getWorkOrderPhotos(appointmentId, workshopId);
     },
-    enabled: !!appointmentId,
+    enabled: !!appointmentId && !!workshopId,
   });
 }
 
 export function useUploadPhoto() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ appointmentId, file }: { appointmentId: string; file: File }) => {
+      if (!workshopId) throw new Error("No se encontró workshop_id");
+
       const ext = file.name.split(".").pop() ?? "jpg";
       const filePath = `${appointmentId}/${Date.now()}.${ext}`;
 
@@ -121,7 +132,7 @@ export function useUploadPhoto() {
       if (uploadError && !isBucketNotFound(uploadError)) throw uploadError;
 
       const dataUrl = await readFileAsDataUrl(file);
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentPhotos = Array.isArray(workOrder?.photos) ? workOrder.photos : [];
 
       const nextPhoto = {
@@ -148,14 +159,16 @@ export function useUploadPhoto() {
 
 export function useDeletePhoto() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ id, appointmentId }: { id: string; appointmentId: string }) => {
       const { error } = await db.from("appointment_photos").delete().eq("id", id);
       if (!error) return;
       if (!isMissingTableError(error)) throw error;
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentPhotos = Array.isArray(workOrder?.photos) ? workOrder.photos : [];
       const nextPhotos = currentPhotos.filter((photo: Record<string, any>) => String(photo.id) !== id);
 
