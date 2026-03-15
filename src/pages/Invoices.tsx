@@ -41,11 +41,12 @@ async function fetchInvoiceParts(appointmentId: string, workshopId: string | nul
 async function generateProfessionalPdf(
   invoice: Invoice,
   settings: any,
+  workshopId: string | null,
 ) {
   // Try invoice_lines first, fallback to order_parts
-  let lines = await fetchInvoiceLines(invoice.id);
+  let lines = await fetchInvoiceLines(invoice.id, workshopId);
   if (!lines.length) {
-    const parts = await fetchInvoiceParts(invoice.appointment_id);
+    const parts = await fetchInvoiceParts(invoice.appointment_id, workshopId);
     lines = parts.map((p: any) => ({
       description: p.name ?? "Pieza",
       quantity: p.quantity ?? 1,
