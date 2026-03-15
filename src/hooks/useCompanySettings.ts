@@ -24,11 +24,13 @@ export function useCompanySettings() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["company_settings"],
+    queryKey: ["company_settings", user?.id],
     queryFn: async () => {
+      if (!user?.id) return null;
       const { data, error } = await (supabase as any)
         .from("company_settings")
         .select("*")
+        .eq("user_id", user.id)
         .limit(1)
         .maybeSingle();
 
