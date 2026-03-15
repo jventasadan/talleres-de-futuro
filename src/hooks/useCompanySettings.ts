@@ -47,9 +47,11 @@ export function useSaveCompanySettings() {
 
   return useMutation({
     mutationFn: async (settings: Partial<CompanySettings>) => {
+      if (!user?.id) throw new Error("No autenticado");
       const { data: existing } = await (supabase as any)
         .from("company_settings")
         .select("id")
+        .eq("user_id", user.id)
         .limit(1)
         .maybeSingle();
 
