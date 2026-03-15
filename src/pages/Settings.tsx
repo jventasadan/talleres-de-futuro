@@ -24,7 +24,6 @@ const SettingsPage = () => {
   const deleteCatalog = useDeletePartsCatalog();
   const { workshopComplete } = useWorkshop();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     company_name: "",
