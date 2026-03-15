@@ -107,9 +107,12 @@ export function useAppointmentPhotos(appointmentId: string) {
 
 export function useUploadPhoto() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ appointmentId, file }: { appointmentId: string; file: File }) => {
+      if (!workshopId) throw new Error("No se encontró workshop_id");
+
       const ext = file.name.split(".").pop() ?? "jpg";
       const filePath = `${appointmentId}/${Date.now()}.${ext}`;
 
@@ -129,7 +132,7 @@ export function useUploadPhoto() {
       if (uploadError && !isBucketNotFound(uploadError)) throw uploadError;
 
       const dataUrl = await readFileAsDataUrl(file);
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentPhotos = Array.isArray(workOrder?.photos) ? workOrder.photos : [];
 
       const nextPhoto = {
@@ -156,14 +159,16 @@ export function useUploadPhoto() {
 
 export function useDeletePhoto() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async ({ id, appointmentId }: { id: string; appointmentId: string }) => {
       const { error } = await db.from("appointment_photos").delete().eq("id", id);
       if (!error) return;
       if (!isMissingTableError(error)) throw error;
+      if (!workshopId) throw new Error("No se encontró workshop_id");
 
-      const workOrder = await ensureWorkOrder(appointmentId);
+      const workOrder = await ensureWorkOrder(appointmentId, workshopId);
       const currentPhotos = Array.isArray(workOrder?.photos) ? workOrder.photos : [];
       const nextPhotos = currentPhotos.filter((photo: Record<string, any>) => String(photo.id) !== id);
 
