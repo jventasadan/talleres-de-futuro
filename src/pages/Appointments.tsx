@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog } from "lucide-react";
+import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone } from "lucide-react";
 import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
