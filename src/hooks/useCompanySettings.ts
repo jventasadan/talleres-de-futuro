@@ -24,18 +24,20 @@ export function useCompanySettings() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["company_settings"],
+    queryKey: ["company_settings", user?.id],
     queryFn: async () => {
+      if (!user?.id) return null;
       const { data, error } = await (supabase as any)
         .from("company_settings")
         .select("*")
+        .eq("user_id", user.id)
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data as CompanySettings | null;
     },
-    enabled: !!user,
+    enabled: !!user?.id,
   });
 }
 
@@ -45,9 +47,11 @@ export function useSaveCompanySettings() {
 
   return useMutation({
     mutationFn: async (settings: Partial<CompanySettings>) => {
+      if (!user?.id) throw new Error("No autenticado");
       const { data: existing } = await (supabase as any)
         .from("company_settings")
         .select("id")
+        .eq("user_id", user.id)
         .limit(1)
         .maybeSingle();
 
