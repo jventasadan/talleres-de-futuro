@@ -212,10 +212,11 @@ async function generateProfessionalPdf(
 const Invoices = () => {
   const { data: invoices, isLoading } = useInvoices();
   const { data: settings } = useCompanySettings();
+  const { workshopId } = useWorkshop();
   const updateStatus = useUpdateInvoiceStatus();
 
   const handleDownload = (inv: Invoice) => {
-    generateProfessionalPdf(inv, settings);
+    generateProfessionalPdf(inv, settings, workshopId);
   };
 
   const handleMarkPaid = (inv: Invoice) => {
