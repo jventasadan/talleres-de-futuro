@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import type { ParsedPartRow } from "@/lib/partsImport";
 
 export interface PartsCatalogItem {
@@ -21,44 +20,38 @@ const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
 });
 
 export function usePartsCatalog() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["parts_catalog", user?.id],
+    queryKey: ["parts_catalog"],
     queryFn: async () => {
-      if (!user?.id) return [];
+      // RLS filters by workshop_id automatically
       const { data, error } = await db
         .from("parts_catalog")
         .select("*")
-        .eq("user_id", user.id)
         .order("name", { ascending: true });
 
       if (error) throw error;
       return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
     },
-    enabled: !!user?.id,
   });
 }
 
 export function useImportPartsCatalog() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (rows: ParsedPartRow[]) => {
       if (!rows.length) throw new Error("No hay filas para importar.");
-      if (!user?.id) throw new Error("Debes iniciar sesión.");
 
-      // Delete existing catalog and re-insert
+      // Delete existing catalog (RLS ensures only own data is deleted)
       await db.from("parts_catalog").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
       const batchSize = 50;
       for (let i = 0; i < rows.length; i += batchSize) {
         const batch = rows.slice(i, i + batchSize).map((part) => ({
-          user_id: user.id,
           name: part.name,
           ref: part.ref,
           price: part.price,
+          // workshop_id is set automatically by DB trigger
         }));
         const { error } = await db.from("parts_catalog").insert(batch);
         if (error) throw error;

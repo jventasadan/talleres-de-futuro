@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export interface Invoice {
   id: string;
@@ -32,22 +31,18 @@ export interface InvoiceLine {
 }
 
 export function useInvoices() {
-  const { user } = useAuth();
-
   return useQuery({
-    queryKey: ["invoices", user?.id],
+    queryKey: ["invoices"],
     queryFn: async () => {
-      if (!user?.id) return [];
+      // RLS filters by workshop_id automatically
       const { data, error } = await supabase
         .from("invoices")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []) as unknown as Invoice[];
     },
-    enabled: !!user?.id,
   });
 }
 
@@ -71,11 +66,9 @@ export function useInvoiceLines(invoiceId: string | null) {
 export async function generateInvoiceNumber(userId: string): Promise<string> {
   const year = new Date().getFullYear();
 
-  // Try to get or create the series for this year
   const { data: series } = await (supabase as any)
     .from("invoice_series")
     .select("*")
-    .eq("user_id", userId)
     .eq("year", year)
     .maybeSingle();
 
@@ -99,10 +92,10 @@ export async function generateInvoiceNumber(userId: string): Promise<string> {
 
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (invoice: Partial<Invoice> & { lines?: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> }) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id ?? "";
       const invoiceNumber = invoice.invoice_number ?? await generateInvoiceNumber(userId);
 
@@ -120,13 +113,13 @@ export function useCreateInvoice() {
           total: Number(invoice.total ?? 0),
           status: invoice.status ?? "emitida",
           user_id: userId,
+          // workshop_id is set automatically by DB trigger
         } as any)
         .select("*")
         .single();
 
       if (error) throw error;
 
-      // Insert invoice lines if provided
       if (invoice.lines?.length && data) {
         const invoiceId = (data as any).id;
         const lineRows = invoice.lines.map((line) => ({
