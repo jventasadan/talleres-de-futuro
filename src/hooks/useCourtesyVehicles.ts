@@ -17,6 +17,21 @@ export interface CourtesyVehicle {
 
 const db = supabase as any;
 
+const isSchemaMismatchError = (error: any) => {
+  const code = String(error?.code ?? "");
+  const message = String(error?.message ?? "").toLowerCase();
+  return code === "42703" || message.includes("does not exist");
+};
+
+const extractMissingColumn = (error: any): string | null => {
+  const message = String(error?.message ?? "");
+  const pgrstMatch = message.match(/Could not find the '([^']+)' column/i);
+  if (pgrstMatch?.[1]) return pgrstMatch[1];
+  const pgMatch = message.match(/column\s+[\w.]+\.([a-zA-Z0-9_]+)\s+does not exist/i);
+  if (pgMatch?.[1]) return pgMatch[1];
+  return null;
+};
+
 const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => ({
   id: String(row.id),
   plate: String(row.plate ?? ""),
@@ -29,6 +44,51 @@ const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => 
   status: String(row.status ?? "disponible"),
 });
 
+const insertWithFallback = async (payload: Record<string, any>) => {
+  let attemptPayload = { ...payload };
+  let lastError: any;
+
+  for (let i = 0; i < 10; i++) {
+    const { data, error } = await db
+      .from("substitution_vehicles")
+      .insert(attemptPayload)
+      .select("*")
+      .maybeSingle();
+
+    if (!error) return data;
+
+    lastError = error;
+    const missingColumn = extractMissingColumn(error);
+    if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) break;
+    delete attemptPayload[missingColumn];
+  }
+
+  throw lastError;
+};
+
+const updateWithFallback = async (id: string, payload: Record<string, any>) => {
+  let attemptPayload = { ...payload };
+  let lastError: any;
+
+  for (let i = 0; i < 10; i++) {
+    const { data, error } = await db
+      .from("substitution_vehicles")
+      .update(attemptPayload)
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+
+    if (!error) return data;
+
+    lastError = error;
+    const missingColumn = extractMissingColumn(error);
+    if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) break;
+    delete attemptPayload[missingColumn];
+  }
+
+  throw lastError;
+};
+
 export function useCourtesyVehicles() {
   const { workshopId } = useWorkshop();
 
@@ -37,14 +97,32 @@ export function useCourtesyVehicles() {
     queryFn: async () => {
       if (!workshopId) return [];
 
-      const { data, error } = await db
+      // Try with workshop_id, fallback without
+      const { data: d1, error: e1 } = await db
         .from("substitution_vehicles")
         .select("*")
         .eq("workshop_id", workshopId)
         .order("plate", { ascending: true });
 
-      if (error) throw error;
-      return (data ?? []).map((row: Record<string, any>) => normalizeCourtesyVehicle(row));
+      if (!e1) return (d1 ?? []).map(normalizeCourtesyVehicle);
+
+      if (isSchemaMismatchError(e1)) {
+        const { data: d2, error: e2 } = await db
+          .from("substitution_vehicles")
+          .select("*")
+          .order("plate", { ascending: true });
+        if (!e2) return (d2 ?? []).map(normalizeCourtesyVehicle);
+        if (isSchemaMismatchError(e2)) {
+          const { data: d3, error: e3 } = await db
+            .from("substitution_vehicles")
+            .select("*");
+          if (!e3) return (d3 ?? []).map(normalizeCourtesyVehicle);
+          throw e3;
+        }
+        throw e2;
+      }
+
+      throw e1;
     },
     enabled: !!workshopId,
   });
@@ -55,14 +133,7 @@ export function useCreateCourtesyVehicle() {
 
   return useMutation({
     mutationFn: async (payload: Omit<CourtesyVehicle, "id">) => {
-      // workshop_id is set automatically by DB trigger
-      const { data, error } = await db
-        .from("substitution_vehicles")
-        .insert({ ...payload })
-        .select("*")
-        .maybeSingle();
-
-      if (error) throw error;
+      const data = await insertWithFallback({ ...payload });
       return normalizeCourtesyVehicle((data ?? payload) as Record<string, any>);
     },
     onSuccess: () => {
@@ -80,14 +151,7 @@ export function useUpdateCourtesyVehicle() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: CourtesyVehicle) => {
-      const { data, error } = await db
-        .from("substitution_vehicles")
-        .update(updates)
-        .eq("id", id)
-        .select("*")
-        .maybeSingle();
-
-      if (error) throw error;
+      const data = await updateWithFallback(id, updates);
       return normalizeCourtesyVehicle((data ?? { id, ...updates }) as Record<string, any>);
     },
     onSuccess: () => {

@@ -1,26 +1,29 @@
-import { Calendar, Clock, TrendingUp, Euro } from "lucide-react";
+import { Calendar, Clock, Car, Euro, Wrench } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAllAppointments } from "@/hooks/useAppointments";
 import { useInvoices } from "@/hooks/useInvoices";
-import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 export function StatsCards() {
   const { data: appointments } = useAllAppointments();
   const { data: invoices } = useInvoices();
 
   const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const activeOrders = (appointments ?? []).filter(
-    (a) => a.status === "recepcionado" || a.status === "en_reparacion"
-  ).length;
+  const all = appointments ?? [];
 
-  const monthRepairs = (appointments ?? []).filter((a) => {
-    const d = new Date(a.date);
-    return (a.status === "listo" || a.status === "entregado") &&
-      isWithinInterval(d, { start: monthStart, end: monthEnd });
-  }).length;
+  const waitingCars = all.filter((a) => a.status === "espera" || a.status === "recepcionado").length;
+  const inRepair = all.filter((a) => a.status === "en_reparacion").length;
+  const readyToday = all.filter((a) => a.status === "listo" && a.date === todayStr).length;
+  const todayAppointments = all.filter((a) => a.date === todayStr).length;
+
+  const todayBilling = (invoices ?? []).filter((inv) => {
+    const d = format(new Date(inv.created_at), "yyyy-MM-dd");
+    return d === todayStr;
+  }).reduce((sum, inv) => sum + Number(inv.total), 0);
 
   const monthBilling = (invoices ?? []).filter((inv) => {
     const d = new Date(inv.created_at);
@@ -28,10 +31,10 @@ export function StatsCards() {
   }).reduce((sum, inv) => sum + Number(inv.total), 0);
 
   const stats = [
-    { title: "Órdenes Activas", value: String(activeOrders), subtitle: "En Taller", icon: Calendar, iconBg: "bg-warning/80" },
-    { title: "Reparaciones (Mes)", value: String(monthRepairs), subtitle: "Completadas", subtitleColor: "text-success", icon: TrendingUp, iconBg: "bg-info/80" },
-    { title: "Tiempo Medio", value: "0h", subtitle: "Por reparación", icon: Clock, iconBg: "bg-muted-foreground/60" },
-    { title: "Facturación Mes", value: `${monthBilling.toFixed(0)} €`, subtitle: "Taller", subtitleColor: "text-primary", icon: Euro, iconBg: "bg-info/80" },
+    { title: "En espera", value: String(waitingCars), subtitle: "Recepcionados", icon: Car, iconBg: "bg-warning/80" },
+    { title: "En reparación", value: String(inRepair), subtitle: "Ahora mismo", subtitleColor: "text-info", icon: Wrench, iconBg: "bg-info/80" },
+    { title: "Listos hoy", value: String(readyToday), subtitle: `${todayAppointments} citas del día`, subtitleColor: "text-success", icon: Calendar, iconBg: "bg-success/80" },
+    { title: "Facturación", value: `${todayBilling.toFixed(0)}€`, subtitle: `${monthBilling.toFixed(0)}€ este mes`, subtitleColor: "text-primary", icon: Euro, iconBg: "bg-primary/80" },
   ];
 
   return (

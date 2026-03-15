@@ -73,9 +73,14 @@ export function UpcomingAppointments() {
                     <TableCell>
                       <p className="text-sm">{apt.service || "Sin servicio"}</p>
                       <p className="text-xs text-muted-foreground">{apt.time_slot}</p>
+                      {apt.phone && <p className="text-[10px] text-muted-foreground">📞 {apt.phone}</p>}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`text-[10px] font-semibold border ${statusClass}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-semibold border ${statusClass} cursor-pointer hover:opacity-80 transition-opacity`}
+                        onClick={() => navigate("/appointments")}
+                      >
                         {apt.status ?? "Recepcionado"}
                       </Badge>
                     </TableCell>

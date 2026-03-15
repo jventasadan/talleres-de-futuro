@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog } from "lucide-react";
+import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone } from "lucide-react";
 import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
@@ -360,6 +360,12 @@ const Appointments = () => {
                               <User className="h-3 w-3 text-muted-foreground" />
                               <span className="font-medium truncate">{apt.client_name || "Sin Nombre"}</span>
                             </div>
+                            {apt.phone && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Phone className="h-3 w-3" />
+                                <span>{apt.phone}</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                               <Car className="h-3 w-3" />
                               <span className="font-mono">{apt.license_plate || "---"}</span>
