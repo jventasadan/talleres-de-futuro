@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 
 export interface OrderPart {
   id: string;
@@ -24,11 +25,12 @@ const normalizePart = (row: Record<string, any>, appointmentId: string): OrderPa
   created_at: row.created_at ? String(row.created_at) : undefined,
 });
 
-const ensureWorkOrder = async (appointmentId: string) => {
+const ensureWorkOrder = async (appointmentId: string, workshopId: string) => {
   const { data: existing, error: existingError } = await db
     .from("work_orders")
     .select("id, parts")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -58,11 +60,12 @@ const ensureWorkOrder = async (appointmentId: string) => {
   return data;
 };
 
-const getPartsFromWorkOrder = async (appointmentId: string): Promise<OrderPart[]> => {
+const getPartsFromWorkOrder = async (appointmentId: string, workshopId: string): Promise<OrderPart[]> => {
   const { data, error } = await db
     .from("work_orders")
     .select("id, parts")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
