@@ -31,6 +31,12 @@ export interface InvoiceLine {
   created_at: string;
 }
 
+const isSchemaMismatchError = (error: any) => {
+  const code = String(error?.code ?? "");
+  const message = String(error?.message ?? "").toLowerCase();
+  return code === "42703" || message.includes("does not exist");
+};
+
 export function useInvoices() {
   const { workshopId } = useWorkshop();
 
@@ -39,14 +45,26 @@ export function useInvoices() {
     queryFn: async () => {
       if (!workshopId) return [];
 
-      const { data, error } = await supabase
+      // Try with workshop_id filter first
+      const { data: d1, error: e1 } = await supabase
         .from("invoices")
         .select("*")
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return (data ?? []) as unknown as Invoice[];
+      if (!e1) return (d1 ?? []) as unknown as Invoice[];
+
+      if (isSchemaMismatchError(e1)) {
+        // Fallback: no workshop_id filter
+        const { data: d2, error: e2 } = await supabase
+          .from("invoices")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (!e2) return (d2 ?? []) as unknown as Invoice[];
+        throw e2;
+      }
+
+      throw e1;
     },
     enabled: !!workshopId,
   });
