@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface CourtesyVehicle {
   id: string;
   plate: string;
+  brand: string;
   model: string;
   km: string;
   assigned_client: string;
+  delivery_date: string;
   return_date: string;
   status: string;
 }
@@ -17,9 +20,11 @@ const db = supabase as any;
 const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => ({
   id: String(row.id),
   plate: String(row.plate ?? ""),
+  brand: String(row.brand ?? ""),
   model: String(row.model ?? ""),
   km: String(row.km ?? ""),
   assigned_client: String(row.assigned_client ?? ""),
+  delivery_date: String(row.delivery_date ?? ""),
   return_date: String(row.return_date ?? ""),
   status: String(row.status ?? "disponible"),
 });
@@ -41,12 +46,13 @@ export function useCourtesyVehicles() {
 
 export function useCreateCourtesyVehicle() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (payload: Omit<CourtesyVehicle, "id">) => {
       const { data, error } = await db
         .from("substitution_vehicles")
-        .insert(payload)
+        .insert({ ...payload, user_id: user?.id ?? "" })
         .select("*")
         .maybeSingle();
 

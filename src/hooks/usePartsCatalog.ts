@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { ParsedPartRow } from "@/lib/partsImport";
 
 export interface PartsCatalogItem {
@@ -11,90 +12,53 @@ export interface PartsCatalogItem {
 }
 
 const db = supabase as any;
-const isMissingTableError = (error: any) => String(error?.code ?? "") === "PGRST205";
 
 const mapCatalogRow = (row: Record<string, any>): PartsCatalogItem => ({
   id: String(row.id),
-  name: String(row.name ?? row.description ?? ""),
-  ref: String(row.ref ?? row.reference ?? ""),
-  price: Number(row.price ?? row.sale_price ?? 0),
+  name: String(row.name ?? ""),
+  ref: String(row.ref ?? ""),
+  price: Number(row.price ?? 0),
 });
-
-const fetchPartsCatalogRows = async (): Promise<PartsCatalogItem[]> => {
-  const { data, error } = await db
-    .from("parts_catalog")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (!error) {
-    return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
-  }
-
-  if (!isMissingTableError(error)) throw error;
-
-  const fallback = await db
-    .from("parts")
-    .select("*")
-    .order("description", { ascending: true });
-
-  if (fallback.error) throw fallback.error;
-
-  return (fallback.data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
-};
-
-const upsertPartsCatalogRows = async (rows: ParsedPartRow[]) => {
-  const { error } = await db
-    .from("parts_catalog")
-    .upsert(rows.map((part) => ({ name: part.name, ref: part.ref, price: part.price })), { onConflict: "ref" });
-
-  if (!error) return;
-  if (!isMissingTableError(error)) throw error;
-
-  for (const part of rows) {
-    const { data: existing, error: findError } = await db
-      .from("parts")
-      .select("id")
-      .eq("reference", part.ref)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (existing?.id) {
-      const { error: updateError } = await db
-        .from("parts")
-        .update({ description: part.name, sale_price: part.price })
-        .eq("id", existing.id);
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await db
-        .from("parts")
-        .insert({
-          reference: part.ref,
-          description: part.name,
-          cost_price: part.price,
-          sale_price: part.price,
-          stock: 0,
-          minimum_stock: 0,
-        });
-      if (insertError) throw insertError;
-    }
-  }
-};
 
 export function usePartsCatalog() {
   return useQuery({
     queryKey: ["parts_catalog"],
-    queryFn: fetchPartsCatalogRows,
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("parts_catalog")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, any>) => mapCatalogRow(row));
+    },
   });
 }
 
 export function useImportPartsCatalog() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (rows: ParsedPartRow[]) => {
       if (!rows.length) throw new Error("No hay filas para importar.");
-      await upsertPartsCatalogRows(rows);
+      if (!user?.id) throw new Error("Debes iniciar sesión.");
+
+      // Delete existing catalog and re-insert
+      await db.from("parts_catalog").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+      const batchSize = 50;
+      for (let i = 0; i < rows.length; i += batchSize) {
+        const batch = rows.slice(i, i + batchSize).map((part) => ({
+          user_id: user.id,
+          name: part.name,
+          ref: part.ref,
+          price: part.price,
+        }));
+        const { error } = await db.from("parts_catalog").insert(batch);
+        if (error) throw error;
+      }
+
       return rows.length;
     },
     onSuccess: (count) => {
@@ -103,6 +67,21 @@ export function useImportPartsCatalog() {
     },
     onError: (error: any) => {
       toast.error(`Error al importar piezas: ${error?.message ?? "Error desconocido"}`);
+    },
+  });
+}
+
+export function useDeletePartsCatalog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await db.from("parts_catalog").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["parts_catalog"] });
+      toast.success("Catálogo eliminado");
     },
   });
 }

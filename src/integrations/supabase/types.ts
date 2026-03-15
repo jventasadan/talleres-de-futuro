@@ -424,6 +424,75 @@ export type Database = {
           },
         ]
       }
+      parts_catalog: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          price: number
+          ref: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          price?: number
+          ref?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          ref?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      substitution_vehicles: {
+        Row: {
+          assigned_client: string | null
+          brand: string | null
+          created_at: string
+          delivery_date: string | null
+          id: string
+          km: string | null
+          model: string | null
+          plate: string
+          return_date: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_client?: string | null
+          brand?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          km?: string | null
+          model?: string | null
+          plate?: string
+          return_date?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_client?: string | null
+          brand?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          km?: string | null
+          model?: string | null
+          plate?: string
+          return_date?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       work_orders: {
         Row: {
           appointment_id: string
