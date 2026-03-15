@@ -76,7 +76,11 @@ export function UpcomingAppointments() {
                       {apt.phone && <p className="text-[10px] text-muted-foreground">📞 {apt.phone}</p>}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`text-[10px] font-semibold border ${statusClass}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-semibold border ${statusClass} cursor-pointer hover:opacity-80 transition-opacity`}
+                        onClick={() => navigate("/appointments")}
+                      >
                         {apt.status ?? "Recepcionado"}
                       </Badge>
                     </TableCell>

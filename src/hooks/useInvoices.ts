@@ -78,14 +78,27 @@ export function useInvoiceLines(invoiceId: string | null) {
     queryFn: async () => {
       if (!invoiceId || !workshopId) return [];
 
-      const { data, error } = await (supabase as any)
+      // Try with workshop_id
+      const { data: d1, error: e1 } = await (supabase as any)
         .from("invoice_lines")
         .select("*")
         .eq("invoice_id", invoiceId)
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as InvoiceLine[];
+
+      if (!e1) return (d1 ?? []) as InvoiceLine[];
+
+      if (isSchemaMismatchError(e1)) {
+        const { data: d2, error: e2 } = await (supabase as any)
+          .from("invoice_lines")
+          .select("*")
+          .eq("invoice_id", invoiceId)
+          .order("created_at", { ascending: true });
+        if (!e2) return (d2 ?? []) as InvoiceLine[];
+        throw e2;
+      }
+
+      throw e1;
     },
     enabled: !!invoiceId && !!workshopId,
   });
