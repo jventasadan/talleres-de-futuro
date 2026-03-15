@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { toast } from "sonner";
 
 export interface Client {
@@ -101,18 +102,23 @@ const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
 };
 
 export function useClients() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["clients"],
+    queryKey: ["clients", workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!workshopId) return [];
+
       const { data, error } = await supabase
         .from("clients")
         .select("*")
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return (data ?? []).map(mapRow);
     },
+    enabled: !!workshopId,
   });
 }
 
