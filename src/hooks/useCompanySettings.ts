@@ -60,6 +60,7 @@ export function useSaveCompanySettings() {
           .from("company_settings")
           .update(settings)
           .eq("id", existing.id)
+          .eq("user_id", user.id)
           .select("*")
           .single();
         if (error) throw error;
@@ -67,7 +68,7 @@ export function useSaveCompanySettings() {
       } else {
         const { data, error } = await (supabase as any)
           .from("company_settings")
-          .insert({ ...settings, user_id: user?.id ?? "" })
+          .insert({ ...settings, user_id: user.id })
           .select("*")
           .single();
         if (error) throw error;
