@@ -42,6 +42,7 @@ const NEXT_STATUS: Record<string, StatusKey> = {
   recepcionado: "en_reparacion",
   en_reparacion: "esperando_piezas",
   esperando_piezas: "listo",
+  listo: "entregado",
 };
 
 const isSchemaMismatchError = (error: any) => {
