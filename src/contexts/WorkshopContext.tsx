@@ -142,7 +142,17 @@ export function WorkshopProvider({ children }: { children: ReactNode }) {
     };
 
     ensureWorkshop();
-    return () => { cancelled = true; };
+
+    const handleSettingsUpdate = () => {
+      cancelled = false;
+      ensureWorkshop();
+    };
+    window.addEventListener("workshop-settings-updated", handleSettingsUpdate);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("workshop-settings-updated", handleSettingsUpdate);
+    };
   }, [user?.id]);
 
   return (

@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Save, Wrench, Phone, DollarSign, Loader2, Upload, Package, Trash2 } from "lucide-react";
 import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
 import { usePartsCatalog, useImportPartsCatalog, useDeletePartsCatalog } from "@/hooks/usePartsCatalog";
+import { useWorkshop } from "@/contexts/WorkshopContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parsePartsFile } from "@/lib/partsImport";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
 import { toast } from "sonner";
