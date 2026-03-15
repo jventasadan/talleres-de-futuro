@@ -77,14 +77,18 @@ const getPartsFromWorkOrder = async (appointmentId: string, workshopId: string):
 };
 
 export function useOrderParts(appointmentId: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["order_parts", appointmentId],
+    queryKey: ["order_parts", appointmentId, workshopId],
     queryFn: async () => {
-      // RLS filters by workshop_id automatically
+      if (!appointmentId || !workshopId) return [];
+
       const { data, error } = await db
         .from("order_parts")
         .select("*")
         .eq("appointment_id", appointmentId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: true });
 
       if (!error) {
@@ -92,9 +96,9 @@ export function useOrderParts(appointmentId: string) {
       }
 
       if (!isMissingTableError(error)) throw error;
-      return getPartsFromWorkOrder(appointmentId);
+      return getPartsFromWorkOrder(appointmentId, workshopId);
     },
-    enabled: !!appointmentId,
+    enabled: !!appointmentId && !!workshopId,
   });
 }
 
