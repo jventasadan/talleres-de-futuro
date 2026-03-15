@@ -12,6 +12,7 @@ import Appointments from "./pages/Appointments";
 import WeeklyCalendar from "./pages/WeeklyCalendar";
 import Clients from "./pages/Clients";
 import Invoices from "./pages/Invoices";
+import Quotes from "./pages/Quotes";
 import MechanicChat from "./pages/MechanicChat";
 import CourtesyVehicles from "./pages/CourtesyVehicles";
 import VehicleHistory from "./pages/VehicleHistory";
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/weekly" element={<ProtectedRoute><WeeklyCalendar /></ProtectedRoute>} />
               <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+              <Route path="/quotes" element={<ProtectedRoute><Quotes /></ProtectedRoute>} />
               <Route path="/mechanic-ai" element={<ProtectedRoute><MechanicChat /></ProtectedRoute>} />
               <Route path="/courtesy-vehicles" element={<ProtectedRoute><CourtesyVehicles /></ProtectedRoute>} />
               <Route path="/vehicle-history" element={<ProtectedRoute><VehicleHistory /></ProtectedRoute>} />

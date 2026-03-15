@@ -559,6 +559,144 @@ export type Database = {
           },
         ]
       }
+      quote_lines: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          line_type: string
+          quantity: number
+          quote_id: string
+          total: number
+          unit_price: number
+          user_id: string
+          workshop_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          line_type?: string
+          quantity?: number
+          quote_id: string
+          total?: number
+          unit_price?: number
+          user_id: string
+          workshop_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          line_type?: string
+          quantity?: number
+          quote_id?: string
+          total?: number
+          unit_price?: number
+          user_id?: string
+          workshop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_lines_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_lines_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          appointment_id: string | null
+          brand: string | null
+          client_name: string
+          created_at: string
+          estimated_hours: number
+          id: string
+          labor_cost: number
+          labor_rate: number
+          license_plate: string
+          model: string | null
+          notes: string | null
+          parts_total: number
+          phone: string | null
+          service: string
+          status: string
+          tax_rate: number
+          total: number
+          updated_at: string
+          user_id: string
+          workshop_id: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          brand?: string | null
+          client_name?: string
+          created_at?: string
+          estimated_hours?: number
+          id?: string
+          labor_cost?: number
+          labor_rate?: number
+          license_plate?: string
+          model?: string | null
+          notes?: string | null
+          parts_total?: number
+          phone?: string | null
+          service?: string
+          status?: string
+          tax_rate?: number
+          total?: number
+          updated_at?: string
+          user_id: string
+          workshop_id?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          brand?: string | null
+          client_name?: string
+          created_at?: string
+          estimated_hours?: number
+          id?: string
+          labor_cost?: number
+          labor_rate?: number
+          license_plate?: string
+          model?: string | null
+          notes?: string | null
+          parts_total?: number
+          phone?: string | null
+          service?: string
+          status?: string
+          tax_rate?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          workshop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       substitution_vehicles: {
         Row: {
           assigned_client: string | null

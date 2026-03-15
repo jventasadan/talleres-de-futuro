@@ -10,6 +10,7 @@ import {
   Stethoscope,
   Users,
   Wrench,
+  Receipt,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -33,6 +34,7 @@ const mainItems = [
   { title: "Clientes", url: "/clients", icon: Users },
   { title: "Órdenes de Trabajo", url: "/appointments", icon: ClipboardList },
   { title: "Calendario", url: "/weekly", icon: Calendar },
+  { title: "Presupuestos", url: "/quotes", icon: Receipt },
   { title: "Facturas", url: "/invoices", icon: FileText },
   { title: "Diagnóstico IA", url: "/mechanic-ai", icon: Stethoscope },
   { title: "Historial Vehículo", url: "/vehicle-history", icon: History },
