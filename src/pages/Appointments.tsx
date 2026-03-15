@@ -124,6 +124,11 @@ const Appointments = () => {
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
     if (newStatus === "en_reparacion") {
+      // Mechanic is mandatory for repair
+      if (!appointment.mechanic_id) {
+        toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
+        return;
+      }
       // Create work order with repair_start_time
       try {
         await (supabase as any)
