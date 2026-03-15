@@ -21,6 +21,7 @@ export type Database = {
           id: string
           photo_url: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           appointment_id: string
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           photo_url: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           appointment_id?: string
@@ -35,8 +37,17 @@ export type Database = {
           id?: string
           photo_url?: string
           user_id?: string
+          workshop_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "appointment_photos_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       appointments: {
         Row: {
@@ -54,6 +65,7 @@ export type Database = {
           time_slot: string
           updated_at: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           client_id?: string | null
@@ -70,6 +82,7 @@ export type Database = {
           time_slot: string
           updated_at?: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           client_id?: string | null
@@ -86,6 +99,7 @@ export type Database = {
           time_slot?: string
           updated_at?: string
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -102,6 +116,13 @@ export type Database = {
             referencedRelation: "mechanics"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       clients: {
@@ -115,6 +136,7 @@ export type Database = {
           phone: string | null
           updated_at: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           brand?: string | null
@@ -126,6 +148,7 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           brand?: string | null
@@ -137,8 +160,17 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id?: string
+          workshop_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_settings: {
         Row: {
@@ -151,6 +183,7 @@ export type Database = {
           email: string | null
           id: string
           labor_rate: number | null
+          owner_user_id: string | null
           phone: string | null
           postal_code: string | null
           province: string | null
@@ -167,6 +200,7 @@ export type Database = {
           email?: string | null
           id?: string
           labor_rate?: number | null
+          owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
           province?: string | null
@@ -183,6 +217,7 @@ export type Database = {
           email?: string | null
           id?: string
           labor_rate?: number | null
+          owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
           province?: string | null
@@ -202,6 +237,7 @@ export type Database = {
           total: number
           unit_price: number
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           created_at?: string
@@ -213,6 +249,7 @@ export type Database = {
           total?: number
           unit_price?: number
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           created_at?: string
@@ -224,6 +261,7 @@ export type Database = {
           total?: number
           unit_price?: number
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -231,6 +269,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]
@@ -246,6 +291,7 @@ export type Database = {
           total: number
           unit_price: number
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           created_at?: string
@@ -257,6 +303,7 @@ export type Database = {
           total?: number
           unit_price?: number
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           created_at?: string
@@ -268,6 +315,7 @@ export type Database = {
           total?: number
           unit_price?: number
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -275,6 +323,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]
@@ -286,6 +341,7 @@ export type Database = {
           last_number: number
           prefix: string | null
           user_id: string
+          workshop_id: string | null
           year: number
         }
         Insert: {
@@ -294,6 +350,7 @@ export type Database = {
           last_number?: number
           prefix?: string | null
           user_id: string
+          workshop_id?: string | null
           year?: number
         }
         Update: {
@@ -302,9 +359,18 @@ export type Database = {
           last_number?: number
           prefix?: string | null
           user_id?: string
+          workshop_id?: string | null
           year?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_series_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -321,6 +387,7 @@ export type Database = {
           tax_rate: number
           total: number
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           appointment_id: string
@@ -336,6 +403,7 @@ export type Database = {
           tax_rate?: number
           total?: number
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           appointment_id?: string
@@ -351,6 +419,7 @@ export type Database = {
           tax_rate?: number
           total?: number
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -358,6 +427,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]
@@ -369,6 +445,7 @@ export type Database = {
           id: string
           name: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           active?: boolean | null
@@ -376,6 +453,7 @@ export type Database = {
           id?: string
           name: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           active?: boolean | null
@@ -383,8 +461,17 @@ export type Database = {
           id?: string
           name?: string
           user_id?: string
+          workshop_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mechanics_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_parts: {
         Row: {
@@ -395,6 +482,7 @@ export type Database = {
           quantity: number
           unit_price: number
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           appointment_id: string
@@ -404,6 +492,7 @@ export type Database = {
           quantity?: number
           unit_price?: number
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           appointment_id?: string
@@ -413,6 +502,7 @@ export type Database = {
           quantity?: number
           unit_price?: number
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -420,6 +510,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_parts_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]
@@ -432,6 +529,7 @@ export type Database = {
           price: number
           ref: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           created_at?: string
@@ -440,6 +538,7 @@ export type Database = {
           price?: number
           ref?: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           created_at?: string
@@ -448,8 +547,17 @@ export type Database = {
           price?: number
           ref?: string
           user_id?: string
+          workshop_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parts_catalog_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       substitution_vehicles: {
         Row: {
@@ -464,6 +572,7 @@ export type Database = {
           return_date: string | null
           status: string | null
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           assigned_client?: string | null
@@ -477,6 +586,7 @@ export type Database = {
           return_date?: string | null
           status?: string | null
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           assigned_client?: string | null
@@ -490,8 +600,17 @@ export type Database = {
           return_date?: string | null
           status?: string | null
           user_id?: string
+          workshop_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "substitution_vehicles_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       work_orders: {
         Row: {
@@ -507,6 +626,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          workshop_id: string | null
         }
         Insert: {
           appointment_id: string
@@ -521,6 +641,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          workshop_id?: string | null
         }
         Update: {
           appointment_id?: string
@@ -535,6 +656,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -542,6 +664,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]
@@ -590,7 +719,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_my_workshop_id: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
