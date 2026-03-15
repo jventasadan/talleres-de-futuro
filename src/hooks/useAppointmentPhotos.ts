@@ -80,13 +80,18 @@ const getWorkOrderPhotos = async (appointmentId: string, workshopId: string): Pr
 };
 
 export function useAppointmentPhotos(appointmentId: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointment_photos", appointmentId],
+    queryKey: ["appointment_photos", appointmentId, workshopId],
     queryFn: async () => {
+      if (!appointmentId || !workshopId) return [];
+
       const { data, error } = await db
         .from("appointment_photos")
         .select("*")
         .eq("appointment_id", appointmentId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
       if (!error) {
@@ -94,9 +99,9 @@ export function useAppointmentPhotos(appointmentId: string) {
       }
 
       if (!isMissingTableError(error)) throw error;
-      return getWorkOrderPhotos(appointmentId);
+      return getWorkOrderPhotos(appointmentId, workshopId);
     },
-    enabled: !!appointmentId,
+    enabled: !!appointmentId && !!workshopId,
   });
 }
 
