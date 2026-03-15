@@ -69,13 +69,17 @@ export function useCreateWorkOrder() {
 
 export function useCompleteWorkOrder() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (params: { id: string; labor_rate: number }) => {
+      if (!workshopId) throw new Error("No se encontró workshop_id");
+
       const { data: wo, error: fetchError } = await (supabase as any)
         .from("work_orders")
         .select("*")
         .eq("id", params.id)
+        .eq("workshop_id", workshopId)
         .single();
       if (fetchError) throw fetchError;
 
