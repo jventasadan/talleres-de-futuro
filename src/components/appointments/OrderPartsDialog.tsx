@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Loader2 } from "lucide-react";
+import { Trash2, Plus, Loader2, Search } from "lucide-react";
 import { useOrderParts, useAddPart, useDeletePart } from "@/hooks/useOrderParts";
+import { usePartsCatalog, type PartsCatalogItem } from "@/hooks/usePartsCatalog";
 
 interface OrderPartsDialogProps {
   open: boolean;
@@ -16,9 +17,28 @@ interface OrderPartsDialogProps {
 
 export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPartsDialogProps) {
   const { data: parts, isLoading } = useOrderParts(appointmentId);
+  const { data: catalog } = usePartsCatalog();
   const addPart = useAddPart();
   const deletePart = useDeletePart();
   const [form, setForm] = useState({ name: "", quantity: "1", unit_price: "0" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showCatalog, setShowCatalog] = useState(false);
+
+  const filteredCatalog = useMemo(() => {
+    if (!searchTerm.trim() || !catalog?.length) return [];
+    const term = searchTerm.toLowerCase();
+    return catalog.filter(
+      (item) =>
+        item.name.toLowerCase().includes(term) ||
+        item.ref.toLowerCase().includes(term)
+    ).slice(0, 8);
+  }, [catalog, searchTerm]);
+
+  const handleSelectCatalogItem = (item: PartsCatalogItem) => {
+    setForm({ name: item.name, quantity: "1", unit_price: String(item.price) });
+    setSearchTerm("");
+    setShowCatalog(false);
+  };
 
   const handleAdd = () => {
     if (!form.name.trim()) return;
@@ -28,7 +48,10 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
       quantity: parseInt(form.quantity) || 1,
       unit_price: parseFloat(form.unit_price) || 0,
     }, {
-      onSuccess: () => setForm({ name: "", quantity: "1", unit_price: "0" }),
+      onSuccess: () => {
+        setForm({ name: "", quantity: "1", unit_price: "0" });
+        setSearchTerm("");
+      },
     });
   };
 
@@ -70,6 +93,47 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
                 </div>
               </div>
             )}
+
+            {/* Catalog search */}
+            <div className="relative">
+              <Label className="text-xs">Buscar en catálogo</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Busca por nombre o referencia..."
+                  className="pl-9"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowCatalog(true);
+                  }}
+                  onFocus={() => setShowCatalog(true)}
+                />
+              </div>
+              {showCatalog && filteredCatalog.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                  {filteredCatalog.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                      onClick={() => handleSelectCatalogItem(item)}
+                    >
+                      <div>
+                        <span className="font-medium">{item.name}</span>
+                        {item.ref && <span className="ml-2 text-xs text-muted-foreground">Ref: {item.ref}</span>}
+                      </div>
+                      <span className="font-mono text-xs font-semibold">{item.price.toFixed(2)}€</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showCatalog && searchTerm.trim() && filteredCatalog.length === 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg p-3 text-xs text-muted-foreground text-center">
+                  No se encontraron piezas en el catálogo
+                </div>
+              )}
+            </div>
 
             {/* Add part form */}
             <div className="grid gap-3 sm:grid-cols-4 items-end">
