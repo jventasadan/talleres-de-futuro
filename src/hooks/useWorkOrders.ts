@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 
 export interface WorkOrder {
   id: string;
@@ -17,22 +18,25 @@ export interface WorkOrder {
 }
 
 export function useWorkOrder(appointmentId: string | null) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["work_orders", appointmentId],
+    queryKey: ["work_orders", appointmentId, workshopId],
     queryFn: async () => {
-      if (!appointmentId) return null;
-      // RLS filters by workshop_id automatically
+      if (!appointmentId || !workshopId) return null;
+
       const { data, error } = await (supabase as any)
         .from("work_orders")
         .select("*")
         .eq("appointment_id", appointmentId)
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data as WorkOrder | null;
     },
-    enabled: !!appointmentId,
+    enabled: !!appointmentId && !!workshopId,
   });
 }
 
