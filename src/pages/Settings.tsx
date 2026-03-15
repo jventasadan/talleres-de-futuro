@@ -22,6 +22,8 @@ const SettingsPage = () => {
   const { data: partsCatalog } = usePartsCatalog();
   const importParts = useImportPartsCatalog();
   const deleteCatalog = useDeletePartsCatalog();
+  const { workshopComplete } = useWorkshop();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
