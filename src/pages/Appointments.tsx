@@ -32,6 +32,7 @@ const KANBAN_COLUMNS = [
   { key: "en_reparacion", label: "EN REPARACIÓN", color: "border-t-pink-500" },
   { key: "esperando_piezas", label: "ESPERANDO PIEZAS", color: "border-t-emerald-500" },
   { key: "listo", label: "LISTO", color: "border-t-green-400" },
+  { key: "entregado", label: "ENTREGADO", color: "border-t-blue-500" },
 ] as const;
 
 type StatusKey = (typeof KANBAN_COLUMNS)[number]["key"];
