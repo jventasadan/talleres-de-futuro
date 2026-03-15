@@ -158,6 +158,7 @@ const Appointments = () => {
           .from("work_orders")
           .select("*")
           .eq("appointment_id", appointment.id)
+          .eq("workshop_id", workshopId)
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
           .limit(1)
