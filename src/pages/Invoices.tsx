@@ -6,14 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileText, Download, CheckCircle } from "lucide-react";
 import { useInvoices, useInvoiceLines, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 
-async function fetchInvoiceLines(invoiceId: string) {
+async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
+  if (!workshopId) return [];
+
   const { data, error } = await (supabase as any)
     .from("invoice_lines")
     .select("*")
     .eq("invoice_id", invoiceId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: true });
 
   if (!error && data?.length) return data;
@@ -22,11 +26,14 @@ async function fetchInvoiceLines(invoiceId: string) {
   return [];
 }
 
-async function fetchInvoiceParts(appointmentId: string) {
+async function fetchInvoiceParts(appointmentId: string, workshopId: string | null) {
+  if (!workshopId) return [];
+
   const { data: orderParts } = await supabase
     .from("order_parts")
     .select("*")
-    .eq("appointment_id", appointmentId) as any;
+    .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId) as any;
 
   return orderParts ?? [];
 }
