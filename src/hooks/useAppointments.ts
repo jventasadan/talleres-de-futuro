@@ -204,22 +204,30 @@ const updateAppointmentWithFallback = async (id: string, payload: AnyRecord) => 
 };
 
 export function useAppointments(dateFilter?: string) {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointments", dateFilter],
+    queryKey: ["appointments", workshopId, dateFilter],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows(dateFilter);
+      if (!workshopId) return [];
+      const rows = await fetchAppointmentsRows(workshopId, dateFilter);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!workshopId,
   });
 }
 
 export function useAllAppointments() {
+  const { workshopId } = useWorkshop();
+
   return useQuery({
-    queryKey: ["appointments", "all"],
+    queryKey: ["appointments", "all", workshopId],
     queryFn: async () => {
-      const rows = await fetchAppointmentsRows();
+      if (!workshopId) return [];
+      const rows = await fetchAppointmentsRows(workshopId);
       return rows.map(mapAppointmentRow);
     },
+    enabled: !!workshopId,
   });
 }
 
