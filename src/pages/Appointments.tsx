@@ -129,8 +129,8 @@ const Appointments = () => {
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
     if (newStatus === "en_reparacion") {
-      // Mechanic is mandatory for repair
-      if (!appointment.mechanic_id) {
+      // Mechanic is mandatory for repair — check both mechanic_id and mechanic (text)
+      if (!appointment.mechanic_id && !appointment.mechanic) {
         toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
         return;
       }
@@ -367,6 +367,12 @@ const Appointments = () => {
                           </div>
 
                           <div className="rounded-md bg-background/50 px-2 py-1.5 text-xs">{apt.service || "Sin servicio"}</div>
+                          {(apt.mechanic || apt.mechanic_id) && (
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <UserCog className="h-3 w-3" />
+                              <span>Mecánico: {apt.mechanic || apt.mechanic_id}</span>
+                            </div>
+                          )}
                           {apt.notes && <div className="text-[10px] text-muted-foreground italic">{apt.notes}</div>}
                           <div className="text-[10px] text-muted-foreground">{apt.date} · {apt.time_slot}</div>
 

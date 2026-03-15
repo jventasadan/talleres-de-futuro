@@ -42,8 +42,8 @@ const mapMechanicRow = (row: AnyRecord): Mechanic => ({
 
 const fetchMechanicsRows = async (workshopId: string): Promise<AnyRecord[]> => {
   const attempts = [
-    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).eq("active", true).order("name"),
     () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).order("name"),
+    () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).eq("active", true).order("name"),
     () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId).order("created_at", { ascending: false }),
     () => supabase.from("mechanics").select("*").eq("workshop_id", workshopId),
   ];
