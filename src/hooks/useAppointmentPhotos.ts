@@ -31,11 +31,12 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const ensureWorkOrder = async (appointmentId: string) => {
+const ensureWorkOrder = async (appointmentId: string, workshopId: string) => {
   const { data: existing, error: findError } = await db
     .from("work_orders")
     .select("id, photos")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -63,11 +64,12 @@ const ensureWorkOrder = async (appointmentId: string) => {
   return data;
 };
 
-const getWorkOrderPhotos = async (appointmentId: string): Promise<AppointmentPhoto[]> => {
+const getWorkOrderPhotos = async (appointmentId: string, workshopId: string): Promise<AppointmentPhoto[]> => {
   const { data, error } = await db
     .from("work_orders")
     .select("photos")
     .eq("appointment_id", appointmentId)
+    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
