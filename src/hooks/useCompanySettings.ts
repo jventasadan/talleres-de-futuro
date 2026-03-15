@@ -37,7 +37,7 @@ export function useCompanySettings() {
       if (error) throw error;
       return data as CompanySettings | null;
     },
-    enabled: !!user,
+    enabled: !!user?.id,
   });
 }
 
