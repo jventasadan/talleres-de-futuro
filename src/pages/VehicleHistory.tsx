@@ -28,9 +28,10 @@ const VehicleHistory = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const { workshopId } = useWorkshop();
 
   const handleSearch = async () => {
-    if (!plate.trim()) return;
+    if (!plate.trim() || !workshopId) return;
     setLoading(true);
     setSearched(true);
 
@@ -39,6 +40,7 @@ const VehicleHistory = () => {
       const { data: appointments } = await supabase
         .from("appointments")
         .select("*")
+        .eq("workshop_id", workshopId)
         .ilike("license_plate", plate.trim().toUpperCase())
         .order("created_at", { ascending: false }) as any;
 
