@@ -121,7 +121,7 @@ const applyDateFilter = (query: any, dateColumn: string | null, dateFilter?: str
   return query.gte(dateColumn, start).lte(dateColumn, end);
 };
 
-const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> => {
+const fetchAppointmentsRows = async (userId: string, dateFilter?: string): Promise<AnyRecord[]> => {
   const attempts: Array<{ dateColumn: "date" | "appointment_date" | "appointment_start" | null; orderColumns: string[] }> = [
     { dateColumn: "date", orderColumns: ["date", "time_slot"] },
     { dateColumn: "appointment_date", orderColumns: ["appointment_date", "appointment_start"] },
@@ -133,7 +133,7 @@ const fetchAppointmentsRows = async (dateFilter?: string): Promise<AnyRecord[]> 
   let lastError: any;
 
   for (const attempt of attempts) {
-    let query: any = supabase.from("appointments").select("*");
+    let query: any = supabase.from("appointments").select("*").eq("user_id", userId);
 
     for (const column of attempt.orderColumns) {
       query = query.order(column);
