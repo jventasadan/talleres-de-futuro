@@ -55,6 +55,7 @@ const VehicleHistory = () => {
       const { data: invoices } = await supabase
         .from("invoices")
         .select("*")
+        .eq("workshop_id", workshopId)
         .in("appointment_id", appointmentIds) as any;
 
       const invoiceMap: Record<string, any> = {};
