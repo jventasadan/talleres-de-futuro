@@ -102,6 +102,7 @@ const Appointments = () => {
   const createMutation = useCreateAppointment();
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();
+  const { workshopId } = useWorkshop();
 
   const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
