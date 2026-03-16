@@ -60,7 +60,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
-      status: "recepcionado",
+      status: defaultStatus ?? "recepcionado",
       notes: [form.problem, form.notes].filter(Boolean).join(" | ") || null,
       created_by: "manual",
     });
