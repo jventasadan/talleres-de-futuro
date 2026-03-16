@@ -25,11 +25,26 @@ interface HistoryEntry {
 }
 
 const VehicleHistory = () => {
+  const [searchParams] = useSearchParams();
   const [plate, setPlate] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const { workshopId } = useWorkshop();
+
+  // Auto-search if plate comes from query param
+  useEffect(() => {
+    const paramPlate = searchParams.get("plate");
+    if (paramPlate) {
+      setPlate(paramPlate.toUpperCase());
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (plate && workshopId && !searched) {
+      handleSearch();
+    }
+  }, [plate, workshopId]);
 
   const handleSearch = async () => {
     if (!plate.trim() || !workshopId) return;
