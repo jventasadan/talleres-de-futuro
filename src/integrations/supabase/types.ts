@@ -374,7 +374,7 @@ export type Database = {
       }
       invoices: {
         Row: {
-          appointment_id: string
+          appointment_id: string | null
           client_name: string
           created_at: string
           id: string
@@ -387,10 +387,11 @@ export type Database = {
           tax_rate: number
           total: number
           user_id: string
+          work_order_id: string | null
           workshop_id: string | null
         }
         Insert: {
-          appointment_id: string
+          appointment_id?: string | null
           client_name: string
           created_at?: string
           id?: string
@@ -403,10 +404,11 @@ export type Database = {
           tax_rate?: number
           total?: number
           user_id: string
+          work_order_id?: string | null
           workshop_id?: string | null
         }
         Update: {
-          appointment_id?: string
+          appointment_id?: string | null
           client_name?: string
           created_at?: string
           id?: string
@@ -419,6 +421,7 @@ export type Database = {
           tax_rate?: number
           total?: number
           user_id?: string
+          work_order_id?: string | null
           workshop_id?: string | null
         }
         Relationships: [
@@ -427,6 +430,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
           {
