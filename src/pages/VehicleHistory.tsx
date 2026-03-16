@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,11 +25,26 @@ interface HistoryEntry {
 }
 
 const VehicleHistory = () => {
+  const [searchParams] = useSearchParams();
   const [plate, setPlate] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const { workshopId } = useWorkshop();
+
+  // Auto-search if plate comes from query param
+  useEffect(() => {
+    const paramPlate = searchParams.get("plate");
+    if (paramPlate) {
+      setPlate(paramPlate.toUpperCase());
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (plate && workshopId && !searched) {
+      handleSearch();
+    }
+  }, [plate, workshopId]);
 
   const handleSearch = async () => {
     if (!plate.trim() || !workshopId) return;

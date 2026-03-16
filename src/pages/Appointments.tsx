@@ -32,6 +32,7 @@ const KANBAN_COLUMNS = [
   { key: "en_reparacion", label: "EN REPARACIÓN", color: "border-t-pink-500" },
   { key: "esperando_piezas", label: "ESPERANDO PIEZAS", color: "border-t-emerald-500" },
   { key: "listo", label: "LISTO", color: "border-t-green-400" },
+  { key: "entregado", label: "ENTREGADO", color: "border-t-blue-500" },
 ] as const;
 
 type StatusKey = (typeof KANBAN_COLUMNS)[number]["key"];
@@ -41,6 +42,7 @@ const NEXT_STATUS: Record<string, StatusKey> = {
   recepcionado: "en_reparacion",
   en_reparacion: "esperando_piezas",
   esperando_piezas: "listo",
+  listo: "entregado",
 };
 
 const isSchemaMismatchError = (error: any) => {
@@ -104,7 +106,7 @@ const Appointments = () => {
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
 
-  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
+  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo", "entregado"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
   const historyAppointments = (appointments ?? []).filter((a) => ["listo", "cancelado", "entregado"].includes(a.status));
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
@@ -306,7 +308,7 @@ const Appointments = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             {KANBAN_COLUMNS.map((col) => {
               const colAppointments = getColumnAppointments(col.key);
               return (
