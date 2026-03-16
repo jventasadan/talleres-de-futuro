@@ -4,26 +4,32 @@ import {
   subMonths, addMonths, isSameDay, isSameMonth, eachDayOfInterval,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { useAllAppointments, type Appointment } from "@/hooks/useAppointments";
+import { ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { useAllAppointments, useCreateAppointment, type Appointment } from "@/hooks/useAppointments";
 import { useMechanics } from "@/hooks/useMechanics";
 import { AppointmentDetailDialog } from "@/components/appointments/AppointmentDetailDialog";
+import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7:00 to 19:00
-const SLOTS_PER_HOUR = 4; // 15-min slots
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
+const SLOTS_PER_HOUR = 4;
 
 const statusColors: Record<string, string> = {
-  espera: "bg-amber-200 border-amber-400 text-amber-900",
-  recepcionado: "bg-purple-200 border-purple-400 text-purple-900",
-  en_reparacion: "bg-pink-200 border-pink-400 text-pink-900",
-  esperando_piezas: "bg-emerald-200 border-emerald-400 text-emerald-900",
-  listo: "bg-green-200 border-green-400 text-green-900",
+  espera: "bg-amber-500/20 border-amber-500/40 text-amber-200",
+  recepcionado: "bg-purple-500/20 border-purple-500/40 text-purple-200",
+  en_reparacion: "bg-blue-500/20 border-blue-500/40 text-blue-200",
+  esperando_piezas: "bg-emerald-500/20 border-emerald-500/40 text-emerald-200",
+  listo: "bg-green-500/20 border-green-500/40 text-green-200",
+  facturado: "bg-green-600/20 border-green-600/40 text-green-200",
+  pending: "bg-amber-500/20 border-amber-500/40 text-amber-200",
 };
 
 const WeeklyCalendar = () => {
@@ -32,11 +38,14 @@ const WeeklyCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedApt, setSelectedApt] = useState<Appointment | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [receptionOpen, setReceptionOpen] = useState(false);
   const { data: allAppointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
+  const createMutation = useCreateAppointment();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const today = new Date();
 
-  // Handle ?today=true query param
   useState(() => {
     if (searchParams.get("today") === "true") {
       setCurrentDate(new Date());
@@ -74,7 +83,6 @@ const WeeklyCalendar = () => {
     return map;
   }, [allAppointments, displayDays]);
 
-  // Taller view: today's appointments grouped by mechanic
   const todayAppointments = useMemo(() => {
     return (allAppointments ?? []).filter((a) => a.date === todayStr);
   }, [allAppointments, todayStr]);
@@ -96,7 +104,6 @@ const WeeklyCalendar = () => {
   };
 
   const getAppointmentDuration = (apt: Appointment): number => {
-    // Duration in 15-min slots based on service type
     const service = apt.service || "";
     const SERVICE_DURATIONS: Record<string, number> = {
       "Cambio de aceite": 3,
@@ -126,13 +133,14 @@ const WeeklyCalendar = () => {
   const statusDot: Record<string, string> = {
     espera: "bg-amber-500",
     recepcionado: "bg-purple-500",
-    en_reparacion: "bg-pink-500",
+    en_reparacion: "bg-blue-500",
     esperando_piezas: "bg-emerald-500",
     listo: "bg-green-400",
+    facturado: "bg-green-600",
     pending: "bg-warning",
   };
 
-  const navigate = (dir: number) => {
+  const navigate_ = (dir: number) => {
     if (viewMode === "taller") {
       setCurrentDate(d => addDays(d, dir));
     } else if (viewMode === "week") {
@@ -142,13 +150,24 @@ const WeeklyCalendar = () => {
     }
   };
 
-  const goToday = () => {
-    setCurrentDate(new Date());
-  };
+  const goToday = () => setCurrentDate(new Date());
 
   const handleAppointmentClick = (apt: Appointment) => {
     setSelectedApt(apt);
     setDetailOpen(true);
+  };
+
+  // Handle "Recepcionar" from calendar - creates appointment as "espera"
+  const handleReception = (apt: Appointment) => {
+    // Navigate to appointments page to recepcionar
+    navigate("/appointments");
+  };
+
+  const handleCreateAppointment = (data: any) => {
+    // Calendar appointments default to "espera"
+    createMutation.mutate({ ...data, status: "espera" }, {
+      onSuccess: () => setReceptionOpen(false),
+    });
   };
 
   const headerLabel = viewMode === "taller"
@@ -160,23 +179,29 @@ const WeeklyCalendar = () => {
   return (
     <DashboardLayout title="Calendario" subtitle="Vista de citas del taller">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+            <Button variant="outline" size="icon" onClick={() => navigate_(-1)} className="h-9 w-9">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" className="min-w-[260px] justify-center font-medium capitalize">
+            <Button variant="outline" className="min-w-[240px] justify-center font-medium capitalize text-sm">
               {headerLabel}
             </Button>
-            <Button variant="outline" size="icon" onClick={() => navigate(1)}>
+            <Button variant="outline" size="icon" onClick={() => navigate_(1)} className="h-9 w-9">
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button variant="default" size="sm" onClick={goToday} className="text-xs">Hoy</Button>
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-            <Button variant={viewMode === "taller" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("taller")} className="text-xs">TALLER</Button>
-            <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="text-xs">SEMANA</Button>
-            <Button variant={viewMode === "month" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("month")} className="text-xs">MES</Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setReceptionOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Nueva cita
+            </Button>
+            <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+              <Button variant={viewMode === "taller" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("taller")} className="text-xs rounded-lg">TALLER</Button>
+              <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="text-xs rounded-lg">SEMANA</Button>
+              <Button variant={viewMode === "month" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("month")} className="text-xs rounded-lg">MES</Button>
+            </div>
           </div>
         </div>
 
@@ -185,20 +210,17 @@ const WeeklyCalendar = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : viewMode === "taller" ? (
-          /* TALLER VIEW: Mechanics as columns, hours as rows */
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-border/30">
             <div className="min-w-[700px]">
-              {/* Header row with mechanic names */}
-              <div className="grid gap-0 border-b" style={{ gridTemplateColumns: `60px repeat(${mechanicNames.length}, 1fr)` }}>
-                <div className="p-2 text-xs font-bold text-muted-foreground border-r bg-muted/30">Hora</div>
+              <div className="grid gap-0" style={{ gridTemplateColumns: `64px repeat(${mechanicNames.length}, 1fr)` }}>
+                <div className="p-3 text-[10px] font-bold text-muted-foreground border-r border-b border-border/30 bg-muted/20 uppercase tracking-wider">Hora</div>
                 {mechanicNames.map((name) => (
-                  <div key={name} className="p-2 text-xs font-bold text-center border-r bg-muted/30 truncate">
+                  <div key={name} className="p-3 text-xs font-bold text-center border-r border-b border-border/30 bg-muted/20 truncate">
                     {name}
                   </div>
                 ))}
               </div>
 
-              {/* Time grid */}
               {HOURS.map((hour) => (
                 Array.from({ length: SLOTS_PER_HOUR }, (_, slotIdx) => {
                   const minute = slotIdx * 15;
@@ -209,24 +231,22 @@ const WeeklyCalendar = () => {
                   return (
                     <div
                       key={timeStr}
-                      className={cn("grid gap-0", isHourStart ? "border-t border-border" : "border-t border-border/30")}
-                      style={{ gridTemplateColumns: `60px repeat(${mechanicNames.length}, 1fr)` }}
+                      className={cn("grid gap-0", isHourStart ? "border-t border-border/40" : "border-t border-border/10")}
+                      style={{ gridTemplateColumns: `64px repeat(${mechanicNames.length}, 1fr)` }}
                     >
                       <div className={cn(
-                        "px-2 py-1 text-[10px] font-mono text-muted-foreground border-r",
-                        isHourStart ? "font-bold" : "opacity-50"
+                        "px-3 py-1 text-[10px] font-mono text-muted-foreground border-r border-border/30",
+                        isHourStart ? "font-bold" : "opacity-40"
                       )}>
                         {timeStr}
                       </div>
                       {mechanicNames.map((mechName) => {
-                        // Find appointment that starts at this slot for this mechanic
                         const apt = todayAppointments.find((a) => {
                           const aptMechanic = a.mechanic || "Sin asignar";
                           if (aptMechanic !== mechName) return false;
                           return getAppointmentSlot(a) === slotIndex;
                         });
 
-                        // Check if this slot is occupied by a multi-slot appointment
                         const occupyingApt = !apt ? todayAppointments.find((a) => {
                           const aptMechanic = a.mechanic || "Sin asignar";
                           if (aptMechanic !== mechName) return false;
@@ -236,38 +256,31 @@ const WeeklyCalendar = () => {
                         }) : null;
 
                         if (occupyingApt) {
-                          // Slot occupied by multi-slot appointment, render nothing
-                          return <div key={mechName} className="border-r min-h-[24px]" />;
+                          return <div key={mechName} className="border-r border-border/10 min-h-[26px]" />;
                         }
 
                         if (apt) {
                           const duration = getAppointmentDuration(apt);
-                          const colorClass = statusColors[apt.status] ?? "bg-secondary border-border text-foreground";
+                          const colorClass = statusColors[apt.status] ?? "bg-secondary/50 border-border/30 text-foreground";
                           return (
-                            <div
-                              key={mechName}
-                              className={cn(
-                                "border-r relative cursor-pointer",
-                              )}
-                              style={{ gridRow: `span 1` }}
-                            >
+                            <div key={mechName} className="border-r border-border/10 relative">
                               <div
                                 className={cn(
-                                  "absolute inset-x-0.5 top-0 rounded border px-1.5 py-0.5 text-[10px] leading-tight z-10 overflow-hidden",
+                                  "absolute inset-x-1 top-0 rounded-lg border px-2 py-1 text-[10px] leading-tight z-10 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity",
                                   colorClass
                                 )}
-                                style={{ height: `${duration * 24}px` }}
+                                style={{ height: `${duration * 26}px` }}
                                 onClick={() => handleAppointmentClick(apt)}
                               >
-                                <div className="font-semibold truncate">{apt.client_name}</div>
-                                <div className="truncate opacity-75">{apt.license_plate} · {apt.service}</div>
+                                <div className="font-bold truncate">{apt.client_name}</div>
+                                <div className="truncate opacity-80">{apt.license_plate} · {apt.service}</div>
                                 {apt.phone && <div className="truncate opacity-60">📞 {apt.phone}</div>}
                               </div>
                             </div>
                           );
                         }
 
-                        return <div key={mechName} className="border-r min-h-[24px]" />;
+                        return <div key={mechName} className="border-r border-border/10 min-h-[26px]" />;
                       })}
                     </div>
                   );
@@ -282,8 +295,8 @@ const WeeklyCalendar = () => {
               const dayAppts = appointmentsByDay.get(key) ?? [];
               const isToday = isSameDay(day, today);
               return (
-                <Card key={key} className={cn("min-h-[280px]", isToday && "ring-2 ring-primary/40 shadow-md")}>
-                  <div className={cn("px-3 py-2 text-center border-b", isToday ? "bg-primary/10" : "bg-muted/30")}>
+                <Card key={key} className={cn("min-h-[280px] border-border/30", isToday && "ring-2 ring-primary/30 shadow-lg")}>
+                  <div className={cn("px-3 py-2 text-center border-b border-border/20", isToday ? "bg-primary/10" : "bg-muted/20")}>
                     <p className="text-[11px] font-medium uppercase text-muted-foreground">{format(day, "EEE", { locale: es })}</p>
                     <p className={cn("text-lg font-display font-bold", isToday ? "text-primary" : "text-foreground")}>{format(day, "d")}</p>
                   </div>
@@ -294,15 +307,14 @@ const WeeklyCalendar = () => {
                       <div
                         key={apt.id}
                         onClick={() => handleAppointmentClick(apt)}
-                        className="rounded-md border bg-secondary/50 p-2 text-[11px] leading-tight cursor-pointer hover:bg-secondary transition-colors"
+                        className="rounded-lg border border-border/20 bg-muted/30 p-2 text-[11px] leading-tight cursor-pointer hover:bg-muted/60 transition-colors"
                       >
                         <div className="flex items-center gap-1 font-semibold">
-                          <div className={cn("h-2 w-2 rounded-full", statusDot[apt.status] ?? "bg-muted-foreground")} />
+                          <div className={cn("h-2 w-2 rounded-full shrink-0", statusDot[apt.status] ?? "bg-muted-foreground")} />
                           {apt.time_slot || "--:--"}
                         </div>
                         <p className="font-medium mt-0.5 truncate">{apt.client_name || "Sin nombre"}</p>
                         <p className="text-[10px] opacity-75 truncate">{apt.license_plate}</p>
-                        {apt.phone && <p className="text-[10px] opacity-60">📞 {apt.phone}</p>}
                       </div>
                     ))}
                   </CardContent>
@@ -327,8 +339,8 @@ const WeeklyCalendar = () => {
                   <div
                     key={key}
                     className={cn(
-                      "min-h-[90px] rounded-lg border p-1.5 transition-colors bg-card",
-                      isToday && "ring-2 ring-primary/40 bg-primary/5",
+                      "min-h-[90px] rounded-lg border border-border/20 p-1.5 transition-colors bg-card",
+                      isToday && "ring-2 ring-primary/30 bg-primary/5",
                       !isCurrentMonth && "opacity-40",
                     )}
                   >
@@ -362,6 +374,13 @@ const WeeklyCalendar = () => {
         appointment={selectedApt}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+      />
+
+      <ReceptionDialog
+        open={receptionOpen}
+        onOpenChange={setReceptionOpen}
+        onSubmit={handleCreateAppointment}
+        isLoading={createMutation.isPending}
       />
     </DashboardLayout>
   );

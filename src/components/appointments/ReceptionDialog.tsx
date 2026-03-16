@@ -30,9 +30,10 @@ interface ReceptionDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: any) => void;
   isLoading?: boolean;
+  defaultStatus?: string;
 }
 
-export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: ReceptionDialogProps) {
+export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defaultStatus }: ReceptionDialogProps) {
   const [form, setForm] = useState({
     client_name: "",
     license_plate: "",
@@ -60,7 +61,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: Rec
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
-      status: "recepcionado",
+      status: defaultStatus ?? "recepcionado",
       notes: [form.problem, form.notes].filter(Boolean).join(" | ") || null,
       created_by: "manual",
     });
