@@ -18,25 +18,29 @@ interface HistoryEntry {
   order_number: string;
   service: string;
   status: string;
+  client_name: string;
   labor_cost: number;
   parts_total: number;
   total: number;
   invoice_number: string | null;
 }
 
+const db = supabase as any;
+
 const VehicleHistory = () => {
   const [searchParams] = useSearchParams();
   const [plate, setPlate] = useState("");
+  const [searchText, setSearchText] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const { workshopId } = useWorkshop();
 
-  // Auto-search if plate comes from query param
   useEffect(() => {
     const paramPlate = searchParams.get("plate");
     if (paramPlate) {
       setPlate(paramPlate.toUpperCase());
+      setSearchText(paramPlate.toUpperCase());
     }
   }, [searchParams]);
 
@@ -47,17 +51,19 @@ const VehicleHistory = () => {
   }, [plate, workshopId]);
 
   const handleSearch = async () => {
-    if (!plate.trim() || !workshopId) return;
+    if (!searchText.trim() || !workshopId) return;
     setLoading(true);
     setSearched(true);
+    const q = searchText.trim().toUpperCase();
+    setPlate(q);
 
     try {
-      // Get appointments for this plate
+      // Search appointments by plate, client name, or id
       const { data: appointments } = await supabase
         .from("appointments")
         .select("*")
         .eq("workshop_id", workshopId)
-        .ilike("license_plate", plate.trim().toUpperCase())
+        .or(`license_plate.ilike.%${q}%,client_name.ilike.%${q}%`)
         .order("created_at", { ascending: false }) as any;
 
       if (!appointments?.length) {
@@ -66,27 +72,45 @@ const VehicleHistory = () => {
         return;
       }
 
-      // Get invoices for these appointments
+      // Get work orders for these appointments
       const appointmentIds = appointments.map((a: any) => a.id);
-      const { data: invoices } = await supabase
-        .from("invoices")
+      const { data: workOrders } = await db
+        .from("work_orders")
         .select("*")
         .eq("workshop_id", workshopId)
-        .in("appointment_id", appointmentIds) as any;
+        .in("appointment_id", appointmentIds);
 
-      const invoiceMap: Record<string, any> = {};
-      (invoices ?? []).forEach((inv: any) => {
-        invoiceMap[inv.appointment_id] = inv;
+      const woMap: Record<string, any> = {};
+      (workOrders ?? []).forEach((wo: any) => {
+        woMap[wo.appointment_id] = wo;
       });
 
+      // Get invoices by work_order_id
+      const woIds = (workOrders ?? []).map((wo: any) => wo.id);
+      let invoiceMap: Record<string, any> = {};
+
+      if (woIds.length > 0) {
+        const { data: invoices } = await db
+          .from("invoices")
+          .select("*")
+          .eq("workshop_id", workshopId)
+          .in("work_order_id", woIds);
+
+        (invoices ?? []).forEach((inv: any) => {
+          if (inv.work_order_id) invoiceMap[inv.work_order_id] = inv;
+        });
+      }
+
       const entries: HistoryEntry[] = appointments.map((apt: any) => {
-        const inv = invoiceMap[apt.id];
+        const wo = woMap[apt.id];
+        const inv = wo ? invoiceMap[wo.id] : null;
         return {
           id: apt.id,
           date: apt.date || apt.created_at?.slice(0, 10) || "",
           order_number: `ORD-${apt.id.slice(0, 4).toUpperCase()}`,
           service: apt.service || "Sin servicio",
           status: apt.status || "pendiente",
+          client_name: apt.client_name || "Sin nombre",
           labor_cost: inv ? Number(inv.labor_cost) : 0,
           parts_total: inv ? Number(inv.parts_total) : 0,
           total: inv ? Number(inv.total) : 0,
@@ -107,20 +131,20 @@ const VehicleHistory = () => {
   };
 
   return (
-    <DashboardLayout title="Historial de Vehículo" subtitle="Consulta el historial completo de reparaciones por matrícula">
+    <DashboardLayout title="Historial de Vehículo" subtitle="Consulta el historial completo de reparaciones">
       <div className="space-y-4 max-w-4xl">
         <div className="flex gap-2">
           <div className="relative flex-1 max-w-sm">
             <Car className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Introduce la matrícula (ej: 1234ABC)"
-              value={plate}
-              onChange={(e) => setPlate(e.target.value.toUpperCase())}
+              placeholder="Buscar por matrícula o nombre de cliente..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
               className="pl-9 font-mono"
             />
           </div>
-          <Button onClick={handleSearch} disabled={loading || !plate.trim()}>
+          <Button onClick={handleSearch} disabled={loading || !searchText.trim()}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
             Buscar
           </Button>
@@ -133,20 +157,21 @@ const VehicleHistory = () => {
         ) : searched && !history.length ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Car className="h-12 w-12 text-muted-foreground/40" />
-            <p className="mt-3 text-sm font-medium text-muted-foreground">No se encontraron reparaciones para {plate}</p>
+            <p className="mt-3 text-sm font-medium text-muted-foreground">No se encontraron reparaciones para "{searchText}"</p>
           </div>
         ) : history.length > 0 ? (
           <Card>
             <CardContent className="p-0">
               <div className="px-4 py-3 border-b bg-muted/30">
-                <h3 className="font-display text-sm font-bold">Vehículo: <span className="font-mono text-primary">{plate}</span></h3>
-                <p className="text-xs text-muted-foreground">{history.length} reparación(es) encontrada(s)</p>
+                <h3 className="font-display text-sm font-bold">Resultados para: <span className="font-mono text-primary">{plate}</span></h3>
+                <p className="text-xs text-muted-foreground">{history.length} registro(s) encontrado(s)</p>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-xs">Fecha</TableHead>
                     <TableHead className="text-xs">Orden</TableHead>
+                    <TableHead className="text-xs">Cliente</TableHead>
                     <TableHead className="text-xs">Reparación</TableHead>
                     <TableHead className="text-xs">Estado</TableHead>
                     <TableHead className="text-xs text-right">Coste</TableHead>
@@ -158,9 +183,10 @@ const VehicleHistory = () => {
                     <TableRow key={entry.id}>
                       <TableCell className="text-xs">{entry.date ? new Date(entry.date).toLocaleDateString("es-ES") : "—"}</TableCell>
                       <TableCell className="font-mono text-xs font-semibold text-primary">{entry.order_number}</TableCell>
+                      <TableCell className="text-xs">{entry.client_name}</TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate">{entry.service}</TableCell>
                       <TableCell>
-                        <Badge variant={entry.status === "listo" ? "default" : "secondary"} className="text-[10px]">
+                        <Badge variant={entry.status === "entregado" ? "default" : "secondary"} className="text-[10px]">
                           {entry.status}
                         </Badge>
                       </TableCell>
