@@ -30,6 +30,7 @@ interface ReceptionDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: any) => void;
   isLoading?: boolean;
+  defaultStatus?: string;
 }
 
 export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: ReceptionDialogProps) {
