@@ -11,43 +11,21 @@ import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 
+const db = supabase as any;
+
 async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
   if (!workshopId) return [];
-  const { data, error } = await (supabase as any)
+  const { data, error } = await db
     .from("invoice_lines")
     .select("*")
     .eq("invoice_id", invoiceId)
-    .eq("workshop_id", workshopId)
     .order("created_at", { ascending: true });
   if (!error && data?.length) return data;
   return [];
 }
 
-async function fetchInvoiceParts(appointmentId: string, workshopId: string | null) {
-  if (!workshopId) return [];
-  const { data: orderParts } = await supabase
-    .from("order_parts")
-    .select("*")
-    .eq("appointment_id", appointmentId)
-    .eq("workshop_id", workshopId) as any;
-  return orderParts ?? [];
-}
-
 async function generateProfessionalPdf(invoice: Invoice, settings: any, workshopId: string | null) {
-  let lines = await fetchInvoiceLines(invoice.id, workshopId);
-  if (!lines.length) {
-    const parts = await fetchInvoiceParts(invoice.appointment_id, workshopId);
-    lines = parts.map((p: any) => ({
-      description: p.name ?? "Pieza",
-      quantity: p.quantity ?? 1,
-      unit_price: Number(p.unit_price ?? 0),
-      total: (p.quantity ?? 1) * Number(p.unit_price ?? 0),
-      line_type: "part",
-    }));
-    if (Number(invoice.labor_cost) > 0) {
-      lines.push({ description: "Mano de obra", quantity: 1, unit_price: Number(invoice.labor_cost), total: Number(invoice.labor_cost), line_type: "labor" });
-    }
-  }
+  const lines = await fetchInvoiceLines(invoice.id, workshopId);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -94,7 +72,23 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   y += 6; doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
 
   if (!lines.length) {
-    doc.setFontSize(9); doc.text("Sin conceptos registrados", colX.name + 3, y + 4); y += 10;
+    // Fallback: show labor + parts as single items
+    if (Number(invoice.parts_total) > 0) {
+      doc.setFontSize(9);
+      doc.text("Piezas y materiales", colX.name + 3, y + 1);
+      doc.text("1", colX.qty + 5, y + 1);
+      doc.text(`${Number(invoice.parts_total).toFixed(2)} €`, colX.price, y + 1);
+      doc.text(`${Number(invoice.parts_total).toFixed(2)} €`, colX.total, y + 1);
+      y += 7;
+    }
+    if (Number(invoice.labor_cost) > 0) {
+      doc.setFontSize(9);
+      doc.text("Mano de obra", colX.name + 3, y + 1);
+      doc.text("1", colX.qty + 5, y + 1);
+      doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.price, y + 1);
+      doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.total, y + 1);
+      y += 7;
+    }
   } else {
     lines.forEach((line: any, index: number) => {
       if (index % 2 === 0) { doc.setFillColor(250, 250, 250); doc.rect(margin, y - 3, contentWidth, 7, "F"); }
@@ -154,7 +148,6 @@ const Invoices = () => {
   return (
     <DashboardLayout title="Facturas" subtitle="Facturas generadas automáticamente">
       <div className="space-y-4">
-        {/* Summary cards */}
         <div className="grid gap-4 sm:grid-cols-3">
           <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => setStatusFilter("all")}>
             <CardContent className="p-4">
@@ -176,7 +169,6 @@ const Invoices = () => {
           </Card>
         </div>
 
-        {/* Search & filter */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

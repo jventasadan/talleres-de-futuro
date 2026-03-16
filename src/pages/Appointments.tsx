@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone, FileText, ArrowRight, Clock } from "lucide-react";
+import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone, FileText, ArrowRight, Clock, CheckCircle, Receipt } from "lucide-react";
 import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
@@ -29,12 +29,10 @@ import { PhotoGallery } from "@/components/appointments/PhotoGallery";
 import { KanbanQuoteDialog } from "@/components/appointments/KanbanQuoteDialog";
 
 const KANBAN_COLUMNS = [
-  { key: "recepcionado", label: "RECEPCIONADO", color: "border-l-purple-500", icon: "📋" },
-  { key: "en_reparacion", label: "EN REPARACIÓN", color: "border-l-blue-500", icon: "🔧" },
-  { key: "esperando_piezas", label: "ESPERANDO PIEZAS", color: "border-l-amber-500", icon: "📦" },
-  { key: "listo", label: "LISTO", color: "border-l-emerald-500", icon: "✅" },
-  { key: "facturado", label: "FACTURADO", color: "border-l-green-500", icon: "🧾" },
-  { key: "entregado", label: "ENTREGADO", color: "border-l-slate-400", icon: "🚗" },
+  { key: "recepcionado", label: "RECEPCIONADO", borderColor: "border-purple-500", bgGlow: "from-purple-500/5 to-transparent" },
+  { key: "en_reparacion", label: "EN REPARACIÓN", borderColor: "border-blue-500", bgGlow: "from-blue-500/5 to-transparent" },
+  { key: "esperando_piezas", label: "ESPERANDO PIEZAS", borderColor: "border-amber-500", bgGlow: "from-amber-500/5 to-transparent" },
+  { key: "listo", label: "LISTO", borderColor: "border-emerald-500", bgGlow: "from-emerald-500/5 to-transparent" },
 ] as const;
 
 type StatusKey = (typeof KANBAN_COLUMNS)[number]["key"];
@@ -44,16 +42,12 @@ const NEXT_STATUS: Record<string, StatusKey> = {
   recepcionado: "en_reparacion",
   en_reparacion: "esperando_piezas",
   esperando_piezas: "listo",
-  listo: "facturado",
-  facturado: "entregado",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   recepcionado: "En reparación",
   en_reparacion: "Esperando piezas",
   esperando_piezas: "Listo",
-  listo: "Facturar",
-  facturado: "Entregar",
 };
 
 const isSchemaMismatchError = (error: any) => {
@@ -104,7 +98,7 @@ const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialogId, setPartsDialogId] = useState<string | null>(null);
-  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null } | null>(null);
+  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null; workOrderId: string | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
@@ -118,7 +112,7 @@ const Appointments = () => {
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
 
-  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo", "facturado", "entregado"];
+  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
   const historyAppointments = (appointments ?? []).filter((a) => ["listo", "facturado", "entregado", "cancelado"].includes(a.status));
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
@@ -164,6 +158,7 @@ const Appointments = () => {
 
     if (newStatus === "listo") {
       let autoHours: number | null = null;
+      let workOrderId: string | null = null;
       try {
         const { data: wo } = await (supabase as any)
           .from("work_orders")
@@ -176,6 +171,7 @@ const Appointments = () => {
           .maybeSingle();
 
         if (wo) {
+          workOrderId = wo.id;
           const startTime = wo.repair_start_time ? new Date(wo.repair_start_time) : new Date(wo.created_at);
           const endTime = new Date();
           const diffMs = endTime.getTime() - startTime.getTime();
@@ -194,7 +190,7 @@ const Appointments = () => {
       } catch (_) { /* best effort */ }
 
       const { total: partsTotal } = await fetchPartsTotal(appointment.id);
-      setLaborDialogData({ appointment, partsTotal, autoHours });
+      setLaborDialogData({ appointment, partsTotal, autoHours, workOrderId });
       return;
     }
 
@@ -203,11 +199,11 @@ const Appointments = () => {
 
   const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
     if (!laborDialogData) return;
-    const { appointment } = laborDialogData;
+    const { appointment, workOrderId } = laborDialogData;
     const partsTotal = laborDialogData.partsTotal;
 
-    // Move to "listo" first, then auto-generate invoice → "facturado"
-    updateStatus.mutate({ id: appointment.id, status: "facturado" });
+    // Move to "listo" — invoice generated automatically
+    updateStatus.mutate({ id: appointment.id, status: "listo" });
 
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
@@ -241,8 +237,7 @@ const Appointments = () => {
     const invoiceNumber = await generateInvoiceNumber(user?.id ?? "");
 
     createInvoice.mutate({
-      appointment_id: appointment.id,
-      invoice_number: invoiceNumber,
+      work_order_id: workOrderId ?? undefined,
       client_name: appointment.client_name,
       license_plate: appointment.license_plate,
       service: appointment.service,
@@ -251,9 +246,15 @@ const Appointments = () => {
       tax_rate: vatRate,
       total,
       lines,
+      invoice_number: invoiceNumber,
     });
 
     setLaborDialogData(null);
+  };
+
+  const handleDeliverVehicle = async (appointment: Appointment) => {
+    updateStatus.mutate({ id: appointment.id, status: "entregado" });
+    toast.success("Vehículo entregado correctamente");
   };
 
   const handleDelete = async (id: string) => {
@@ -316,7 +317,7 @@ const Appointments = () => {
             Recepcionar vehículo
           </Button>
           <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO</Button>
+            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO ACTIVO</Button>
             <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs rounded-lg">HISTÓRICO</Button>
           </div>
         </div>
@@ -326,26 +327,23 @@ const Appointments = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {KANBAN_COLUMNS.map((col) => {
               const colAppointments = getColumnAppointments(col.key);
               return (
-                <div key={col.key} className={`rounded-xl border-l-4 ${col.color} bg-card/50 backdrop-blur-sm min-h-[450px]`}>
-                  <div className="flex items-center justify-between px-3 py-3 border-b border-border/30">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{col.icon}</span>
-                      <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">{col.label}</span>
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] font-mono h-5 min-w-[20px] justify-center">{colAppointments.length}</Badge>
+                <div key={col.key} className={`rounded-xl border ${col.borderColor} bg-gradient-to-b ${col.bgGlow} min-h-[500px]`}>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                    <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase">{col.label}</span>
+                    <Badge variant="secondary" className="text-[10px] font-mono h-5 min-w-[20px] justify-center rounded-full">{colAppointments.length}</Badge>
                   </div>
-                  <div className="space-y-2 px-2 py-3">
+                  <div className="space-y-3 px-3 py-3">
                     {colAppointments.map((apt) => {
                       const mechName = getMechanicName(apt);
                       return (
-                        <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-shadow">
+                        <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-all">
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-bold text-primary/80">{orderNumber(apt.id)}</span>
+                              <span className="text-[10px] font-mono font-bold text-primary">{orderNumber(apt.id)}</span>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3 w-3" /></Button>
@@ -405,17 +403,33 @@ const Appointments = () => {
                             </div>
 
                             <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
-                            
-                            {mechName && (
-                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                <UserCog className="h-3 w-3 text-primary/60" />
-                                <span>{mechName}</span>
-                              </div>
-                            )}
 
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>{apt.date} · {apt.time_slot}</span>
+                            <div className="flex items-center justify-between">
+                              {mechName ? (
+                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                  <Wrench className="h-3 w-3 text-primary/60" />
+                                  <span>{mechName}</span>
+                                </div>
+                              ) : (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2">
+                                      <UserCog className="mr-1 h-3 w-3" />Asignar
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                    {(mechanics ?? []).map((m) => (
+                                      <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m)}>
+                                        {m.name}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                <span>{apt.time_slot}</span>
+                              </div>
                             </div>
 
                             {apt.notes && <div className="text-[10px] text-muted-foreground italic line-clamp-2">{apt.notes}</div>}
@@ -443,6 +457,27 @@ const Appointments = () => {
                                   <FileText className="mr-1 h-3 w-3" />
                                   Presupuesto
                                 </Button>
+                              )}
+                              {apt.status === "listo" && (
+                                <>
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={() => handleDeliverVehicle(apt)}
+                                  >
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    Entregar vehículo
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2"
+                                    title="Ver factura"
+                                  >
+                                    <Receipt className="h-3 w-3" />
+                                  </Button>
+                                </>
                               )}
                             </div>
 

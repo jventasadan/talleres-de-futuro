@@ -6,7 +6,8 @@ import { toast } from "sonner";
 export interface Invoice {
   id: string;
   invoice_number: string;
-  appointment_id: string;
+  work_order_id: string | null;
+  appointment_id: string | null;
   user_id: string;
   client_name: string;
   license_plate: string;
@@ -17,6 +18,7 @@ export interface Invoice {
   total: number;
   status: string;
   created_at: string;
+  workshop_id: string | null;
 }
 
 export interface InvoiceLine {
@@ -31,11 +33,7 @@ export interface InvoiceLine {
   created_at: string;
 }
 
-const isSchemaMismatchError = (error: any) => {
-  const code = String(error?.code ?? "");
-  const message = String(error?.message ?? "").toLowerCase();
-  return code === "42703" || message.includes("does not exist");
-};
+const db = supabase as any;
 
 export function useInvoices() {
   const { workshopId } = useWorkshop();
@@ -45,26 +43,14 @@ export function useInvoices() {
     queryFn: async () => {
       if (!workshopId) return [];
 
-      // Try with workshop_id filter first
-      const { data: d1, error: e1 } = await supabase
+      const { data, error } = await db
         .from("invoices")
         .select("*")
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
-      if (!e1) return (d1 ?? []) as unknown as Invoice[];
-
-      if (isSchemaMismatchError(e1)) {
-        // Fallback: no workshop_id filter
-        const { data: d2, error: e2 } = await supabase
-          .from("invoices")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (!e2) return (d2 ?? []) as unknown as Invoice[];
-        throw e2;
-      }
-
-      throw e1;
+      if (error) throw error;
+      return (data ?? []) as Invoice[];
     },
     enabled: !!workshopId,
   });
@@ -78,27 +64,14 @@ export function useInvoiceLines(invoiceId: string | null) {
     queryFn: async () => {
       if (!invoiceId || !workshopId) return [];
 
-      // Try with workshop_id
-      const { data: d1, error: e1 } = await (supabase as any)
+      const { data, error } = await db
         .from("invoice_lines")
         .select("*")
         .eq("invoice_id", invoiceId)
-        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: true });
 
-      if (!e1) return (d1 ?? []) as InvoiceLine[];
-
-      if (isSchemaMismatchError(e1)) {
-        const { data: d2, error: e2 } = await (supabase as any)
-          .from("invoice_lines")
-          .select("*")
-          .eq("invoice_id", invoiceId)
-          .order("created_at", { ascending: true });
-        if (!e2) return (d2 ?? []) as InvoiceLine[];
-        throw e2;
-      }
-
-      throw e1;
+      if (error) throw error;
+      return (data ?? []) as InvoiceLine[];
     },
     enabled: !!invoiceId && !!workshopId,
   });
@@ -107,7 +80,7 @@ export function useInvoiceLines(invoiceId: string | null) {
 export async function generateInvoiceNumber(userId: string): Promise<string> {
   const year = new Date().getFullYear();
 
-  const { data: series } = await (supabase as any)
+  const { data: series } = await db
     .from("invoice_series")
     .select("*")
     .eq("year", year)
@@ -117,13 +90,13 @@ export async function generateInvoiceNumber(userId: string): Promise<string> {
 
   if (series) {
     nextNumber = (series.last_number ?? 0) + 1;
-    await (supabase as any)
+    await db
       .from("invoice_series")
       .update({ last_number: nextNumber })
       .eq("id", series.id);
   } else {
     nextNumber = 1;
-    await (supabase as any)
+    await db
       .from("invoice_series")
       .insert({ user_id: userId, year, last_number: 1, prefix: "" });
   }
@@ -131,19 +104,38 @@ export async function generateInvoiceNumber(userId: string): Promise<string> {
   return `${year}-${String(nextNumber).padStart(4, "0")}`;
 }
 
+interface CreateInvoiceInput {
+  work_order_id?: string;
+  invoice_number?: string;
+  client_name: string;
+  license_plate: string;
+  service: string;
+  parts_total: number;
+  labor_cost: number;
+  tax_rate: number;
+  total: number;
+  lines?: Array<{
+    description: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    line_type: string;
+  }>;
+}
+
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (invoice: Partial<Invoice> & { lines?: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> }) => {
+    mutationFn: async (invoice: CreateInvoiceInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id ?? "";
       const invoiceNumber = invoice.invoice_number ?? await generateInvoiceNumber(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("invoices")
         .insert({
-          appointment_id: invoice.appointment_id ?? "",
+          work_order_id: invoice.work_order_id ?? null,
           invoice_number: invoiceNumber,
           client_name: invoice.client_name ?? "",
           license_plate: invoice.license_plate ?? "",
@@ -152,10 +144,9 @@ export function useCreateInvoice() {
           labor_cost: Number(invoice.labor_cost ?? 0),
           tax_rate: Number(invoice.tax_rate ?? 21),
           total: Number(invoice.total ?? 0),
-          status: invoice.status ?? "emitida",
+          status: "emitida",
           user_id: userId,
-          // workshop_id is set automatically by DB trigger
-        } as any)
+        })
         .select("*")
         .single();
 
@@ -173,12 +164,10 @@ export function useCreateInvoice() {
           line_type: line.line_type,
         }));
 
-        await (supabase as any)
-          .from("invoice_lines")
-          .insert(lineRows);
+        await db.from("invoice_lines").insert(lineRows);
       }
 
-      return data as unknown as Invoice;
+      return data as Invoice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -196,9 +185,9 @@ export function useUpdateInvoiceStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("invoices")
-        .update({ status } as any)
+        .update({ status })
         .eq("id", id);
       if (error) throw error;
     },
