@@ -33,7 +33,7 @@ interface ReceptionDialogProps {
   defaultStatus?: string;
 }
 
-export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading }: ReceptionDialogProps) {
+export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defaultStatus }: ReceptionDialogProps) {
   const [form, setForm] = useState({
     client_name: "",
     license_plate: "",
