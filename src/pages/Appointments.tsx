@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone } from "lucide-react";
+import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone, FileText, ArrowRight, Clock } from "lucide-react";
 import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
@@ -26,13 +26,15 @@ import { OrderPartsDialog } from "@/components/appointments/OrderPartsDialog";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
+import { KanbanQuoteDialog } from "@/components/appointments/KanbanQuoteDialog";
 
 const KANBAN_COLUMNS = [
-  { key: "recepcionado", label: "RECEPCIONADO", color: "border-t-purple-500" },
-  { key: "en_reparacion", label: "EN REPARACIÓN", color: "border-t-pink-500" },
-  { key: "esperando_piezas", label: "ESPERANDO PIEZAS", color: "border-t-emerald-500" },
-  { key: "listo", label: "LISTO", color: "border-t-green-400" },
-  { key: "entregado", label: "ENTREGADO", color: "border-t-blue-500" },
+  { key: "recepcionado", label: "RECEPCIONADO", color: "border-l-purple-500", icon: "📋" },
+  { key: "en_reparacion", label: "EN REPARACIÓN", color: "border-l-blue-500", icon: "🔧" },
+  { key: "esperando_piezas", label: "ESPERANDO PIEZAS", color: "border-l-amber-500", icon: "📦" },
+  { key: "listo", label: "LISTO", color: "border-l-emerald-500", icon: "✅" },
+  { key: "facturado", label: "FACTURADO", color: "border-l-green-500", icon: "🧾" },
+  { key: "entregado", label: "ENTREGADO", color: "border-l-slate-400", icon: "🚗" },
 ] as const;
 
 type StatusKey = (typeof KANBAN_COLUMNS)[number]["key"];
@@ -42,7 +44,16 @@ const NEXT_STATUS: Record<string, StatusKey> = {
   recepcionado: "en_reparacion",
   en_reparacion: "esperando_piezas",
   esperando_piezas: "listo",
-  listo: "entregado",
+  listo: "facturado",
+  facturado: "entregado",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  recepcionado: "En reparación",
+  en_reparacion: "Esperando piezas",
+  esperando_piezas: "Listo",
+  listo: "Facturar",
+  facturado: "Entregar",
 };
 
 const isSchemaMismatchError = (error: any) => {
@@ -96,6 +107,7 @@ const Appointments = () => {
   const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
+  const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
 
   const { data: appointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
@@ -106,9 +118,9 @@ const Appointments = () => {
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
 
-  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo", "entregado"];
+  const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo", "facturado", "entregado"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
-  const historyAppointments = (appointments ?? []).filter((a) => ["listo", "cancelado", "entregado"].includes(a.status));
+  const historyAppointments = (appointments ?? []).filter((a) => ["listo", "facturado", "entregado", "cancelado"].includes(a.status));
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
@@ -131,12 +143,10 @@ const Appointments = () => {
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
     if (newStatus === "en_reparacion") {
-      // Mechanic is mandatory for repair — check both mechanic_id and mechanic (text)
       if (!appointment.mechanic_id && !appointment.mechanic) {
         toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
         return;
       }
-      // Create work order with repair_start_time
       try {
         await (supabase as any)
           .from("work_orders")
@@ -153,7 +163,6 @@ const Appointments = () => {
     }
 
     if (newStatus === "listo") {
-      // Complete work order and get auto hours
       let autoHours: number | null = null;
       try {
         const { data: wo } = await (supabase as any)
@@ -197,7 +206,8 @@ const Appointments = () => {
     const { appointment } = laborDialogData;
     const partsTotal = laborDialogData.partsTotal;
 
-    updateStatus.mutate({ id: appointment.id, status: "listo" });
+    // Move to "listo" first, then auto-generate invoice → "facturado"
+    updateStatus.mutate({ id: appointment.id, status: "facturado" });
 
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
@@ -205,7 +215,6 @@ const Appointments = () => {
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
-    // Build invoice lines
     const { parts } = await fetchPartsTotal(appointment.id);
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
@@ -289,17 +298,26 @@ const Appointments = () => {
 
   const orderNumber = (id: string) => `ORD-${id.slice(0, 4).toUpperCase()}`;
 
+  const getMechanicName = (apt: Appointment) => {
+    if (apt.mechanic) return apt.mechanic;
+    if (apt.mechanic_id && mechanics) {
+      const m = mechanics.find(m => m.id === apt.mechanic_id);
+      return m?.name ?? null;
+    }
+    return null;
+  };
+
   return (
-    <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de órdenes del taller">
-      <div className="space-y-4">
+    <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de reparaciones del taller">
+      <div className="space-y-5">
         <div className="flex items-center justify-between">
-          <Button onClick={() => setReceptionOpen(true)}>
+          <Button onClick={() => setReceptionOpen(true)} size="lg" className="font-semibold">
             <Plus className="mr-2 h-4 w-4" />
             Recepcionar vehículo
           </Button>
-          <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs">TABLERO ACTIVO</Button>
-            <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs">HISTÓRICO</Button>
+          <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO</Button>
+            <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs rounded-lg">HISTÓRICO</Button>
           </div>
         </div>
 
@@ -308,86 +326,131 @@ const Appointments = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
             {KANBAN_COLUMNS.map((col) => {
               const colAppointments = getColumnAppointments(col.key);
               return (
-                <div key={col.key} className={`rounded-xl border-t-4 ${col.color} bg-card min-h-[400px]`}>
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-xs font-bold tracking-wider text-muted-foreground">{col.label}</span>
-                    <Badge variant="secondary" className="text-xs font-mono">{colAppointments.length}</Badge>
+                <div key={col.key} className={`rounded-xl border-l-4 ${col.color} bg-card/50 backdrop-blur-sm min-h-[450px]`}>
+                  <div className="flex items-center justify-between px-3 py-3 border-b border-border/30">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{col.icon}</span>
+                      <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">{col.label}</span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] font-mono h-5 min-w-[20px] justify-center">{colAppointments.length}</Badge>
                   </div>
-                  <div className="space-y-3 px-3 pb-4">
-                    {colAppointments.map((apt) => (
-                      <Card key={apt.id} className="bg-secondary/50 border-border/50">
-                        <CardContent className="p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-semibold text-primary">{orderNumber(apt.id)}</span>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3 w-3" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {NEXT_STATUS[apt.status] && (
-                                  <DropdownMenuItem onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}>
-                                    Mover a {KANBAN_COLUMNS.find((c) => c.key === NEXT_STATUS[apt.status])?.label}
+                  <div className="space-y-2 px-2 py-3">
+                    {colAppointments.map((apt) => {
+                      const mechName = getMechanicName(apt);
+                      return (
+                        <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-shadow">
+                          <CardContent className="p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-bold text-primary/80">{orderNumber(apt.id)}</span>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3 w-3" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-52">
+                                  {NEXT_STATUS[apt.status] && (
+                                    <DropdownMenuItem onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}>
+                                      <ArrowRight className="mr-2 h-3 w-3" />
+                                      {STATUS_LABELS[apt.status] ?? `Mover a ${NEXT_STATUS[apt.status]}`}
+                                    </DropdownMenuItem>
+                                  )}
+                                  {apt.status === "en_reparacion" && (
+                                    <DropdownMenuItem onClick={() => setQuoteAppointment(apt)}>
+                                      <FileText className="mr-2 h-3 w-3" />Generar presupuesto
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem onClick={() => setPartsDialogId(apt.id)}>
+                                    <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
                                   </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem onClick={() => setPartsDialogId(apt.id)}>
-                                  <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
-                                  <Camera className="mr-2 h-3 w-3" />Fotos
-                                </DropdownMenuItem>
-                                {(mechanics ?? []).length > 0 && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    {(mechanics ?? []).map((m) => (
-                                      <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m)}>
-                                        <UserCog className="mr-2 h-3 w-3" />{m.name}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setDeleteConfirm(apt.id)} className="text-destructive">
-                                  <Trash2 className="mr-2 h-3 w-3" />Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium truncate">{apt.client_name || "Sin Nombre"}</span>
+                                  <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
+                                    <Camera className="mr-2 h-3 w-3" />Fotos
+                                  </DropdownMenuItem>
+                                  {(mechanics ?? []).length > 0 && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold uppercase">Asignar mecánico</div>
+                                      {(mechanics ?? []).map((m) => (
+                                        <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m)}>
+                                          <UserCog className="mr-2 h-3 w-3" />{m.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDeleteConfirm(apt.id)} className="text-destructive">
+                                    <Trash2 className="mr-2 h-3 w-3" />Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
-                            {apt.phone && (
+
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-semibold truncate text-foreground">{apt.client_name || "Sin Nombre"}</span>
+                              </div>
+                              {apt.phone && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Phone className="h-3 w-3" />
+                                  <a href={`tel:${apt.phone}`} className="hover:text-primary transition-colors">{apt.phone}</a>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Phone className="h-3 w-3" />
-                                <span>{apt.phone}</span>
+                                <Car className="h-3 w-3" />
+                                <span className="font-mono font-semibold">{apt.license_plate || "---"}</span>
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
+                            
+                            {mechName && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <UserCog className="h-3 w-3 text-primary/60" />
+                                <span>{mechName}</span>
                               </div>
                             )}
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Car className="h-3 w-3" />
-                              <span className="font-mono">{apt.license_plate || "---"}</span>
-                            </div>
-                          </div>
 
-                          <div className="rounded-md bg-background/50 px-2 py-1.5 text-xs">{apt.service || "Sin servicio"}</div>
-                          {(apt.mechanic || apt.mechanic_id) && (
-                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <UserCog className="h-3 w-3" />
-                              <span>Mecánico: {apt.mechanic || apt.mechanic_id}</span>
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{apt.date} · {apt.time_slot}</span>
                             </div>
-                          )}
-                          {apt.notes && <div className="text-[10px] text-muted-foreground italic">{apt.notes}</div>}
-                          <div className="text-[10px] text-muted-foreground">{apt.date} · {apt.time_slot}</div>
 
-                          {expandedPhotos === apt.id && <PhotoGallery appointmentId={apt.id} />}
-                        </CardContent>
-                      </Card>
-                    ))}
+                            {apt.notes && <div className="text-[10px] text-muted-foreground italic line-clamp-2">{apt.notes}</div>}
+
+                            {/* Quick action buttons */}
+                            <div className="flex items-center gap-1 pt-1 border-t border-border/20">
+                              {NEXT_STATUS[apt.status] && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2 text-primary hover:text-primary"
+                                  onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}
+                                >
+                                  <ArrowRight className="mr-1 h-3 w-3" />
+                                  {STATUS_LABELS[apt.status]}
+                                </Button>
+                              )}
+                              {apt.status === "en_reparacion" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2"
+                                  onClick={() => setQuoteAppointment(apt)}
+                                >
+                                  <FileText className="mr-1 h-3 w-3" />
+                                  Presupuesto
+                                </Button>
+                              )}
+                            </div>
+
+                            {expandedPhotos === apt.id && <PhotoGallery appointmentId={apt.id} />}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -411,6 +474,12 @@ const Appointments = () => {
           onConfirm={handleLaborConfirm}
         />
       )}
+
+      <KanbanQuoteDialog
+        open={!!quoteAppointment}
+        onOpenChange={(open) => !open && setQuoteAppointment(null)}
+        appointment={quoteAppointment}
+      />
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <AlertDialogContent>
