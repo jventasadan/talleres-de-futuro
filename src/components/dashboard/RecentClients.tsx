@@ -1,61 +1,60 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wrench, Loader2 } from "lucide-react";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { useAllAppointments } from "@/hooks/useAppointments";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, User, Phone, Car } from "lucide-react";
+import { useClients, type Client } from "@/hooks/useClients";
+import { useNavigate } from "react-router-dom";
 
 export function RecentClients() {
-  const { data: appointments, isLoading } = useAllAppointments();
+  const { data: clients, isLoading } = useClients();
+  const navigate = useNavigate();
 
-  // Group by status for a simple overview
-  const statusMap = new Map<string, number>();
-  (appointments ?? []).forEach((apt) => {
-    const s = apt.status || "pending";
-    statusMap.set(s, (statusMap.get(s) ?? 0) + 1);
-  });
-
-  const statuses = Array.from(statusMap.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+  const recent = (clients ?? [])
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
 
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-3">
-        <CardTitle className="font-display text-base font-bold">Resumen de Estados</CardTitle>
-        <p className="text-xs text-muted-foreground">Distribución de órdenes por estado.</p>
+        <div className="flex items-center justify-between">
+          <CardTitle className="font-display text-base font-bold">Últimos clientes</CardTitle>
+          <Badge variant="outline" className="text-xs">{(clients ?? []).length} total</Badge>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : !statuses.length ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Sin datos</p>
+        ) : !recent.length ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Sin clientes registrados</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Estado</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider text-muted-foreground text-center">Cantidad</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {statuses.map((s) => (
-                <TableRow key={s.name} className="border-border/30 hover:bg-secondary/50">
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
-                        <Wrench className="h-3.5 w-3.5 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium capitalize">{s.name.replace("_", " ")}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center font-mono text-sm font-bold">{s.count}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="space-y-2">
+            {recent.map((client) => (
+              <div
+                key={client.id}
+                className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-secondary/50 cursor-pointer"
+                onClick={() => navigate(`/clients?search=${encodeURIComponent(client.license_plate || client.name)}`)}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <User className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{client.name || "Sin nombre"}</p>
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    {client.phone && (
+                      <span className="flex items-center gap-0.5"><Phone className="h-2.5 w-2.5" />{client.phone}</span>
+                    )}
+                    {client.license_plate && (
+                      <span className="flex items-center gap-0.5 font-mono"><Car className="h-2.5 w-2.5" />{client.license_plate}</span>
+                    )}
+                  </div>
+                </div>
+                {client.brand && (
+                  <Badge variant="outline" className="text-[10px] shrink-0">{client.brand}</Badge>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

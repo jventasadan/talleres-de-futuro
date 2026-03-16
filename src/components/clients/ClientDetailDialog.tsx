@@ -11,9 +11,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Trash2, Wrench } from "lucide-react";
+import { Loader2, Trash2, Wrench, History } from "lucide-react";
 import { useUpdateClient, useDeleteClient, type Client } from "@/hooks/useClients";
 import { useAllAppointments } from "@/hooks/useAppointments";
+import { useNavigate } from "react-router-dom";
 
 interface Props {
   client: Client | null;
@@ -26,6 +27,7 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
   const { data: appointments } = useAllAppointments();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (client) {
@@ -54,6 +56,11 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
 
   const handleDelete = () => {
     deleteClient.mutate(client.id, { onSuccess: () => onOpenChange(false) });
+  };
+
+  const handleViewHistory = () => {
+    onOpenChange(false);
+    navigate(`/vehicle-history?plate=${encodeURIComponent(client.license_plate || "")}`);
   };
 
   return (
@@ -91,10 +98,18 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
           <Separator />
 
           <div>
-            <h4 className="flex items-center gap-2 text-sm font-semibold mb-2">
-              <Wrench className="h-4 w-4 text-primary" />
-              Historial de reparaciones ({history.length})
-            </h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="flex items-center gap-2 text-sm font-semibold">
+                <Wrench className="h-4 w-4 text-primary" />
+                Historial de reparaciones ({history.length})
+              </h4>
+              {client.license_plate && (
+                <Button variant="outline" size="sm" onClick={handleViewHistory} className="text-xs">
+                  <History className="mr-1.5 h-3 w-3" />
+                  Ver historial completo
+                </Button>
+              )}
+            </div>
             {history.length === 0 ? (
               <p className="text-xs text-muted-foreground">Sin reparaciones registradas</p>
             ) : (

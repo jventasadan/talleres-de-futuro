@@ -308,7 +308,7 @@ const Appointments = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             {KANBAN_COLUMNS.map((col) => {
               const colAppointments = getColumnAppointments(col.key);
               return (
