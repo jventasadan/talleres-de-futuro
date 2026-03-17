@@ -596,12 +596,35 @@ const Appointments = () => {
 
                             <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
 
-                            {/* Quote badge */}
                             {quote && apt.status === "en_reparacion" && (
-                              <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs">
-                                <FileText className="h-3 w-3 text-primary" />
-                                <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
-                                <Badge variant="outline" className="text-[9px] h-4 ml-auto">{quote.status}</Badge>
+                              <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-3 w-3 text-primary" />
+                                  <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
+                                  <Badge variant="outline" className="ml-auto h-4 text-[9px]">
+                                    {getQuoteStatusLabel(quote.status)}
+                                  </Badge>
+                                </div>
+                                {quote.status === "esperando_cliente" && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "aprobado")}
+                                    >
+                                      Aceptar
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "rechazado")}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             )}
 
