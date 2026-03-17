@@ -301,6 +301,11 @@ const Appointments = () => {
 
   const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
     if (!laborDialogData) return;
+    if (!workshopId) {
+      toast.error("No se encontró el taller activo");
+      return;
+    }
+
     const { appointment, workOrderId } = laborDialogData;
     const partsTotal = laborDialogData.partsTotal;
 
@@ -308,7 +313,7 @@ const Appointments = () => {
 
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
-    const discountAmount = subtotal * (discount / 100);
+    const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
@@ -335,7 +340,17 @@ const Appointments = () => {
       });
     }
 
-    const invoiceNumber = await generateInvoiceNumber(user?.id ?? "");
+    if (discountAmount > 0) {
+      lines.push({
+        description: `Descuento aplicado (${discount}%)`,
+        quantity: 1,
+        unit_price: -discountAmount,
+        total: -discountAmount,
+        line_type: "discount",
+      });
+    }
+
+    const invoiceNumber = await generateInvoiceNumber(user?.id ?? "", workshopId);
 
     createInvoice.mutate({
       work_order_id: workOrderId ?? undefined,
