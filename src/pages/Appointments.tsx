@@ -373,6 +373,61 @@ const Appointments = () => {
     toast.success("Vehículo entregado correctamente");
   };
 
+  const handleQuoteDecision = async (appointment: Appointment, quoteId: string, nextStatus: "aprobado" | "rechazado") => {
+    try {
+      if (nextStatus === "aprobado") {
+        if (!workshopId) throw new Error("No se encontró el taller activo");
+
+        const workOrderId = await ensureWorkOrderForAppointment(appointment);
+        const [{ data: quoteLines, error: quoteLinesError }, { data: currentParts, error: currentPartsError }] = await Promise.all([
+          (supabase as any)
+            .from("quote_lines")
+            .select("*")
+            .eq("quote_id", quoteId),
+          (supabase as any)
+            .from("work_order_parts")
+            .select("name, quantity, unit_price")
+            .eq("work_order_id", workOrderId),
+        ]);
+
+        if (quoteLinesError) throw quoteLinesError;
+        if (currentPartsError) throw currentPartsError;
+
+        const partsToInsert = (quoteLines ?? [])
+          .filter((line: any) => line.line_type === "part")
+          .filter((line: any) => {
+            return !(currentParts ?? []).some((part: any) => (
+              part.name === (line.description ?? "") &&
+              Number(part.quantity ?? 1) === Number(line.quantity ?? 1) &&
+              Number(part.unit_price ?? 0) === Number(line.unit_price ?? 0)
+            ));
+          })
+          .map((line: any) => ({
+            work_order_id: workOrderId,
+            name: line.description ?? "Pieza",
+            quantity: Number(line.quantity ?? 1),
+            unit_price: Number(line.unit_price ?? 0),
+            total: Number(line.total ?? 0),
+            user_id: user?.id ?? "",
+            workshop_id: workshopId,
+          }));
+
+        if (partsToInsert.length > 0) {
+          const { error: insertError } = await (supabase as any)
+            .from("work_order_parts")
+            .insert(partsToInsert);
+
+          if (insertError) throw insertError;
+        }
+      }
+
+      await updateQuoteStatus.mutateAsync({ id: quoteId, status: nextStatus });
+      toast.success(nextStatus === "aprobado" ? "Presupuesto aceptado y piezas sincronizadas" : "Presupuesto cancelado");
+    } catch (error: any) {
+      toast.error("No se pudo actualizar el presupuesto: " + (error?.message ?? "Error desconocido"));
+    }
+  };
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("appointments").delete().eq("id", id) as any;
     if (error) {
