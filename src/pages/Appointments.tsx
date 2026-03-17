@@ -193,7 +193,6 @@ const Appointments = () => {
         workshop_id: workshopId,
         status: "in_progress",
         repair_start_time: new Date().toISOString(),
-        labor_rate: companySettings?.labor_rate ?? 35,
       })
       .select("id")
       .single();
@@ -202,7 +201,7 @@ const Appointments = () => {
 
     setWorkOrderMap((prev) => ({ ...prev, [appointment.id]: created.id }));
     return created.id;
-  }, [companySettings?.labor_rate, user?.id, workOrderMap, workshopId]);
+  }, [user?.id, workOrderMap, workshopId]);
 
   const openPartsDialogForAppointment = useCallback(async (appointment: Appointment) => {
     try {
