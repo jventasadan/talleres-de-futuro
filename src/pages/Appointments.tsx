@@ -548,11 +548,11 @@ const Appointments = () => {
                                     </DropdownMenuItem>
                                   )}
                                   {apt.status === "en_reparacion" && (
-                                    <DropdownMenuItem onClick={() => setQuoteAppointment(apt)}>
+                                    <DropdownMenuItem onClick={() => void openQuoteDialogForAppointment(apt)}>
                                       <FileText className="mr-2 h-3 w-3" />Generar presupuesto
                                     </DropdownMenuItem>
                                   )}
-                                  <DropdownMenuItem onClick={() => setPartsDialog({ appointmentId: apt.id, workOrderId: woId })}>
+                                  <DropdownMenuItem onClick={() => void openPartsDialogForAppointment(apt)}>
                                     <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
