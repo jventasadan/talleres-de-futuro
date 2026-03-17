@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -18,6 +18,7 @@ import {
   type Appointment,
 } from "@/hooks/useAppointments";
 import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
+import { useQuotes } from "@/hooks/useQuotes";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,20 +98,45 @@ const updateAppointmentWithFallback = async (appointmentId: string, payload: Any
 const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
-  const [partsDialogId, setPartsDialogId] = useState<string | null>(null);
+  const [partsDialog, setPartsDialog] = useState<{ appointmentId: string; workOrderId: string | null } | null>(null);
   const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null; workOrderId: string | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
+  const [workOrderMap, setWorkOrderMap] = useState<Record<string, string>>({});
 
   const { data: appointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
   const { data: companySettings } = useCompanySettings();
+  const { data: quotes } = useQuotes();
   const updateStatus = useUpdateAppointmentStatus();
   const createMutation = useCreateAppointment();
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
+
+  // Fetch work_order map for all active appointments
+  const fetchWorkOrderMap = useCallback(async () => {
+    if (!workshopId || !appointments?.length) return;
+    const activeIds = appointments
+      .filter(a => ["recepcionado", "en_reparacion", "esperando_piezas", "listo"].includes(a.status))
+      .map(a => a.id);
+    if (!activeIds.length) return;
+
+    const { data } = await (supabase as any)
+      .from("work_orders")
+      .select("id, appointment_id")
+      .eq("workshop_id", workshopId)
+      .in("appointment_id", activeIds);
+
+    if (data) {
+      const map: Record<string, string> = {};
+      (data as any[]).forEach((wo) => { map[wo.appointment_id] = wo.id; });
+      setWorkOrderMap(map);
+    }
+  }, [workshopId, appointments]);
+
+  useEffect(() => { fetchWorkOrderMap(); }, [fetchWorkOrderMap]);
 
   const activeStatuses = ["recepcionado", "en_reparacion", "esperando_piezas", "listo"];
   const activeAppointments = (appointments ?? []).filter((a) => activeStatuses.includes(a.status));
@@ -118,20 +144,22 @@ const Appointments = () => {
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
-  const fetchPartsTotal = async (appointmentId: string): Promise<{ parts: any[]; total: number }> => {
-    if (!workshopId) return { parts: [], total: 0 };
+  // Get quote for an appointment (via work_order_id linkage or appointment_id)
+  const getQuoteForAppointment = (aptId: string) => {
+    if (!quotes?.length) return null;
+    return quotes.find(q => q.appointment_id === aptId) ?? null;
+  };
 
-    const { data: orderParts, error: orderError } = await supabase
-      .from("order_parts")
+  const fetchPartsTotalFromWorkOrder = async (workOrderId: string): Promise<{ parts: any[]; total: number }> => {
+    const { data, error } = await (supabase as any)
+      .from("work_order_parts")
       .select("*")
-      .eq("appointment_id", appointmentId)
-      .eq("workshop_id", workshopId) as any;
+      .eq("work_order_id", workOrderId);
 
-    if (!orderError && orderParts?.length) {
-      const total = orderParts.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
-      return { parts: orderParts, total };
+    if (!error && data?.length) {
+      const total = data.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
+      return { parts: data, total };
     }
-
     return { parts: [], total: 0 };
   };
 
@@ -142,7 +170,7 @@ const Appointments = () => {
         return;
       }
       try {
-        await (supabase as any)
+        const { data: wo } = await (supabase as any)
           .from("work_orders")
           .insert({
             appointment_id: appointment.id,
@@ -150,47 +178,50 @@ const Appointments = () => {
             status: "in_progress",
             repair_start_time: new Date().toISOString(),
             labor_rate: companySettings?.labor_rate ?? 35,
-          });
+          })
+          .select("id")
+          .single();
+        if (wo) {
+          setWorkOrderMap(prev => ({ ...prev, [appointment.id]: wo.id }));
+        }
       } catch (_) { /* best effort */ }
       updateStatus.mutate({ id: appointment.id, status: newStatus });
       return;
     }
 
     if (newStatus === "listo") {
+      const woId = workOrderMap[appointment.id] ?? null;
       let autoHours: number | null = null;
-      let workOrderId: string | null = null;
-      try {
-        const { data: wo } = await (supabase as any)
-          .from("work_orders")
-          .select("*")
-          .eq("appointment_id", appointment.id)
-          .eq("workshop_id", workshopId)
-          .eq("status", "in_progress")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
 
-        if (wo) {
-          workOrderId = wo.id;
-          const startTime = wo.repair_start_time ? new Date(wo.repair_start_time) : new Date(wo.created_at);
-          const endTime = new Date();
-          const diffMs = endTime.getTime() - startTime.getTime();
-          autoHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
-
-          await (supabase as any)
+      if (woId) {
+        try {
+          const { data: wo } = await (supabase as any)
             .from("work_orders")
-            .update({
-              status: "completed",
-              repair_end_time: endTime.toISOString(),
-              repair_time_hours: autoHours,
-              labor_cost: autoHours * (companySettings?.labor_rate ?? 35),
-            })
-            .eq("id", wo.id);
-        }
-      } catch (_) { /* best effort */ }
+            .select("*")
+            .eq("id", woId)
+            .single();
 
-      const { total: partsTotal } = await fetchPartsTotal(appointment.id);
-      setLaborDialogData({ appointment, partsTotal, autoHours, workOrderId });
+          if (wo) {
+            const startTime = wo.repair_start_time ? new Date(wo.repair_start_time) : new Date(wo.created_at);
+            const endTime = new Date();
+            const diffMs = endTime.getTime() - startTime.getTime();
+            autoHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+
+            await (supabase as any)
+              .from("work_orders")
+              .update({
+                status: "completed",
+                repair_end_time: endTime.toISOString(),
+                repair_time_hours: autoHours,
+                labor_cost: autoHours * (companySettings?.labor_rate ?? 35),
+              })
+              .eq("id", woId);
+          }
+        } catch (_) { /* best effort */ }
+      }
+
+      const { total: partsTotal } = woId ? await fetchPartsTotalFromWorkOrder(woId) : { total: 0 };
+      setLaborDialogData({ appointment, partsTotal, autoHours, workOrderId: woId });
       return;
     }
 
@@ -202,7 +233,6 @@ const Appointments = () => {
     const { appointment, workOrderId } = laborDialogData;
     const partsTotal = laborDialogData.partsTotal;
 
-    // Move to "listo" — invoice generated automatically
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
     const vatRate = companySettings?.default_vat ?? 21;
@@ -211,7 +241,7 @@ const Appointments = () => {
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
-    const { parts } = await fetchPartsTotal(appointment.id);
+    const parts = workOrderId ? (await fetchPartsTotalFromWorkOrder(workOrderId)).parts : [];
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
     parts.forEach((p: any) => {
@@ -281,6 +311,25 @@ const Appointments = () => {
   };
 
   const handleCreate = async (data: AnyRecord) => {
+    // Check mechanic capacity
+    if (data.date && data.time_slot && workshopId) {
+      const mechanicCount = (mechanics ?? []).length;
+      if (mechanicCount > 0) {
+        const { count } = await supabase
+          .from("appointments")
+          .select("id", { count: "exact", head: true })
+          .eq("workshop_id", workshopId)
+          .eq("date", data.date)
+          .eq("time_slot", data.time_slot)
+          .not("status", "in", '("cancelado","entregado")') as any;
+        
+        if ((count ?? 0) >= mechanicCount) {
+          toast.error(`No hay mecánicos disponibles en esa franja horaria (${mechanicCount} mecánicos, ${count} citas)`);
+          return;
+        }
+      }
+    }
+
     if (user && data.client_name && data.license_plate) {
       try {
         await insertClientWithFallback({
@@ -314,7 +363,7 @@ const Appointments = () => {
         <div className="flex items-center justify-between">
           <Button onClick={() => setReceptionOpen(true)} size="lg" className="font-semibold">
             <Plus className="mr-2 h-4 w-4" />
-            Recepcionar vehículo
+            Nueva cita
           </Button>
           <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
             <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO ACTIVO</Button>
@@ -339,6 +388,8 @@ const Appointments = () => {
                   <div className="space-y-3 px-3 py-3">
                     {colAppointments.map((apt) => {
                       const mechName = getMechanicName(apt);
+                      const woId = workOrderMap[apt.id] ?? null;
+                      const quote = getQuoteForAppointment(apt.id);
                       return (
                         <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-all">
                           <CardContent className="p-3 space-y-2">
@@ -360,7 +411,7 @@ const Appointments = () => {
                                       <FileText className="mr-2 h-3 w-3" />Generar presupuesto
                                     </DropdownMenuItem>
                                   )}
-                                  <DropdownMenuItem onClick={() => setPartsDialogId(apt.id)}>
+                                  <DropdownMenuItem onClick={() => setPartsDialog({ appointmentId: apt.id, workOrderId: woId })}>
                                     <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
@@ -403,6 +454,15 @@ const Appointments = () => {
                             </div>
 
                             <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
+
+                            {/* Quote badge */}
+                            {quote && apt.status === "en_reparacion" && (
+                              <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs">
+                                <FileText className="h-3 w-3 text-primary" />
+                                <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
+                                <Badge variant="outline" className="text-[9px] h-4 ml-auto">{quote.status}</Badge>
+                              </div>
+                            )}
 
                             <div className="flex items-center justify-between">
                               {mechName ? (
@@ -496,8 +556,13 @@ const Appointments = () => {
 
       <ReceptionDialog open={receptionOpen} onOpenChange={setReceptionOpen} onSubmit={handleCreate} isLoading={createMutation.isPending} />
 
-      {partsDialogId && (
-        <OrderPartsDialog open={!!partsDialogId} onOpenChange={(open) => !open && setPartsDialogId(null)} appointmentId={partsDialogId} />
+      {partsDialog && (
+        <OrderPartsDialog
+          open={!!partsDialog}
+          onOpenChange={(open) => !open && setPartsDialog(null)}
+          appointmentId={partsDialog.appointmentId}
+          workOrderId={partsDialog.workOrderId}
+        />
       )}
 
       {laborDialogData && (
