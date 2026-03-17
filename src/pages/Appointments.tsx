@@ -248,22 +248,14 @@ const Appointments = () => {
         toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
         return;
       }
+
       try {
-        const { data: wo } = await (supabase as any)
-          .from("work_orders")
-          .insert({
-            appointment_id: appointment.id,
-            user_id: user?.id ?? "",
-            status: "in_progress",
-            repair_start_time: new Date().toISOString(),
-            labor_rate: companySettings?.labor_rate ?? 35,
-          })
-          .select("id")
-          .single();
-        if (wo) {
-          setWorkOrderMap(prev => ({ ...prev, [appointment.id]: wo.id }));
-        }
-      } catch (_) { /* best effort */ }
+        await ensureWorkOrderForAppointment(appointment);
+      } catch (error: any) {
+        toast.error("No se pudo preparar la orden de trabajo: " + (error?.message ?? "Error desconocido"));
+        return;
+      }
+
       updateStatus.mutate({ id: appointment.id, status: newStatus });
       return;
     }
