@@ -261,8 +261,16 @@ const Appointments = () => {
     }
 
     if (newStatus === "listo") {
-      const woId = workOrderMap[appointment.id] ?? null;
+      let woId = workOrderMap[appointment.id] ?? null;
       let autoHours: number | null = null;
+
+      if (!woId) {
+        try {
+          woId = await ensureWorkOrderForAppointment(appointment);
+        } catch (_) {
+          woId = null;
+        }
+      }
 
       if (woId) {
         try {
