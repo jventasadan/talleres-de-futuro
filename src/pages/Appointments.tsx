@@ -671,12 +671,23 @@ const Appointments = () => {
                                   {STATUS_LABELS[apt.status]}
                                 </Button>
                               )}
+                              {["en_reparacion", "esperando_piezas", "listo"].includes(apt.status) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-[10px]"
+                                  onClick={() => void openPartsDialogForAppointment(apt)}
+                                >
+                                  <Wrench className="mr-1 h-3 w-3" />
+                                  Piezas
+                                </Button>
+                              )}
                               {apt.status === "en_reparacion" && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-6 text-[10px] px-2"
-                                  onClick={() => setQuoteAppointment(apt)}
+                                  onClick={() => void openQuoteDialogForAppointment(apt)}
                                 >
                                   <FileText className="mr-1 h-3 w-3" />
                                   Presupuesto
