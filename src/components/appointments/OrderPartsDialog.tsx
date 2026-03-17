@@ -6,20 +6,21 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Trash2, Plus, Loader2, Search } from "lucide-react";
-import { useOrderParts, useAddPart, useDeletePart } from "@/hooks/useOrderParts";
+import { useWorkOrderParts, useAddWorkOrderPart, useDeleteWorkOrderPart } from "@/hooks/useWorkOrderParts";
 import { usePartsCatalog, type PartsCatalogItem } from "@/hooks/usePartsCatalog";
 
 interface OrderPartsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointmentId: string;
+  workOrderId?: string | null;
 }
 
-export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPartsDialogProps) {
-  const { data: parts, isLoading } = useOrderParts(appointmentId);
+export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderId }: OrderPartsDialogProps) {
+  const { data: parts, isLoading } = useWorkOrderParts(workOrderId ?? null);
   const { data: catalog } = usePartsCatalog();
-  const addPart = useAddPart();
-  const deletePart = useDeletePart();
+  const addPart = useAddWorkOrderPart();
+  const deletePart = useDeleteWorkOrderPart();
   const [form, setForm] = useState({ name: "", quantity: "1", unit_price: "0" });
   const [searchTerm, setSearchTerm] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
@@ -41,9 +42,9 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
   };
 
   const handleAdd = () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !workOrderId) return;
     addPart.mutate({
-      appointment_id: appointmentId,
+      work_order_id: workOrderId,
       name: form.name,
       quantity: parseInt(form.quantity) || 1,
       unit_price: parseFloat(form.unit_price) || 0,
@@ -56,6 +57,21 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
   };
 
   const total = (parts ?? []).reduce((sum, p) => sum + p.quantity * p.unit_price, 0);
+
+  if (!workOrderId) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">Piezas utilizadas</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-4">
+            Este vehículo debe estar en reparación para poder gestionar piezas. Mueve la orden a "En reparación" primero.
+          </p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,7 +86,6 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Existing parts */}
             {(parts ?? []).length > 0 && (
               <div className="space-y-2">
                 {(parts ?? []).map((part) => (
@@ -82,7 +97,7 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => deletePart.mutate({ id: part.id, appointmentId })}
+                      onClick={() => deletePart.mutate(part.id)}
                     >
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
@@ -94,7 +109,6 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
               </div>
             )}
 
-            {/* Catalog search */}
             <div className="relative">
               <Label className="text-xs">Buscar en catálogo</Label>
               <div className="relative">
@@ -135,7 +149,6 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId }: OrderPar
               )}
             </div>
 
-            {/* Add part form */}
             <div className="grid gap-3 sm:grid-cols-4 items-end">
               <div className="sm:col-span-2 space-y-1">
                 <Label className="text-xs">Pieza</Label>

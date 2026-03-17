@@ -760,6 +760,50 @@ export type Database = {
           },
         ]
       }
+      work_order_parts: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          quantity: number
+          total: number | null
+          unit_price: number
+          user_id: string
+          work_order_id: string
+          workshop_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          quantity?: number
+          total?: number | null
+          unit_price?: number
+          user_id: string
+          work_order_id: string
+          workshop_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          quantity?: number
+          total?: number | null
+          unit_price?: number
+          user_id?: string
+          work_order_id?: string
+          workshop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_parts_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_orders: {
         Row: {
           appointment_id: string
