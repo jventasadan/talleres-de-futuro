@@ -10,7 +10,6 @@ export interface WorkOrder {
   repair_start_time: string | null;
   repair_end_time: string | null;
   repair_time_hours: number;
-  labor_rate: number;
   labor_cost: number;
   notes: string | null;
   created_at: string;
@@ -44,7 +43,7 @@ export function useCreateWorkOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { appointment_id: string; labor_rate: number }) => {
+    mutationFn: async (params: { appointment_id: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await (supabase as any)
         .from("work_orders")
@@ -53,8 +52,8 @@ export function useCreateWorkOrder() {
           user_id: user?.id ?? "",
           status: "in_progress",
           repair_start_time: new Date().toISOString(),
-          labor_rate: params.labor_rate,
           // workshop_id is set automatically by DB trigger
+          // labor_rate comes from company_settings, not stored here
         })
         .select("*")
         .single();
@@ -72,7 +71,7 @@ export function useCompleteWorkOrder() {
   const { workshopId } = useWorkshop();
 
   return useMutation({
-    mutationFn: async (params: { id: string; labor_rate: number }) => {
+    mutationFn: async (params: { id: string; laborRate: number }) => {
       if (!workshopId) throw new Error("No se encontró workshop_id");
 
       const { data: wo, error: fetchError } = await (supabase as any)
@@ -87,7 +86,7 @@ export function useCompleteWorkOrder() {
       const endTime = new Date();
       const diffMs = endTime.getTime() - startTime.getTime();
       const hours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
-      const laborCost = Math.round(hours * params.labor_rate * 100) / 100;
+      const laborCost = Math.round(hours * params.laborRate * 100) / 100;
 
       const { data, error } = await (supabase as any)
         .from("work_orders")
@@ -95,7 +94,6 @@ export function useCompleteWorkOrder() {
           status: "completed",
           repair_end_time: endTime.toISOString(),
           repair_time_hours: hours,
-          labor_rate: params.labor_rate,
           labor_cost: laborCost,
         })
         .eq("id", params.id)
