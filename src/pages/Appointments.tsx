@@ -529,7 +529,6 @@ const Appointments = () => {
                   <div className="space-y-3 px-3 py-3">
                     {colAppointments.map((apt) => {
                       const mechName = getMechanicName(apt);
-                      const woId = workOrderMap[apt.id] ?? null;
                       const quote = getQuoteForAppointment(apt.id);
                       return (
                         <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-all">
