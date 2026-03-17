@@ -18,7 +18,7 @@ import {
   type Appointment,
 } from "@/hooks/useAppointments";
 import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
-import { useQuotes } from "@/hooks/useQuotes";
+import { useQuotes, useUpdateQuoteStatus } from "@/hooks/useQuotes";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
