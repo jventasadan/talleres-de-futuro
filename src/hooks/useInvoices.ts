@@ -77,14 +77,19 @@ export function useInvoiceLines(invoiceId: string | null) {
   });
 }
 
-export async function generateInvoiceNumber(userId: string): Promise<string> {
+export async function generateInvoiceNumber(userId: string, workshopId?: string | null): Promise<string> {
   const year = new Date().getFullYear();
 
-  const { data: series } = await db
+  let seriesQuery = db
     .from("invoice_series")
     .select("*")
-    .eq("year", year)
-    .maybeSingle();
+    .eq("year", year);
+
+  if (workshopId) {
+    seriesQuery = seriesQuery.eq("workshop_id", workshopId);
+  }
+
+  const { data: series } = await seriesQuery.maybeSingle();
 
   let nextNumber: number;
 
@@ -98,7 +103,13 @@ export async function generateInvoiceNumber(userId: string): Promise<string> {
     nextNumber = 1;
     await db
       .from("invoice_series")
-      .insert({ user_id: userId, year, last_number: 1, prefix: "" });
+      .insert({
+        user_id: userId,
+        year,
+        last_number: 1,
+        prefix: "",
+        workshop_id: workshopId ?? null,
+      });
   }
 
   return `${year}-${String(nextNumber).padStart(4, "0")}`;
@@ -125,12 +136,18 @@ interface CreateInvoiceInput {
 
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (invoice: CreateInvoiceInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id ?? "";
-      const invoiceNumber = invoice.invoice_number ?? await generateInvoiceNumber(userId);
+
+      if (!workshopId) {
+        throw new Error("No se encontró el taller activo");
+      }
+
+      const invoiceNumber = invoice.invoice_number ?? await generateInvoiceNumber(userId, workshopId);
 
       const { data, error } = await db
         .from("invoices")
@@ -146,6 +163,7 @@ export function useCreateInvoice() {
           total: Number(invoice.total ?? 0),
           status: "emitida",
           user_id: userId,
+          workshop_id: workshopId,
         })
         .select("*")
         .single();
@@ -162,9 +180,11 @@ export function useCreateInvoice() {
           unit_price: line.unit_price,
           total: line.total,
           line_type: line.line_type,
+          workshop_id: workshopId,
         }));
 
-        await db.from("invoice_lines").insert(lineRows);
+        const { error: linesError } = await db.from("invoice_lines").insert(lineRows);
+        if (linesError) throw linesError;
       }
 
       return data as Invoice;

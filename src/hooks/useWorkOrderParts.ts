@@ -38,18 +38,26 @@ export function useWorkOrderParts(workOrderId: string | null) {
 
 export function useAddWorkOrderPart() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (part: { work_order_id: string; name: string; quantity: number; unit_price: number }) => {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!workshopId) throw new Error("No se encontró el taller activo");
+
+      const quantity = Math.max(1, Number(part.quantity) || 1);
+      const unitPrice = Number(part.unit_price ?? 0);
+
       const { data, error } = await db
         .from("work_order_parts")
         .insert({
           work_order_id: part.work_order_id,
           name: part.name.trim(),
-          quantity: part.quantity,
-          unit_price: part.unit_price,
+          quantity,
+          unit_price: unitPrice,
+          total: Number((quantity * unitPrice).toFixed(2)),
           user_id: user?.id ?? "",
+          workshop_id: workshopId,
         })
         .select("*")
         .single();

@@ -27,6 +27,21 @@ async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
 async function generateProfessionalPdf(invoice: Invoice, settings: any, workshopId: string | null) {
   const lines = await fetchInvoiceLines(invoice.id, workshopId);
 
+  const partLines = lines.filter((line: any) => line.line_type === "part");
+  const laborLines = lines.filter((line: any) => line.line_type === "labor");
+  const discountLines = lines.filter((line: any) => line.line_type === "discount");
+
+  const partsTotal = partLines.length
+    ? partLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0)
+    : Number(invoice.parts_total ?? 0);
+  const laborTotal = laborLines.length
+    ? laborLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0)
+    : Number(invoice.labor_cost ?? 0);
+  const discountTotal = Math.abs(discountLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0));
+  const subtotal = partsTotal + laborTotal;
+  const taxableBase = subtotal - discountTotal;
+  const taxAmount = Number((Number(invoice.total) - taxableBase).toFixed(2));
+
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 20;
@@ -72,7 +87,6 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   y += 6; doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
 
   if (!lines.length) {
-    // Fallback: show labor + parts as single items
     if (Number(invoice.parts_total) > 0) {
       doc.setFontSize(9);
       doc.text("Piezas y materiales", colX.name + 3, y + 1);
@@ -104,10 +118,12 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   y += 3; doc.setDrawColor(200, 200, 200); doc.line(margin, y, margin + contentWidth, y);
   y += 8;
   const totalsX = margin + contentWidth * 0.6; const valuesX = margin + contentWidth * 0.85;
-  const subtotal = Number(invoice.parts_total) + Number(invoice.labor_cost);
-  const taxAmount = subtotal * (Number(invoice.tax_rate) / 100);
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(80, 80, 80);
-  doc.text("Subtotal:", totalsX, y); doc.text(`${subtotal.toFixed(2)} €`, valuesX, y);
+  doc.text("Piezas:", totalsX, y); doc.text(`${partsTotal.toFixed(2)} €`, valuesX, y);
+  y += 6; doc.text("Mano de obra:", totalsX, y); doc.text(`${laborTotal.toFixed(2)} €`, valuesX, y);
+  if (discountTotal > 0) {
+    y += 6; doc.text("Descuento:", totalsX, y); doc.text(`-${discountTotal.toFixed(2)} €`, valuesX, y);
+  }
   y += 6; doc.text(`IVA (${Number(invoice.tax_rate)}%):`, totalsX, y); doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
   y += 8;
   doc.setFillColor(34, 197, 94); doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");

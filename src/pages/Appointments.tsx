@@ -18,7 +18,7 @@ import {
   type Appointment,
 } from "@/hooks/useAppointments";
 import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
-import { useQuotes } from "@/hooks/useQuotes";
+import { useQuotes, useUpdateQuoteStatus } from "@/hooks/useQuotes";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,6 +110,7 @@ const Appointments = () => {
   const { data: companySettings } = useCompanySettings();
   const { data: quotes } = useQuotes();
   const updateStatus = useUpdateAppointmentStatus();
+  const updateQuoteStatus = useUpdateQuoteStatus();
   const createMutation = useCreateAppointment();
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();
@@ -144,11 +145,89 @@ const Appointments = () => {
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
-  // Get quote for an appointment (via work_order_id linkage or appointment_id)
   const getQuoteForAppointment = (aptId: string) => {
     if (!quotes?.length) return null;
-    return quotes.find(q => q.appointment_id === aptId) ?? null;
+    return quotes.find((q) => q.appointment_id === aptId) ?? null;
   };
+
+  const getQuoteStatusLabel = (status: string) => {
+    switch (status) {
+      case "esperando_cliente":
+        return "A la espera del cliente";
+      case "aprobado":
+        return "Aceptado";
+      case "rechazado":
+        return "Cancelado";
+      default:
+        return status;
+    }
+  };
+
+  const ensureWorkOrderForAppointment = useCallback(async (appointment: Appointment) => {
+    if (!workshopId) throw new Error("No se encontró el taller activo");
+
+    const mappedWorkOrderId = workOrderMap[appointment.id];
+    if (mappedWorkOrderId) return mappedWorkOrderId;
+
+    const { data: existing, error: existingError } = await (supabase as any)
+      .from("work_orders")
+      .select("id")
+      .eq("workshop_id", workshopId)
+      .eq("appointment_id", appointment.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existing?.id) {
+      setWorkOrderMap((prev) => ({ ...prev, [appointment.id]: existing.id }));
+      return existing.id;
+    }
+
+    const { data: created, error: createdError } = await (supabase as any)
+      .from("work_orders")
+      .insert({
+        appointment_id: appointment.id,
+        user_id: user?.id ?? "",
+        workshop_id: workshopId,
+        status: "in_progress",
+        repair_start_time: new Date().toISOString(),
+        labor_rate: companySettings?.labor_rate ?? 35,
+      })
+      .select("id")
+      .single();
+
+    if (createdError) throw createdError;
+
+    setWorkOrderMap((prev) => ({ ...prev, [appointment.id]: created.id }));
+    return created.id;
+  }, [companySettings?.labor_rate, user?.id, workOrderMap, workshopId]);
+
+  const openPartsDialogForAppointment = useCallback(async (appointment: Appointment) => {
+    try {
+      let workOrderId = workOrderMap[appointment.id] ?? null;
+
+      if (!workOrderId && ["en_reparacion", "esperando_piezas", "listo"].includes(appointment.status)) {
+        workOrderId = await ensureWorkOrderForAppointment(appointment);
+      }
+
+      setPartsDialog({ appointmentId: appointment.id, workOrderId });
+    } catch (error: any) {
+      toast.error("No se pudieron cargar las piezas: " + (error?.message ?? "Error desconocido"));
+    }
+  }, [ensureWorkOrderForAppointment, workOrderMap]);
+
+  const openQuoteDialogForAppointment = useCallback(async (appointment: Appointment) => {
+    try {
+      if (["en_reparacion", "esperando_piezas", "listo"].includes(appointment.status)) {
+        await ensureWorkOrderForAppointment(appointment);
+      }
+      setQuoteAppointment(appointment);
+    } catch (error: any) {
+      toast.error("No se pudo abrir el presupuesto: " + (error?.message ?? "Error desconocido"));
+    }
+  }, [ensureWorkOrderForAppointment]);
 
   const fetchPartsTotalFromWorkOrder = async (workOrderId: string): Promise<{ parts: any[]; total: number }> => {
     const { data, error } = await (supabase as any)
@@ -169,29 +248,29 @@ const Appointments = () => {
         toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
         return;
       }
+
       try {
-        const { data: wo } = await (supabase as any)
-          .from("work_orders")
-          .insert({
-            appointment_id: appointment.id,
-            user_id: user?.id ?? "",
-            status: "in_progress",
-            repair_start_time: new Date().toISOString(),
-            labor_rate: companySettings?.labor_rate ?? 35,
-          })
-          .select("id")
-          .single();
-        if (wo) {
-          setWorkOrderMap(prev => ({ ...prev, [appointment.id]: wo.id }));
-        }
-      } catch (_) { /* best effort */ }
+        await ensureWorkOrderForAppointment(appointment);
+      } catch (error: any) {
+        toast.error("No se pudo preparar la orden de trabajo: " + (error?.message ?? "Error desconocido"));
+        return;
+      }
+
       updateStatus.mutate({ id: appointment.id, status: newStatus });
       return;
     }
 
     if (newStatus === "listo") {
-      const woId = workOrderMap[appointment.id] ?? null;
+      let woId = workOrderMap[appointment.id] ?? null;
       let autoHours: number | null = null;
+
+      if (!woId) {
+        try {
+          woId = await ensureWorkOrderForAppointment(appointment);
+        } catch (_) {
+          woId = null;
+        }
+      }
 
       if (woId) {
         try {
@@ -230,6 +309,11 @@ const Appointments = () => {
 
   const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
     if (!laborDialogData) return;
+    if (!workshopId) {
+      toast.error("No se encontró el taller activo");
+      return;
+    }
+
     const { appointment, workOrderId } = laborDialogData;
     const partsTotal = laborDialogData.partsTotal;
 
@@ -237,7 +321,7 @@ const Appointments = () => {
 
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
-    const discountAmount = subtotal * (discount / 100);
+    const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
@@ -264,7 +348,17 @@ const Appointments = () => {
       });
     }
 
-    const invoiceNumber = await generateInvoiceNumber(user?.id ?? "");
+    if (discountAmount > 0) {
+      lines.push({
+        description: `Descuento aplicado (${discount}%)`,
+        quantity: 1,
+        unit_price: -discountAmount,
+        total: -discountAmount,
+        line_type: "discount",
+      });
+    }
+
+    const invoiceNumber = await generateInvoiceNumber(user?.id ?? "", workshopId);
 
     createInvoice.mutate({
       work_order_id: workOrderId ?? undefined,
@@ -285,6 +379,61 @@ const Appointments = () => {
   const handleDeliverVehicle = async (appointment: Appointment) => {
     updateStatus.mutate({ id: appointment.id, status: "entregado" });
     toast.success("Vehículo entregado correctamente");
+  };
+
+  const handleQuoteDecision = async (appointment: Appointment, quoteId: string, nextStatus: "aprobado" | "rechazado") => {
+    try {
+      if (nextStatus === "aprobado") {
+        if (!workshopId) throw new Error("No se encontró el taller activo");
+
+        const workOrderId = await ensureWorkOrderForAppointment(appointment);
+        const [{ data: quoteLines, error: quoteLinesError }, { data: currentParts, error: currentPartsError }] = await Promise.all([
+          (supabase as any)
+            .from("quote_lines")
+            .select("*")
+            .eq("quote_id", quoteId),
+          (supabase as any)
+            .from("work_order_parts")
+            .select("name, quantity, unit_price")
+            .eq("work_order_id", workOrderId),
+        ]);
+
+        if (quoteLinesError) throw quoteLinesError;
+        if (currentPartsError) throw currentPartsError;
+
+        const partsToInsert = (quoteLines ?? [])
+          .filter((line: any) => line.line_type === "part")
+          .filter((line: any) => {
+            return !(currentParts ?? []).some((part: any) => (
+              part.name === (line.description ?? "") &&
+              Number(part.quantity ?? 1) === Number(line.quantity ?? 1) &&
+              Number(part.unit_price ?? 0) === Number(line.unit_price ?? 0)
+            ));
+          })
+          .map((line: any) => ({
+            work_order_id: workOrderId,
+            name: line.description ?? "Pieza",
+            quantity: Number(line.quantity ?? 1),
+            unit_price: Number(line.unit_price ?? 0),
+            total: Number(line.total ?? 0),
+            user_id: user?.id ?? "",
+            workshop_id: workshopId,
+          }));
+
+        if (partsToInsert.length > 0) {
+          const { error: insertError } = await (supabase as any)
+            .from("work_order_parts")
+            .insert(partsToInsert);
+
+          if (insertError) throw insertError;
+        }
+      }
+
+      await updateQuoteStatus.mutateAsync({ id: quoteId, status: nextStatus });
+      toast.success(nextStatus === "aprobado" ? "Presupuesto aceptado y piezas sincronizadas" : "Presupuesto cancelado");
+    } catch (error: any) {
+      toast.error("No se pudo actualizar el presupuesto: " + (error?.message ?? "Error desconocido"));
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -388,7 +537,6 @@ const Appointments = () => {
                   <div className="space-y-3 px-3 py-3">
                     {colAppointments.map((apt) => {
                       const mechName = getMechanicName(apt);
-                      const woId = workOrderMap[apt.id] ?? null;
                       const quote = getQuoteForAppointment(apt.id);
                       return (
                         <Card key={apt.id} className="border-border/30 shadow-sm hover:shadow-md transition-all">
@@ -407,11 +555,11 @@ const Appointments = () => {
                                     </DropdownMenuItem>
                                   )}
                                   {apt.status === "en_reparacion" && (
-                                    <DropdownMenuItem onClick={() => setQuoteAppointment(apt)}>
+                                    <DropdownMenuItem onClick={() => void openQuoteDialogForAppointment(apt)}>
                                       <FileText className="mr-2 h-3 w-3" />Generar presupuesto
                                     </DropdownMenuItem>
                                   )}
-                                  <DropdownMenuItem onClick={() => setPartsDialog({ appointmentId: apt.id, workOrderId: woId })}>
+                                  <DropdownMenuItem onClick={() => void openPartsDialogForAppointment(apt)}>
                                     <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
@@ -455,12 +603,35 @@ const Appointments = () => {
 
                             <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
 
-                            {/* Quote badge */}
                             {quote && apt.status === "en_reparacion" && (
-                              <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs">
-                                <FileText className="h-3 w-3 text-primary" />
-                                <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
-                                <Badge variant="outline" className="text-[9px] h-4 ml-auto">{quote.status}</Badge>
+                              <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-3 w-3 text-primary" />
+                                  <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
+                                  <Badge variant="outline" className="ml-auto h-4 text-[9px]">
+                                    {getQuoteStatusLabel(quote.status)}
+                                  </Badge>
+                                </div>
+                                {quote.status === "esperando_cliente" && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "aprobado")}
+                                    >
+                                      Aceptar
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "rechazado")}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -507,12 +678,23 @@ const Appointments = () => {
                                   {STATUS_LABELS[apt.status]}
                                 </Button>
                               )}
+                              {["en_reparacion", "esperando_piezas", "listo"].includes(apt.status) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-[10px]"
+                                  onClick={() => void openPartsDialogForAppointment(apt)}
+                                >
+                                  <Wrench className="mr-1 h-3 w-3" />
+                                  Piezas
+                                </Button>
+                              )}
                               {apt.status === "en_reparacion" && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="h-6 text-[10px] px-2"
-                                  onClick={() => setQuoteAppointment(apt)}
+                                  onClick={() => void openQuoteDialogForAppointment(apt)}
                                 >
                                   <FileText className="mr-1 h-3 w-3" />
                                   Presupuesto

@@ -97,6 +97,7 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment }: KanbanQuo
     }
 
     createQuote.mutate({
+      appointment_id: appointment.id,
       client_name: appointment.client_name,
       license_plate: appointment.license_plate,
       service: appointment.service,
@@ -107,6 +108,7 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment }: KanbanQuo
       estimated_hours: Number(estimatedHours),
       labor_rate: laborRate,
       tax_rate: taxRate,
+      status: "esperando_cliente",
       lines: allLines,
     }, {
       onSuccess: () => {
@@ -114,6 +116,9 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment }: KanbanQuo
         setLines([]);
         setEstimatedHours("1");
         setNotes("");
+        setPartForm({ name: "", quantity: "1", unit_price: "0" });
+        setSearchTerm("");
+        setShowCatalog(false);
       },
     });
   };
@@ -125,6 +130,9 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment }: KanbanQuo
       setEstimatedHours(String((mins / 60).toFixed(1)));
       setNotes(appointment.notes || "");
       setLines([]);
+      setPartForm({ name: "", quantity: "1", unit_price: "0" });
+      setSearchTerm("");
+      setShowCatalog(false);
     }
     onOpenChange(isOpen);
   };
