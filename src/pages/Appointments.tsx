@@ -145,11 +145,89 @@ const Appointments = () => {
   const displayedAppointments = view === "active" ? activeAppointments : historyAppointments;
   const getColumnAppointments = (status: string) => displayedAppointments.filter((a) => a.status === status);
 
-  // Get quote for an appointment (via work_order_id linkage or appointment_id)
   const getQuoteForAppointment = (aptId: string) => {
     if (!quotes?.length) return null;
-    return quotes.find(q => q.appointment_id === aptId) ?? null;
+    return quotes.find((q) => q.appointment_id === aptId) ?? null;
   };
+
+  const getQuoteStatusLabel = (status: string) => {
+    switch (status) {
+      case "esperando_cliente":
+        return "A la espera del cliente";
+      case "aprobado":
+        return "Aceptado";
+      case "rechazado":
+        return "Cancelado";
+      default:
+        return status;
+    }
+  };
+
+  const ensureWorkOrderForAppointment = useCallback(async (appointment: Appointment) => {
+    if (!workshopId) throw new Error("No se encontró el taller activo");
+
+    const mappedWorkOrderId = workOrderMap[appointment.id];
+    if (mappedWorkOrderId) return mappedWorkOrderId;
+
+    const { data: existing, error: existingError } = await (supabase as any)
+      .from("work_orders")
+      .select("id")
+      .eq("workshop_id", workshopId)
+      .eq("appointment_id", appointment.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existing?.id) {
+      setWorkOrderMap((prev) => ({ ...prev, [appointment.id]: existing.id }));
+      return existing.id;
+    }
+
+    const { data: created, error: createdError } = await (supabase as any)
+      .from("work_orders")
+      .insert({
+        appointment_id: appointment.id,
+        user_id: user?.id ?? "",
+        workshop_id: workshopId,
+        status: "in_progress",
+        repair_start_time: new Date().toISOString(),
+        labor_rate: companySettings?.labor_rate ?? 35,
+      })
+      .select("id")
+      .single();
+
+    if (createdError) throw createdError;
+
+    setWorkOrderMap((prev) => ({ ...prev, [appointment.id]: created.id }));
+    return created.id;
+  }, [companySettings?.labor_rate, user?.id, workOrderMap, workshopId]);
+
+  const openPartsDialogForAppointment = useCallback(async (appointment: Appointment) => {
+    try {
+      let workOrderId = workOrderMap[appointment.id] ?? null;
+
+      if (!workOrderId && ["en_reparacion", "esperando_piezas", "listo"].includes(appointment.status)) {
+        workOrderId = await ensureWorkOrderForAppointment(appointment);
+      }
+
+      setPartsDialog({ appointmentId: appointment.id, workOrderId });
+    } catch (error: any) {
+      toast.error("No se pudieron cargar las piezas: " + (error?.message ?? "Error desconocido"));
+    }
+  }, [ensureWorkOrderForAppointment, workOrderMap]);
+
+  const openQuoteDialogForAppointment = useCallback(async (appointment: Appointment) => {
+    try {
+      if (["en_reparacion", "esperando_piezas", "listo"].includes(appointment.status)) {
+        await ensureWorkOrderForAppointment(appointment);
+      }
+      setQuoteAppointment(appointment);
+    } catch (error: any) {
+      toast.error("No se pudo abrir el presupuesto: " + (error?.message ?? "Error desconocido"));
+    }
+  }, [ensureWorkOrderForAppointment]);
 
   const fetchPartsTotalFromWorkOrder = async (workOrderId: string): Promise<{ parts: any[]; total: number }> => {
     const { data, error } = await (supabase as any)
