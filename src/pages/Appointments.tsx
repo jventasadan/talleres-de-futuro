@@ -110,6 +110,7 @@ const Appointments = () => {
   const { data: companySettings } = useCompanySettings();
   const { data: quotes } = useQuotes();
   const updateStatus = useUpdateAppointmentStatus();
+  const updateQuoteStatus = useUpdateQuoteStatus();
   const createMutation = useCreateAppointment();
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();

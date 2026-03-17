@@ -97,6 +97,7 @@ export function useQuoteLines(quoteId: string | null) {
 }
 
 interface CreateQuoteInput {
+  appointment_id?: string | null;
   client_name: string;
   license_plate: string;
   service: string;
@@ -107,6 +108,7 @@ interface CreateQuoteInput {
   estimated_hours: number;
   labor_rate: number;
   tax_rate: number;
+  status?: string;
   lines: Array<{
     description: string;
     quantity: number;
@@ -118,11 +120,16 @@ interface CreateQuoteInput {
 
 export function useCreateQuote() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (input: CreateQuoteInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id ?? "";
+
+      if (!workshopId) {
+        throw new Error("No se encontró el taller activo");
+      }
 
       const laborCost = input.estimated_hours * input.labor_rate;
       const partsTotal = input.lines
@@ -134,6 +141,7 @@ export function useCreateQuote() {
       const { data, error } = await db
         .from("quotes")
         .insert({
+          appointment_id: input.appointment_id ?? null,
           client_name: input.client_name,
           license_plate: input.license_plate,
           service: input.service,
@@ -147,15 +155,15 @@ export function useCreateQuote() {
           parts_total: partsTotal,
           tax_rate: input.tax_rate,
           total,
-          status: "pendiente",
+          status: input.status ?? "pendiente",
           user_id: userId,
+          workshop_id: workshopId,
         })
         .select("*")
         .single();
 
       if (error) throw error;
 
-      // Insert lines
       if (input.lines.length > 0 && data) {
         const lineRows = input.lines.map((line) => ({
           quote_id: (data as any).id,
@@ -165,9 +173,11 @@ export function useCreateQuote() {
           total: line.total,
           line_type: line.line_type,
           user_id: userId,
+          workshop_id: workshopId,
         }));
 
-        await db.from("quote_lines").insert(lineRows);
+        const { error: linesError } = await db.from("quote_lines").insert(lineRows);
+        if (linesError) throw linesError;
       }
 
       return data as Quote;

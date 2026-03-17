@@ -130,6 +130,9 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment }: KanbanQuo
       setEstimatedHours(String((mins / 60).toFixed(1)));
       setNotes(appointment.notes || "");
       setLines([]);
+      setPartForm({ name: "", quantity: "1", unit_price: "0" });
+      setSearchTerm("");
+      setShowCatalog(false);
     }
     onOpenChange(isOpen);
   };
