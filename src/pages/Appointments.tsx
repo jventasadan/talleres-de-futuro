@@ -99,7 +99,7 @@ const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialog, setPartsDialog] = useState<{ appointmentId: string; workOrderId: string | null } | null>(null);
-  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null } | null>(null);
+  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null; items: any[] } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
