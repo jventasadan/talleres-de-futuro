@@ -324,27 +324,35 @@ const Appointments = () => {
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
-    const parts = workOrderId ? (await fetchPartsTotalFromWorkOrder(workOrderId)).parts : [];
+    const { items: woItems } = workOrderId ? await fetchItemsFromWorkOrder(workOrderId) : { items: [] };
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
-    parts.forEach((p: any) => {
+    woItems.forEach((item: any) => {
       lines.push({
-        description: p.name ?? "Pieza",
-        quantity: p.quantity ?? 1,
-        unit_price: Number(p.unit_price ?? 0),
-        total: (p.quantity ?? 1) * Number(p.unit_price ?? 0),
-        line_type: "part",
+        description: item.description ?? "Concepto",
+        quantity: Number(item.quantity ?? 1),
+        unit_price: Number(item.unit_price ?? 0),
+        total: Number(item.total ?? 0),
+        line_type: item.item_type === "mano_obra" ? "labor" : "part",
       });
     });
 
-    if (laborCost > 0) {
-      lines.push({
-        description: `Mano de obra (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
-        quantity: hours,
-        unit_price: companySettings?.labor_rate ?? 35,
-        total: laborCost,
-        line_type: "labor",
-      });
+    // Add extra labor from dialog if not already in items
+    const existingLaborTotal = woItems
+      .filter((i: any) => i.item_type === "mano_obra")
+      .reduce((s: number, i: any) => s + Number(i.total ?? 0), 0);
+
+    if (laborCost > existingLaborTotal) {
+      const extraLabor = laborCost - existingLaborTotal;
+      if (extraLabor > 0) {
+        lines.push({
+          description: `Mano de obra adicional (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
+          quantity: hours,
+          unit_price: companySettings?.labor_rate ?? 35,
+          total: extraLabor,
+          line_type: "labor",
+        });
+      }
     }
 
     if (discountAmount > 0) {
