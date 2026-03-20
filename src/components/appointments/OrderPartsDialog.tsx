@@ -51,8 +51,7 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderI
   const handleAddPart = () => {
     if (!workOrderId) return;
 
-    const piezaNombre = form.name.trim() || searchTerm.trim();
-    console.log("piezaNombre:", piezaNombre);
+    const piezaNombre = form.name.trim();
 
     if (!piezaNombre) {
       toast.error("Introduce o selecciona una pieza");
