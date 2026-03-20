@@ -228,17 +228,17 @@ const Appointments = () => {
     }
   }, [ensureWorkOrderForAppointment]);
 
-  const fetchPartsTotalFromWorkOrder = async (workOrderId: string): Promise<{ parts: any[]; total: number }> => {
+  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number }> => {
     const { data, error } = await (supabase as any)
-      .from("work_order_parts")
+      .from("work_order_items")
       .select("*")
       .eq("work_order_id", workOrderId);
 
     if (!error && data?.length) {
-      const total = data.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
-      return { parts: data, total };
+      const total = data.reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      return { items: data, total };
     }
-    return { parts: [], total: 0 };
+    return { items: [], total: 0 };
   };
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
