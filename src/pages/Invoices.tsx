@@ -13,35 +13,124 @@ import { jsPDF } from "jspdf";
 
 const db = supabase as any;
 
-async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
-  if (!workshopId) return [];
-  const { data, error } = await db
-    .from("invoice_lines")
-    .select("*")
-    .eq("invoice_id", invoiceId)
-    .order("created_at", { ascending: true });
-  if (!error && data?.length) return data;
-  return [];
+type PdfLine = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  line_type: "part" | "labor" | "discount";
+  discount_percent: number;
+};
+
+const safeText = (value: unknown, fallback = "") =>
+  String(value ?? fallback)
+    .replace(/[\r\n]+/g, " ")
+    .trim() || fallback;
+
+async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null): Promise<{
+  lines: PdfLine[];
+  comment: string;
+}> {
+  if (!workshopId) {
+    return { lines: [], comment: "" };
+  }
+
+  const [invoiceLinesResult, workOrderItemsResult, workOrderResult] = await Promise.all([
+    db
+      .from("invoice_lines")
+      .select("*")
+      .eq("invoice_id", invoice.id)
+      .order("created_at", { ascending: true }),
+    invoice.work_order_id
+      ? db
+          .from("work_order_items")
+          .select("*")
+          .eq("work_order_id", invoice.work_order_id)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    invoice.work_order_id
+      ? db
+          .from("work_orders")
+          .select("comentario_factura")
+          .eq("id", invoice.work_order_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  const invoiceLines = (invoiceLinesResult.data ?? []) as any[];
+  const workOrderItems = (workOrderItemsResult.data ?? []) as any[];
+  const comment = safeText(workOrderResult.data?.comentario_factura ?? "", "");
+
+  if (invoiceLines.length > 0) {
+    return {
+      lines: invoiceLines.map((line) => ({
+        description: safeText(line.description, "Concepto"),
+        quantity: Number(line.quantity ?? 1),
+        unit_price: Number(line.unit_price ?? 0),
+        total: Number(line.total ?? 0),
+        line_type: line.line_type === "labor" ? "labor" : line.line_type === "discount" ? "discount" : "part",
+        discount_percent: 0,
+      })),
+      comment,
+    };
+  }
+
+  if (workOrderItems.length > 0) {
+    return {
+      lines: workOrderItems.map((item) => ({
+        description: safeText(item.description ?? item.descripcion, "Concepto"),
+        quantity: Number(item.quantity ?? item.cantidad ?? 1),
+        unit_price: Number(item.unit_price ?? item.precio_unitario ?? 0),
+        total: Number(item.total ?? 0),
+        line_type: (item.item_type ?? item.tipo ?? "pieza") === "mano_obra" ? "labor" : "part",
+        discount_percent: Number(item.discount_percent ?? item.descuento ?? 0),
+      })),
+      comment,
+    };
+  }
+
+  return {
+    lines: [],
+    comment,
+  };
 }
 
 async function generateProfessionalPdf(invoice: Invoice, settings: any, workshopId: string | null) {
-  const lines = await fetchInvoiceLines(invoice.id, workshopId);
+  const { lines, comment } = await fetchInvoicePdfData(invoice, workshopId);
 
-  const partLines = lines.filter((line: any) => line.line_type === "part" || line.line_type === "pieza");
-  const laborLines = lines.filter((line: any) => line.line_type === "labor" || line.line_type === "mano_obra");
-  const discountLines = lines.filter((line: any) => line.line_type === "discount");
+  const partLines = lines.filter((line) => line.line_type === "part");
+  const laborLines = lines.filter((line) => line.line_type === "labor");
+  const discountLines = lines.filter((line) => line.line_type === "discount");
 
-  const partsTotal = partLines.length
-    ? partLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0)
-    : Number(invoice.parts_total ?? 0);
-  const laborTotal = laborLines.length
-    ? laborLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0)
-    : Number(invoice.labor_cost ?? 0);
-  const discountTotal = Math.abs(discountLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0));
-  const subtotal = partsTotal + laborTotal;
-  const taxableBase = subtotal - discountTotal;
+  const partsSubtotal = partLines.reduce(
+    (sum, line) => sum + Number((line.quantity * line.unit_price).toFixed(2)),
+    0,
+  );
+  const partsNetTotal = partLines.reduce((sum, line) => sum + Number(line.total ?? 0), 0);
+  const laborSubtotal = laborLines.reduce(
+    (sum, line) => sum + Number((line.quantity * line.unit_price).toFixed(2)),
+    0,
+  );
+  const laborNetTotal = laborLines.reduce((sum, line) => sum + Number(line.total ?? 0), 0);
+  const lineDiscountTotal = Number(((partsSubtotal + laborSubtotal) - (partsNetTotal + laborNetTotal)).toFixed(2));
+  const extraDiscountTotal = Math.abs(discountLines.reduce((sum, line) => sum + Number(line.total ?? 0), 0));
+  const totalDiscount = Number((lineDiscountTotal + extraDiscountTotal).toFixed(2));
+  const subtotal = Number((partsSubtotal + laborSubtotal).toFixed(2));
+  const taxableBase = Number((subtotal - totalDiscount).toFixed(2));
   const taxRate = Number(invoice.tax_rate ?? 21);
-  const taxAmount = Number((taxableBase * taxRate / 100).toFixed(2));
+  const taxAmount = Number(((taxableBase * taxRate) / 100).toFixed(2));
+  const displayTotal = Number((taxableBase + taxAmount).toFixed(2));
+
+  const displayLines = lines.length
+    ? lines
+    : [
+        ...(Number(invoice.parts_total ?? 0) > 0
+          ? [{ description: "Piezas y materiales", quantity: 1, unit_price: Number(invoice.parts_total ?? 0), total: Number(invoice.parts_total ?? 0), line_type: "part" as const, discount_percent: 0 }]
+          : []),
+        ...(Number(invoice.labor_cost ?? 0) > 0
+          ? [{ description: "Mano de obra", quantity: 1, unit_price: Number(invoice.labor_cost ?? 0), total: Number(invoice.labor_cost ?? 0), line_type: "labor" as const, discount_percent: 0 }]
+          : []),
+      ];
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -49,94 +138,148 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   const contentWidth = pageWidth - margin * 2;
   let y = margin;
 
-  const wName = settings?.company_name || "Mi Taller";
-  const wCif = settings?.cif || "";
-  const wAddress = [settings?.address, settings?.city, settings?.postal_code, settings?.province].filter(Boolean).join(", ") || "";
-  const wPhone = settings?.phone || "";
-  const wEmail = settings?.email || "";
+  const wName = safeText(settings?.company_name, "Mi Taller");
+  const wCif = safeText(settings?.cif, "");
+  const wAddress = safeText([
+    settings?.address,
+    settings?.city,
+    settings?.postal_code,
+    settings?.province,
+  ].filter(Boolean).join(", "), "");
+  const wPhone = safeText(settings?.phone, "");
+  const wEmail = safeText(settings?.email, "");
 
   doc.setFillColor(34, 197, 94);
   doc.rect(0, 0, pageWidth, 40, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
   doc.text(wName, margin, 18);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(220, 255, 220);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(220, 255, 220);
   doc.text([wCif ? `CIF: ${wCif}` : "", wPhone ? `Tlf: ${wPhone}` : "", wEmail].filter(Boolean).join(" | "), margin, 27);
   if (wAddress) doc.text(wAddress, margin, 33);
   y = 50;
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(30, 30, 30);
-  doc.text(`FACTURA ${invoice.invoice_number}`, margin, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(30, 30, 30);
+  doc.text(`FACTURA ${safeText(invoice.invoice_number)}`, margin, y);
   y += 8;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100, 100, 100);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
   doc.text(`Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}`, margin, y);
 
   y += 12;
-  doc.setFillColor(245, 245, 245); doc.roundedRect(margin, y, contentWidth, 28, 3, 3, "F");
+  doc.setFillColor(245, 245, 245);
+  doc.roundedRect(margin, y, contentWidth, comment ? 38 : 28, 3, 3, "F");
   y += 7;
-  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(30, 30, 30);
   doc.text("DATOS DEL CLIENTE", margin + 5, y);
-  y += 6; doc.setFont("helvetica", "normal"); doc.setTextColor(60, 60, 60);
-  doc.text(`Cliente: ${invoice.client_name}`, margin + 5, y);
-  y += 5; doc.text(`Matrícula: ${invoice.license_plate}`, margin + 5, y);
-  y += 5; doc.text(`Servicio: ${invoice.service}`, margin + 5, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Cliente: ${safeText(invoice.client_name)}`, margin + 5, y);
+  y += 5;
+  doc.text(`Matrícula: ${safeText(invoice.license_plate)}`, margin + 5, y);
+  y += 5;
+  doc.text(`Servicio: ${safeText(invoice.service)}`, margin + 5, y);
+  if (comment) {
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Comentario:", margin + 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(safeText(comment), margin + 28, y);
+  }
 
   y += 15;
-  const colX = { name: margin, qty: margin + contentWidth * 0.55, price: margin + contentWidth * 0.7, total: margin + contentWidth * 0.85 };
-  doc.setFillColor(34, 197, 94); doc.rect(margin, y - 5, contentWidth, 8, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
-  doc.text("DESCRIPCIÓN", colX.name + 3, y); doc.text("CANT.", colX.qty, y); doc.text("P. UNIT.", colX.price, y); doc.text("TOTAL", colX.total, y);
-  y += 6; doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
+  const colX = {
+    name: margin,
+    qty: margin + contentWidth * 0.5,
+    discount: margin + contentWidth * 0.62,
+    price: margin + contentWidth * 0.74,
+    total: margin + contentWidth * 0.88,
+  };
+  doc.setFillColor(34, 197, 94);
+  doc.rect(margin, y - 5, contentWidth, 8, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("DESCRIPCIÓN", colX.name + 3, y);
+  doc.text("CANT.", colX.qty, y);
+  doc.text("DTO.", colX.discount, y);
+  doc.text("P. UNIT.", colX.price, y);
+  doc.text("TOTAL", colX.total, y);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(50, 50, 50);
 
-  if (!lines.length) {
-    if (Number(invoice.parts_total) > 0) {
-      doc.setFontSize(9);
-      doc.text("Piezas y materiales", colX.name + 3, y + 1);
-      doc.text("1", colX.qty + 5, y + 1);
-      doc.text(`${Number(invoice.parts_total).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${Number(invoice.parts_total).toFixed(2)} €`, colX.total, y + 1);
-      y += 7;
-    }
-    if (Number(invoice.labor_cost) > 0) {
-      doc.setFontSize(9);
-      doc.text("Mano de obra", colX.name + 3, y + 1);
-      doc.text("1", colX.qty + 5, y + 1);
-      doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${Number(invoice.labor_cost).toFixed(2)} €`, colX.total, y + 1);
-      y += 7;
-    }
+  if (!displayLines.length) {
+    doc.setFontSize(9);
+    doc.text("No hay conceptos añadidos", colX.name + 3, y + 1);
+    y += 7;
   } else {
-    lines.forEach((line: any, index: number) => {
-      if (index % 2 === 0) { doc.setFillColor(250, 250, 250); doc.rect(margin, y - 3, contentWidth, 7, "F"); }
+    displayLines.forEach((line, index) => {
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(margin, y - 3, contentWidth, 7, "F");
+      }
+
       doc.setFontSize(9);
-      doc.text(String(line.description ?? "Concepto"), colX.name + 3, y + 1);
-      doc.text(String(line.quantity ?? 1), colX.qty + 5, y + 1);
+      doc.text(safeText(line.description, "Concepto"), colX.name + 3, y + 1);
+      doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
+      doc.text(line.discount_percent > 0 ? `${line.discount_percent}%` : "—", colX.discount + 1, y + 1);
       doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
       doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
       y += 7;
     });
   }
 
-  y += 3; doc.setDrawColor(200, 200, 200); doc.line(margin, y, margin + contentWidth, y);
+  y += 3;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, y, margin + contentWidth, y);
   y += 8;
-  const totalsX = margin + contentWidth * 0.6; const valuesX = margin + contentWidth * 0.85;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(80, 80, 80);
-  doc.text("Piezas:", totalsX, y); doc.text(`${partsTotal.toFixed(2)} €`, valuesX, y);
-  y += 6; doc.text("Mano de obra:", totalsX, y); doc.text(`${laborTotal.toFixed(2)} €`, valuesX, y);
-  if (discountTotal > 0) {
-    y += 6; doc.text("Descuento:", totalsX, y); doc.text(`-${discountTotal.toFixed(2)} €`, valuesX, y);
+
+  const totalsX = margin + contentWidth * 0.62;
+  const valuesX = margin + contentWidth * 0.85;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text("Piezas:", totalsX, y);
+  doc.text(`${partsNetTotal.toFixed(2)} €`, valuesX, y);
+  y += 6;
+  doc.text("Mano de obra:", totalsX, y);
+  doc.text(`${laborNetTotal.toFixed(2)} €`, valuesX, y);
+  if (totalDiscount > 0) {
+    y += 6;
+    doc.text("Descuento:", totalsX, y);
+    doc.text(`-${totalDiscount.toFixed(2)} €`, valuesX, y);
   }
-  y += 6; doc.text(`IVA (${Number(invoice.tax_rate)}%):`, totalsX, y); doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
+  y += 6;
+  doc.text(`IVA (${taxRate}%):`, totalsX, y);
+  doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
   y += 8;
-  doc.setFillColor(34, 197, 94); doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(255, 255, 255);
-  doc.text("TOTAL:", totalsX, y + 3); doc.text(`${Number(invoice.total).toFixed(2)} €`, valuesX, y + 3);
+  doc.setFillColor(34, 197, 94);
+  doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text("TOTAL:", totalsX, y + 3);
+  doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
 
   const footerY = doc.internal.pageSize.getHeight() - 20;
-  doc.setDrawColor(200, 200, 200); doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
   doc.text([wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · "), pageWidth / 2, footerY, { align: "center" });
   doc.text("Gracias por confiar en nosotros", pageWidth / 2, footerY + 5, { align: "center" });
-  doc.save(`${invoice.invoice_number}.pdf`);
+  doc.save(`${safeText(invoice.invoice_number, "factura")}.pdf`);
 }
 
 const Invoices = () => {
