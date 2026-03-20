@@ -99,7 +99,7 @@ const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialog, setPartsDialog] = useState<{ appointmentId: string; workOrderId: string | null } | null>(null);
-  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; autoHours: number | null; workOrderId: string | null } | null>(null);
+  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
@@ -228,7 +228,7 @@ const Appointments = () => {
     }
   }, [ensureWorkOrderForAppointment]);
 
-  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number }> => {
+  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number; partsOnly: number; laborOnly: number }> => {
     const { data, error } = await (supabase as any)
       .from("work_order_items")
       .select("*")
@@ -236,9 +236,15 @@ const Appointments = () => {
 
     if (!error && data?.length) {
       const total = data.reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
-      return { items: data, total };
+      const partsOnly = data
+        .filter((i: any) => (i.item_type ?? i.tipo ?? "pieza") !== "mano_obra")
+        .reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      const laborOnly = data
+        .filter((i: any) => (i.item_type ?? i.tipo ?? "pieza") === "mano_obra")
+        .reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      return { items: data, total, partsOnly, laborOnly };
     }
-    return { items: [], total: 0 };
+    return { items: [], total: 0, partsOnly: 0, laborOnly: 0 };
   };
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
@@ -298,8 +304,8 @@ const Appointments = () => {
         } catch (_) { /* best effort */ }
       }
 
-      const { total: itemsTotal } = woId ? await fetchItemsFromWorkOrder(woId) : { total: 0 };
-      setLaborDialogData({ appointment, partsTotal: itemsTotal, autoHours, workOrderId: woId });
+      const { partsOnly, laborOnly } = woId ? await fetchItemsFromWorkOrder(woId) : { partsOnly: 0, laborOnly: 0 };
+      setLaborDialogData({ appointment, partsTotal: partsOnly, laborFromItems: laborOnly, autoHours, workOrderId: woId });
       return;
     }
 
@@ -314,7 +320,8 @@ const Appointments = () => {
     }
 
     const { appointment, workOrderId } = laborDialogData;
-    const partsTotal = laborDialogData.partsTotal;
+    const partsTotal = laborDialogData.partsTotal; // only parts, no labor
+    const laborFromItems = laborDialogData.laborFromItems; // labor already in work_order_items
 
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
@@ -327,32 +334,33 @@ const Appointments = () => {
     }
 
     const vatRate = companySettings?.default_vat ?? 21;
-    const subtotal = partsTotal + laborCost;
-    const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
-    const beforeTax = subtotal - discountAmount;
-    const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
+    // Fetch all items from work order
     const { items: woItems } = workOrderId ? await fetchItemsFromWorkOrder(workOrderId) : { items: [] };
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
-    // Add all work_order_items (piezas + mano_obra) with per-line discount already applied in total
+    // Add all work_order_items (piezas + mano_obra)
     woItems.forEach((item: any) => {
+      const desc = item.description ?? item.descripcion ?? "Concepto";
+      const qty = Number(item.quantity ?? item.cantidad ?? 1);
+      const price = Number(item.unit_price ?? item.precio_unitario ?? 0);
+      const discPct = Number(item.discount_percent ?? item.descuento ?? 0);
+      const lineTotal = Number(item.total ?? 0);
+      const itemType = item.item_type ?? item.tipo ?? "pieza";
+
       lines.push({
-        description: item.description ?? "Concepto",
-        quantity: Number(item.quantity ?? 1),
-        unit_price: Number(item.unit_price ?? 0),
-        total: Number(item.total ?? 0),
-        line_type: item.item_type === "mano_obra" ? "labor" : "part",
+        description: discPct > 0 ? `${desc} (-${discPct}%)` : desc,
+        quantity: qty,
+        unit_price: price,
+        total: lineTotal,
+        line_type: itemType === "mano_obra" ? "labor" : "part",
       });
     });
 
     // Add extra labor from dialog if not already covered by items
-    const existingLaborTotal = woItems
-      .filter((i: any) => i.item_type === "mano_obra")
-      .reduce((s: number, i: any) => s + Number(i.total ?? 0), 0);
-
-    if (laborCost > existingLaborTotal) {
-      const extraLabor = laborCost - existingLaborTotal;
+    const totalLaborFromItems = laborFromItems;
+    if (laborCost > totalLaborFromItems) {
+      const extraLabor = laborCost - totalLaborFromItems;
       if (extraLabor > 0) {
         lines.push({
           description: `Mano de obra (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
@@ -363,6 +371,14 @@ const Appointments = () => {
         });
       }
     }
+
+    // Calculate correct totals from lines
+    const actualPartsTotal = lines.filter(l => l.line_type === "part").reduce((s, l) => s + l.total, 0);
+    const actualLaborTotal = lines.filter(l => l.line_type === "labor").reduce((s, l) => s + l.total, 0);
+    const subtotal = actualPartsTotal + actualLaborTotal;
+    const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
+    const beforeTax = subtotal - discountAmount;
+    const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
     // Global discount from dialog
     if (discountAmount > 0) {
@@ -382,8 +398,8 @@ const Appointments = () => {
       client_name: appointment.client_name,
       license_plate: appointment.license_plate,
       service: appointment.service,
-      parts_total: partsTotal,
-      labor_cost: laborCost,
+      parts_total: actualPartsTotal,
+      labor_cost: actualLaborTotal,
       tax_rate: vatRate,
       total,
       lines,
