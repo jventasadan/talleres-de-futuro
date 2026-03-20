@@ -848,6 +848,7 @@ const Appointments = () => {
         open={!!quoteAppointment}
         onOpenChange={(open) => !open && setQuoteAppointment(null)}
         appointment={quoteAppointment}
+        workOrderId={quoteAppointment ? (workOrderMap[quoteAppointment.id] ?? null) : null}
       />
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
