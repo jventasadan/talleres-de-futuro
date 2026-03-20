@@ -394,43 +394,44 @@ const Appointments = () => {
         if (!workshopId) throw new Error("No se encontró el taller activo");
 
         const workOrderId = await ensureWorkOrderForAppointment(appointment);
-        const [{ data: quoteLines, error: quoteLinesError }, { data: currentParts, error: currentPartsError }] = await Promise.all([
+        const [{ data: quoteLines, error: quoteLinesError }, { data: currentItems, error: currentItemsError }] = await Promise.all([
           (supabase as any)
             .from("quote_lines")
             .select("*")
             .eq("quote_id", quoteId),
           (supabase as any)
-            .from("work_order_parts")
-            .select("name, quantity, unit_price")
+            .from("work_order_items")
+            .select("description, quantity, unit_price")
             .eq("work_order_id", workOrderId),
         ]);
 
         if (quoteLinesError) throw quoteLinesError;
-        if (currentPartsError) throw currentPartsError;
+        if (currentItemsError) throw currentItemsError;
 
-        const partsToInsert = (quoteLines ?? [])
-          .filter((line: any) => line.line_type === "part")
+        const itemsToInsert = (quoteLines ?? [])
           .filter((line: any) => {
-            return !(currentParts ?? []).some((part: any) => (
-              part.name === (line.description ?? "") &&
-              Number(part.quantity ?? 1) === Number(line.quantity ?? 1) &&
-              Number(part.unit_price ?? 0) === Number(line.unit_price ?? 0)
+            return !(currentItems ?? []).some((item: any) => (
+              item.description === (line.description ?? "") &&
+              Number(item.quantity ?? 1) === Number(line.quantity ?? 1) &&
+              Number(item.unit_price ?? 0) === Number(line.unit_price ?? 0)
             ));
           })
           .map((line: any) => ({
             work_order_id: workOrderId,
-            name: line.description ?? "Pieza",
+            description: line.description ?? "Concepto",
             quantity: Number(line.quantity ?? 1),
             unit_price: Number(line.unit_price ?? 0),
+            discount_percent: 0,
             total: Number(line.total ?? 0),
+            item_type: line.line_type === "labor" ? "mano_obra" : "pieza",
             user_id: user?.id ?? "",
             workshop_id: workshopId,
           }));
 
-        if (partsToInsert.length > 0) {
+        if (itemsToInsert.length > 0) {
           const { error: insertError } = await (supabase as any)
-            .from("work_order_parts")
-            .insert(partsToInsert);
+            .from("work_order_items")
+            .insert(itemsToInsert);
 
           if (insertError) throw insertError;
         }
