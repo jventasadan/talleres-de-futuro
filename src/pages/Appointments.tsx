@@ -228,17 +228,17 @@ const Appointments = () => {
     }
   }, [ensureWorkOrderForAppointment]);
 
-  const fetchPartsTotalFromWorkOrder = async (workOrderId: string): Promise<{ parts: any[]; total: number }> => {
+  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number }> => {
     const { data, error } = await (supabase as any)
-      .from("work_order_parts")
+      .from("work_order_items")
       .select("*")
       .eq("work_order_id", workOrderId);
 
     if (!error && data?.length) {
-      const total = data.reduce((sum: number, p: any) => sum + ((p.quantity ?? 1) * (p.unit_price ?? 0)), 0);
-      return { parts: data, total };
+      const total = data.reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      return { items: data, total };
     }
-    return { parts: [], total: 0 };
+    return { items: [], total: 0 };
   };
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
@@ -298,15 +298,15 @@ const Appointments = () => {
         } catch (_) { /* best effort */ }
       }
 
-      const { total: partsTotal } = woId ? await fetchPartsTotalFromWorkOrder(woId) : { total: 0 };
-      setLaborDialogData({ appointment, partsTotal, autoHours, workOrderId: woId });
+      const { total: itemsTotal } = woId ? await fetchItemsFromWorkOrder(woId) : { total: 0 };
+      setLaborDialogData({ appointment, partsTotal: itemsTotal, autoHours, workOrderId: woId });
       return;
     }
 
     updateStatus.mutate({ id: appointment.id, status: newStatus });
   };
 
-  const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
+  const handleLaborConfirm = async (laborCost: number, discount: number, hours: number, comment: string) => {
     if (!laborDialogData) return;
     if (!workshopId) {
       toast.error("No se encontró el taller activo");
@@ -318,33 +318,49 @@ const Appointments = () => {
 
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
+    // Save comment to work order
+    if (comment && workOrderId) {
+      await (supabase as any)
+        .from("work_orders")
+        .update({ comentario_factura: comment })
+        .eq("id", workOrderId);
+    }
+
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
     const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
-    const parts = workOrderId ? (await fetchPartsTotalFromWorkOrder(workOrderId)).parts : [];
+    const { items: woItems } = workOrderId ? await fetchItemsFromWorkOrder(workOrderId) : { items: [] };
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
-    parts.forEach((p: any) => {
+    woItems.forEach((item: any) => {
       lines.push({
-        description: p.name ?? "Pieza",
-        quantity: p.quantity ?? 1,
-        unit_price: Number(p.unit_price ?? 0),
-        total: (p.quantity ?? 1) * Number(p.unit_price ?? 0),
-        line_type: "part",
+        description: item.description ?? "Concepto",
+        quantity: Number(item.quantity ?? 1),
+        unit_price: Number(item.unit_price ?? 0),
+        total: Number(item.total ?? 0),
+        line_type: item.item_type === "mano_obra" ? "labor" : "part",
       });
     });
 
-    if (laborCost > 0) {
-      lines.push({
-        description: `Mano de obra (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
-        quantity: hours,
-        unit_price: companySettings?.labor_rate ?? 35,
-        total: laborCost,
-        line_type: "labor",
-      });
+    // Add extra labor from dialog if not already in items
+    const existingLaborTotal = woItems
+      .filter((i: any) => i.item_type === "mano_obra")
+      .reduce((s: number, i: any) => s + Number(i.total ?? 0), 0);
+
+    if (laborCost > existingLaborTotal) {
+      const extraLabor = laborCost - existingLaborTotal;
+      if (extraLabor > 0) {
+        lines.push({
+          description: `Mano de obra adicional (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
+          quantity: hours,
+          unit_price: companySettings?.labor_rate ?? 35,
+          total: extraLabor,
+          line_type: "labor",
+        });
+      }
     }
 
     if (discountAmount > 0) {
@@ -386,43 +402,44 @@ const Appointments = () => {
         if (!workshopId) throw new Error("No se encontró el taller activo");
 
         const workOrderId = await ensureWorkOrderForAppointment(appointment);
-        const [{ data: quoteLines, error: quoteLinesError }, { data: currentParts, error: currentPartsError }] = await Promise.all([
+        const [{ data: quoteLines, error: quoteLinesError }, { data: currentItems, error: currentItemsError }] = await Promise.all([
           (supabase as any)
             .from("quote_lines")
             .select("*")
             .eq("quote_id", quoteId),
           (supabase as any)
-            .from("work_order_parts")
-            .select("name, quantity, unit_price")
+            .from("work_order_items")
+            .select("description, quantity, unit_price")
             .eq("work_order_id", workOrderId),
         ]);
 
         if (quoteLinesError) throw quoteLinesError;
-        if (currentPartsError) throw currentPartsError;
+        if (currentItemsError) throw currentItemsError;
 
-        const partsToInsert = (quoteLines ?? [])
-          .filter((line: any) => line.line_type === "part")
+        const itemsToInsert = (quoteLines ?? [])
           .filter((line: any) => {
-            return !(currentParts ?? []).some((part: any) => (
-              part.name === (line.description ?? "") &&
-              Number(part.quantity ?? 1) === Number(line.quantity ?? 1) &&
-              Number(part.unit_price ?? 0) === Number(line.unit_price ?? 0)
+            return !(currentItems ?? []).some((item: any) => (
+              item.description === (line.description ?? "") &&
+              Number(item.quantity ?? 1) === Number(line.quantity ?? 1) &&
+              Number(item.unit_price ?? 0) === Number(line.unit_price ?? 0)
             ));
           })
           .map((line: any) => ({
             work_order_id: workOrderId,
-            name: line.description ?? "Pieza",
+            description: line.description ?? "Concepto",
             quantity: Number(line.quantity ?? 1),
             unit_price: Number(line.unit_price ?? 0),
+            discount_percent: 0,
             total: Number(line.total ?? 0),
+            item_type: line.line_type === "labor" ? "mano_obra" : "pieza",
             user_id: user?.id ?? "",
             workshop_id: workshopId,
           }));
 
-        if (partsToInsert.length > 0) {
+        if (itemsToInsert.length > 0) {
           const { error: insertError } = await (supabase as any)
-            .from("work_order_parts")
-            .insert(partsToInsert);
+            .from("work_order_items")
+            .insert(itemsToInsert);
 
           if (insertError) throw insertError;
         }

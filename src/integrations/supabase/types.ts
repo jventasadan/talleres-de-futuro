@@ -760,6 +760,63 @@ export type Database = {
           },
         ]
       }
+      work_order_items: {
+        Row: {
+          created_at: string
+          description: string
+          discount_percent: number
+          id: string
+          item_type: string
+          quantity: number
+          total: number
+          unit_price: number
+          user_id: string
+          work_order_id: string
+          workshop_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          discount_percent?: number
+          id?: string
+          item_type?: string
+          quantity?: number
+          total?: number
+          unit_price?: number
+          user_id: string
+          work_order_id: string
+          workshop_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discount_percent?: number
+          id?: string
+          item_type?: string
+          quantity?: number
+          total?: number
+          unit_price?: number
+          user_id?: string
+          work_order_id?: string
+          workshop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_items_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_order_items_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_order_parts: {
         Row: {
           created_at: string
@@ -807,6 +864,7 @@ export type Database = {
       work_orders: {
         Row: {
           appointment_id: string
+          comentario_factura: string | null
           created_at: string
           id: string
           labor_cost: number | null
@@ -822,6 +880,7 @@ export type Database = {
         }
         Insert: {
           appointment_id: string
+          comentario_factura?: string | null
           created_at?: string
           id?: string
           labor_cost?: number | null
@@ -837,6 +896,7 @@ export type Database = {
         }
         Update: {
           appointment_id?: string
+          comentario_factura?: string | null
           created_at?: string
           id?: string
           labor_cost?: number | null
