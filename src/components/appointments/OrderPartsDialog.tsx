@@ -50,15 +50,18 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderI
 
   const handleAddPart = () => {
     if (!workOrderId) return;
-    const description = form.name.trim();
-    console.log("[OrderParts] Adding part →", { description, form });
-    if (!description) {
-      toast.error("Selecciona una pieza del catálogo o escribe un nombre");
+
+    const piezaNombre = form.name.trim() || searchTerm.trim();
+    console.log("piezaNombre:", piezaNombre);
+
+    if (!piezaNombre) {
+      toast.error("Introduce o selecciona una pieza");
       return;
     }
+
     addItem.mutate({
       work_order_id: workOrderId,
-      description,
+      description: piezaNombre,
       quantity: parseInt(form.quantity) || 1,
       unit_price: parseFloat(form.unit_price) || 0,
       discount_percent: parseFloat(form.discount) || 0,
