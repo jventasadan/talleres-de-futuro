@@ -27,8 +27,8 @@ async function fetchInvoiceLines(invoiceId: string, workshopId: string | null) {
 async function generateProfessionalPdf(invoice: Invoice, settings: any, workshopId: string | null) {
   const lines = await fetchInvoiceLines(invoice.id, workshopId);
 
-  const partLines = lines.filter((line: any) => line.line_type === "part");
-  const laborLines = lines.filter((line: any) => line.line_type === "labor");
+  const partLines = lines.filter((line: any) => line.line_type === "part" || line.line_type === "pieza");
+  const laborLines = lines.filter((line: any) => line.line_type === "labor" || line.line_type === "mano_obra");
   const discountLines = lines.filter((line: any) => line.line_type === "discount");
 
   const partsTotal = partLines.length
@@ -40,7 +40,8 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   const discountTotal = Math.abs(discountLines.reduce((sum: number, line: any) => sum + Number(line.total ?? 0), 0));
   const subtotal = partsTotal + laborTotal;
   const taxableBase = subtotal - discountTotal;
-  const taxAmount = Number((Number(invoice.total) - taxableBase).toFixed(2));
+  const taxRate = Number(invoice.tax_rate ?? 21);
+  const taxAmount = Number((taxableBase * taxRate / 100).toFixed(2));
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
