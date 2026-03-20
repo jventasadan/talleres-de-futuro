@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,10 +49,15 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderI
   };
 
   const handleAddPart = () => {
-    if (!form.name.trim() || !workOrderId) return;
+    if (!workOrderId) return;
+    const description = form.name.trim();
+    if (!description) {
+      toast.error("Selecciona una pieza del catálogo o escribe un nombre");
+      return;
+    }
     addItem.mutate({
       work_order_id: workOrderId,
-      description: form.name,
+      description,
       quantity: parseInt(form.quantity) || 1,
       unit_price: parseFloat(form.unit_price) || 0,
       discount_percent: parseFloat(form.discount) || 0,

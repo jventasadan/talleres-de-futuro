@@ -499,15 +499,39 @@ const Appointments = () => {
 
     if (user && data.client_name && data.license_plate) {
       try {
-        await insertClientWithFallback({
-          full_name: data.client_name,
-          name: data.client_name,
-          phone: data.phone ?? null,
-          license_plate: data.license_plate.toUpperCase(),
-          brand: data.brand ?? null,
-          model: data.model ?? null,
-          user_id: user.id,
-        });
+        // Deduplicate by license_plate first, then phone
+        const plate = data.license_plate.toUpperCase();
+        const { data: existingByPlate } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("workshop_id", workshopId)
+          .eq("license_plate", plate)
+          .maybeSingle() as any;
+
+        if (!existingByPlate) {
+          let existingByPhone = null;
+          if (data.phone) {
+            const { data: phoneMatch } = await supabase
+              .from("clients")
+              .select("id")
+              .eq("workshop_id", workshopId)
+              .eq("phone", data.phone)
+              .maybeSingle() as any;
+            existingByPhone = phoneMatch;
+          }
+
+          if (!existingByPhone) {
+            await insertClientWithFallback({
+              name: data.client_name,
+              phone: data.phone ?? null,
+              license_plate: plate,
+              brand: data.brand ?? null,
+              model: data.model ?? null,
+              user_id: user.id,
+              workshop_id: workshopId,
+            });
+          }
+        }
       } catch (_) { /* best effort */ }
     }
     createMutation.mutate(data, { onSuccess: () => setReceptionOpen(false) });
