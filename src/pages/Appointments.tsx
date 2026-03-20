@@ -304,8 +304,8 @@ const Appointments = () => {
         } catch (_) { /* best effort */ }
       }
 
-      const { partsOnly, laborOnly } = woId ? await fetchItemsFromWorkOrder(woId) : { partsOnly: 0, laborOnly: 0 };
-      setLaborDialogData({ appointment, partsTotal: partsOnly, laborFromItems: laborOnly, autoHours, workOrderId: woId });
+      const { items: woItems, partsOnly, laborOnly } = woId ? await fetchItemsFromWorkOrder(woId) : { items: [], partsOnly: 0, laborOnly: 0 };
+      setLaborDialogData({ appointment, partsTotal: partsOnly, laborFromItems: laborOnly, autoHours, workOrderId: woId, items: woItems });
       return;
     }
 
