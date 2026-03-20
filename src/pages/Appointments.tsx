@@ -228,7 +228,7 @@ const Appointments = () => {
     }
   }, [ensureWorkOrderForAppointment]);
 
-  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number }> => {
+  const fetchItemsFromWorkOrder = async (workOrderId: string): Promise<{ items: any[]; total: number; partsOnly: number; laborOnly: number }> => {
     const { data, error } = await (supabase as any)
       .from("work_order_items")
       .select("*")
@@ -236,9 +236,15 @@ const Appointments = () => {
 
     if (!error && data?.length) {
       const total = data.reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
-      return { items: data, total };
+      const partsOnly = data
+        .filter((i: any) => (i.item_type ?? i.tipo ?? "pieza") !== "mano_obra")
+        .reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      const laborOnly = data
+        .filter((i: any) => (i.item_type ?? i.tipo ?? "pieza") === "mano_obra")
+        .reduce((sum: number, i: any) => sum + Number(i.total ?? 0), 0);
+      return { items: data, total, partsOnly, laborOnly };
     }
-    return { items: [], total: 0 };
+    return { items: [], total: 0, partsOnly: 0, laborOnly: 0 };
   };
 
   const handleStatusChange = async (appointment: Appointment, newStatus: string) => {
