@@ -51,6 +51,7 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderI
   const handleAddPart = () => {
     if (!workOrderId) return;
     const description = form.name.trim();
+    console.log("[OrderParts] Adding part →", { description, form });
     if (!description) {
       toast.error("Selecciona una pieza del catálogo o escribe un nombre");
       return;

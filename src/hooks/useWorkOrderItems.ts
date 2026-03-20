@@ -56,6 +56,7 @@ export function useAddWorkOrderItem() {
 
       // Validate description - NEVER allow null or empty
       const description = (item.description ?? "").trim();
+      console.log("[useAddWorkOrderItem] insert payload →", { description, item });
       if (!description) {
         throw new Error(item.item_type === "mano_obra" ? "Descripción de mano de obra requerida" : "Selecciona una pieza");
       }
