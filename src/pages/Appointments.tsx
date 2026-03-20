@@ -318,6 +318,14 @@ const Appointments = () => {
 
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
+    // Save comment to work order
+    if (comment && workOrderId) {
+      await (supabase as any)
+        .from("work_orders")
+        .update({ comentario_factura: comment })
+        .eq("id", workOrderId);
+    }
+
     const vatRate = companySettings?.default_vat ?? 21;
     const subtotal = partsTotal + laborCost;
     const discountAmount = Number(((subtotal * discount) / 100).toFixed(2));
