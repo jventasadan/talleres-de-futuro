@@ -63,14 +63,19 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
 
   if (invoiceLines.length > 0) {
     return {
-      lines: invoiceLines.map((line) => ({
-        description: safeText(line.description, "Concepto"),
-        quantity: Number(line.quantity ?? 1),
-        unit_price: Number(line.unit_price ?? 0),
-        total: Number(line.total ?? 0),
-        line_type: line.line_type === "labor" ? "labor" : line.line_type === "discount" ? "discount" : "part",
-        discount_percent: 0,
-      })),
+      lines: invoiceLines.map((line) => {
+        // Extract discount % from description if embedded like "Disco (-5%)"
+        const descMatch = String(line.description ?? "").match(/\(-?(\d+(?:\.\d+)?)%\)\s*$/);
+        const discountFromDesc = descMatch ? Number(descMatch[1]) : 0;
+        return {
+          description: safeText(line.description, "Concepto"),
+          quantity: Number(line.quantity ?? 1),
+          unit_price: Number(line.unit_price ?? 0),
+          total: Number(line.total ?? 0),
+          line_type: line.line_type === "labor" ? "labor" : line.line_type === "discount" ? "discount" : "part",
+          discount_percent: discountFromDesc,
+        };
+      }),
       comment,
     };
   }
