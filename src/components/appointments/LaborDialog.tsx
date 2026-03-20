@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -12,12 +13,13 @@ interface LaborDialogProps {
   onOpenChange: (open: boolean) => void;
   partsTotal: number;
   autoHours?: number | null;
-  onConfirm: (laborCost: number, discount: number, hours: number) => void;
+  onConfirm: (laborCost: number, discount: number, hours: number, comment: string) => void;
 }
 
 export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, onConfirm }: LaborDialogProps) {
   const [hours, setHours] = useState(autoHours ? String(autoHours) : "1");
   const [discount, setDiscount] = useState("0");
+  const [comment, setComment] = useState("");
   const { data: settings } = useCompanySettings();
 
   const laborRate = settings?.labor_rate ?? 35;
@@ -30,7 +32,7 @@ export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, onConfi
   const total = beforeTax + tax;
 
   const handleConfirm = () => {
-    onConfirm(laborCost, Number(discount), Number(hours));
+    onConfirm(laborCost, Number(discount), Number(hours), comment);
     onOpenChange(false);
   };
 
@@ -58,9 +60,19 @@ export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, onConfi
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label>Comentario adicional</Label>
+            <Textarea
+              placeholder="Recomendaciones, garantía, observaciones..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={2}
+            />
+          </div>
+
           <div className="rounded-lg border bg-secondary/50 p-3 space-y-1 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Piezas</span>
+              <span className="text-muted-foreground">Items orden</span>
               <span>{partsTotal.toFixed(2)}€</span>
             </div>
             <div className="flex justify-between">
