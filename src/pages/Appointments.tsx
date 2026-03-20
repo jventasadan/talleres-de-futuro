@@ -840,6 +840,7 @@ const Appointments = () => {
           onOpenChange={(open) => !open && setLaborDialogData(null)}
           partsTotal={laborDialogData.partsTotal}
           autoHours={laborDialogData.autoHours}
+          items={laborDialogData.items ?? []}
           onConfirm={handleLaborConfirm}
         />
       )}
