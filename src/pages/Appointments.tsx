@@ -99,7 +99,7 @@ const Appointments = () => {
   const [view, setView] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialog, setPartsDialog] = useState<{ appointmentId: string; workOrderId: string | null } | null>(null);
-  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null } | null>(null);
+  const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null; items: any[] } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
@@ -304,8 +304,8 @@ const Appointments = () => {
         } catch (_) { /* best effort */ }
       }
 
-      const { partsOnly, laborOnly } = woId ? await fetchItemsFromWorkOrder(woId) : { partsOnly: 0, laborOnly: 0 };
-      setLaborDialogData({ appointment, partsTotal: partsOnly, laborFromItems: laborOnly, autoHours, workOrderId: woId });
+      const { items: woItems, partsOnly, laborOnly } = woId ? await fetchItemsFromWorkOrder(woId) : { items: [], partsOnly: 0, laborOnly: 0 };
+      setLaborDialogData({ appointment, partsTotal: partsOnly, laborFromItems: laborOnly, autoHours, workOrderId: woId, items: woItems });
       return;
     }
 
@@ -840,6 +840,7 @@ const Appointments = () => {
           onOpenChange={(open) => !open && setLaborDialogData(null)}
           partsTotal={laborDialogData.partsTotal}
           autoHours={laborDialogData.autoHours}
+          items={laborDialogData.items ?? []}
           onConfirm={handleLaborConfirm}
         />
       )}
