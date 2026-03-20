@@ -54,6 +54,12 @@ export function useAddWorkOrderItem() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!workshopId) throw new Error("No se encontró el taller activo");
 
+      // Validate description - NEVER allow null or empty
+      const description = (item.description ?? "").trim();
+      if (!description) {
+        throw new Error(item.item_type === "mano_obra" ? "Descripción de mano de obra requerida" : "Selecciona una pieza");
+      }
+
       const quantity = Math.max(0.01, Number(item.quantity) || 1);
       const unitPrice = Number(item.unit_price ?? 0);
       const discountPercent = Number(item.discount_percent ?? 0);
