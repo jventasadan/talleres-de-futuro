@@ -335,6 +335,7 @@ const Appointments = () => {
     const { items: woItems } = workOrderId ? await fetchItemsFromWorkOrder(workOrderId) : { items: [] };
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
+    // Add all work_order_items (piezas + mano_obra) with per-line discount already applied in total
     woItems.forEach((item: any) => {
       lines.push({
         description: item.description ?? "Concepto",
@@ -345,7 +346,7 @@ const Appointments = () => {
       });
     });
 
-    // Add extra labor from dialog if not already in items
+    // Add extra labor from dialog if not already covered by items
     const existingLaborTotal = woItems
       .filter((i: any) => i.item_type === "mano_obra")
       .reduce((s: number, i: any) => s + Number(i.total ?? 0), 0);
@@ -354,7 +355,7 @@ const Appointments = () => {
       const extraLabor = laborCost - existingLaborTotal;
       if (extraLabor > 0) {
         lines.push({
-          description: `Mano de obra adicional (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
+          description: `Mano de obra (${hours}h × ${companySettings?.labor_rate ?? 35}€/h)`,
           quantity: hours,
           unit_price: companySettings?.labor_rate ?? 35,
           total: extraLabor,
@@ -363,9 +364,10 @@ const Appointments = () => {
       }
     }
 
+    // Global discount from dialog
     if (discountAmount > 0) {
       lines.push({
-        description: `Descuento aplicado (${discount}%)`,
+        description: `Descuento (${discount}%)`,
         quantity: 1,
         unit_price: -discountAmount,
         total: -discountAmount,
