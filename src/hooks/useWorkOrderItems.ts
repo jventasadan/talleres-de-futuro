@@ -71,7 +71,7 @@ export function useAddWorkOrderItem() {
         .from("work_order_items")
         .insert({
           work_order_id: item.work_order_id,
-          description: item.description.trim(),
+          description,
           quantity,
           unit_price: unitPrice,
           discount_percent: discountPercent,

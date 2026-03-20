@@ -56,13 +56,18 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Wrench className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
+            <Wrench className="h-5 w-5 text-primary-foreground" />
           </div>
           {!collapsed && (
-            <span className="font-display text-base font-bold text-primary">
-              Talleres de Futuro
-            </span>
+            <div className="flex flex-col">
+              <span className="font-display text-lg font-extrabold tracking-tight text-foreground leading-none">
+                Talleres
+              </span>
+              <span className="font-display text-[11px] font-bold tracking-[0.25em] uppercase text-primary">
+                de Futuro
+              </span>
+            </div>
           )}
         </div>
       </SidebarHeader>
