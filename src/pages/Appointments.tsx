@@ -411,7 +411,7 @@ const Appointments = () => {
             .eq("quote_id", quoteId),
           (supabase as any)
             .from("work_order_items")
-            .select("description, quantity, unit_price")
+            .select("*")
             .eq("work_order_id", workOrderId),
         ]);
 
@@ -420,11 +420,17 @@ const Appointments = () => {
 
         const itemsToInsert = (quoteLines ?? [])
           .filter((line: any) => {
-            return !(currentItems ?? []).some((item: any) => (
-              item.description === (line.description ?? "") &&
-              Number(item.quantity ?? 1) === Number(line.quantity ?? 1) &&
-              Number(item.unit_price ?? 0) === Number(line.unit_price ?? 0)
-            ));
+            return !(currentItems ?? []).some((item: any) => {
+              const currentDescription = item.description ?? item.descripcion ?? "";
+              const currentQuantity = Number(item.quantity ?? item.cantidad ?? 1);
+              const currentUnitPrice = Number(item.unit_price ?? item.precio_unitario ?? 0);
+
+              return (
+                currentDescription === (line.description ?? "") &&
+                currentQuantity === Number(line.quantity ?? 1) &&
+                currentUnitPrice === Number(line.unit_price ?? 0)
+              );
+            });
           })
           .map((line: any) => ({
             work_order_id: workOrderId,
@@ -439,11 +445,34 @@ const Appointments = () => {
           }));
 
         if (itemsToInsert.length > 0) {
-          const { error: insertError } = await (supabase as any)
+          const primaryInsert = await (supabase as any)
             .from("work_order_items")
             .insert(itemsToInsert);
 
-          if (insertError) throw insertError;
+          const insertMessage = String(primaryInsert.error?.message ?? "").toLowerCase();
+          const insertDetails = String(primaryInsert.error?.details ?? "").toLowerCase();
+          const needsLegacyColumns = ["descripcion", "cantidad", "precio_unitario", "descuento", "tipo"].some((term) =>
+            insertMessage.includes(term) || insertDetails.includes(term)
+          );
+
+          if (primaryInsert.error && !needsLegacyColumns) throw primaryInsert.error;
+
+          if (primaryInsert.error && needsLegacyColumns) {
+            const legacyItemsToInsert = itemsToInsert.map((item) => ({
+              ...item,
+              descripcion: item.description,
+              cantidad: item.quantity,
+              precio_unitario: item.unit_price,
+              descuento: item.discount_percent,
+              tipo: item.item_type,
+            }));
+
+            const { error: legacyInsertError } = await (supabase as any)
+              .from("work_order_items")
+              .insert(legacyItemsToInsert);
+
+            if (legacyInsertError) throw legacyInsertError;
+          }
         }
       }
 
