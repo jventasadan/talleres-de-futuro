@@ -306,7 +306,7 @@ const Appointments = () => {
     updateStatus.mutate({ id: appointment.id, status: newStatus });
   };
 
-  const handleLaborConfirm = async (laborCost: number, discount: number, hours: number) => {
+  const handleLaborConfirm = async (laborCost: number, discount: number, hours: number, comment: string) => {
     if (!laborDialogData) return;
     if (!workshopId) {
       toast.error("No se encontró el taller activo");
