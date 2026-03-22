@@ -597,10 +597,10 @@ const Appointments = () => {
     <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de reparaciones del taller">
       <div className="space-y-5">
         <div className="flex items-center justify-between">
-          <Button onClick={() => setReceptionOpen(true)} size="lg" className="font-semibold">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva cita
-          </Button>
+          <div />
+          <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO ACTIVO</Button>
+            <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs rounded-lg">HISTÓRICO</Button>
           <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
             <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO ACTIVO</Button>
             <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs rounded-lg">HISTÓRICO</Button>
