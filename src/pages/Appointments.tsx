@@ -823,7 +823,7 @@ const Appointments = () => {
         )}
       </div>
 
-      <ReceptionDialog open={receptionOpen} onOpenChange={setReceptionOpen} onSubmit={handleCreate} isLoading={createMutation.isPending} />
+      {/* ReceptionDialog removed - new appointments created from Calendar */}
 
       {partsDialog && (
         <OrderPartsDialog
