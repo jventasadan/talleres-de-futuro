@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   format, startOfWeek, startOfMonth, endOfMonth, addDays, subWeeks, addWeeks,
   subMonths, addMonths, isSameDay, isSameMonth, eachDayOfInterval,
@@ -16,8 +16,10 @@ import { AppointmentDetailDialog } from "@/components/appointments/AppointmentDe
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getEstimatedMinutes } from "@/lib/serviceEstimates";
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
 const SLOTS_PER_HOUR = 4;
@@ -43,8 +45,14 @@ const WeeklyCalendar = () => {
   const { data: mechanics } = useMechanics();
   const createMutation = useCreateAppointment();
   const { user } = useAuth();
+  const { workshopId } = useWorkshop();
   const navigate = useNavigate();
   const today = new Date();
+
+  // Filter out entregado/cancelado from calendar
+  const visibleAppointments = useMemo(() => {
+    return (allAppointments ?? []).filter(a => !["entregado", "cancelado"].includes(a.status));
+  }, [allAppointments]);
 
   useState(() => {
     if (searchParams.get("today") === "true") {
@@ -76,16 +84,16 @@ const WeeklyCalendar = () => {
   const appointmentsByDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
     displayDays.forEach((d) => map.set(format(d, "yyyy-MM-dd"), []));
-    (allAppointments ?? []).forEach((apt) => {
+    visibleAppointments.forEach((apt) => {
       const key = apt.date;
       if (map.has(key)) map.get(key)!.push(apt);
     });
     return map;
-  }, [allAppointments, displayDays]);
+  }, [visibleAppointments, displayDays]);
 
   const todayAppointments = useMemo(() => {
-    return (allAppointments ?? []).filter((a) => a.date === todayStr);
-  }, [allAppointments, todayStr]);
+    return visibleAppointments.filter((a) => a.date === todayStr);
+  }, [visibleAppointments, todayStr]);
 
   const mechanicNames = useMemo(() => {
     const names = new Set<string>();
@@ -104,30 +112,8 @@ const WeeklyCalendar = () => {
   };
 
   const getAppointmentDuration = (apt: Appointment): number => {
-    const service = apt.service || "";
-    const SERVICE_DURATIONS: Record<string, number> = {
-      "Cambio de aceite": 3,
-      "Cambio de correas": 8,
-      "Cambiar correa de distribución": 16,
-      "Cambio de filtros": 2,
-      "Frenos": 8,
-      "Neumáticos": 4,
-      "Revisión general": 6,
-      "ITV Pre-inspección": 4,
-      "Diagnóstico": 4,
-      "Electricidad": 8,
-      "Aire acondicionado": 6,
-      "Chapa y pintura": 32,
-      "Cambio de embrague": 20,
-      "Cambio de amortiguadores": 8,
-      "Alineación y equilibrado": 3,
-      "Cambio de batería": 2,
-      "Cambio de bujías": 4,
-      "Cambio de escape": 6,
-      "Reparación de dirección": 12,
-      "Cambio de radiador": 8,
-    };
-    return SERVICE_DURATIONS[service] ?? 4;
+    const minutes = getEstimatedMinutes(apt.service || "");
+    return Math.max(2, Math.ceil(minutes / 15));
   };
 
   const statusDot: Record<string, string> = {
@@ -157,15 +143,102 @@ const WeeklyCalendar = () => {
     setDetailOpen(true);
   };
 
-  // Handle "Recepcionar" from calendar - creates appointment as "espera"
-  const handleReception = (apt: Appointment) => {
-    // Navigate to appointments page to recepcionar
-    navigate("/appointments");
-  };
+  // Find nearest available slot considering mechanic availability
+  const findNearestAvailableSlot = useCallback((date: string, requestedTime: string, serviceName: string) => {
+    const mechanicCount = (mechanics ?? []).length || 1;
+    const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(serviceName) / 15));
+    const dayAppointments = visibleAppointments.filter(a => a.date === date && !["entregado", "cancelado"].includes(a.status));
 
-  const handleCreateAppointment = (data: any) => {
-    // Calendar appointments default to "espera"
-    createMutation.mutate({ ...data, status: "espera" }, {
+    const [reqH, reqM] = requestedTime.split(":").map(Number);
+    const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
+
+    // Try from requested slot forward, then backward
+    const totalSlots = HOURS.length * SLOTS_PER_HOUR;
+    for (let offset = 0; offset < totalSlots; offset++) {
+      for (const candidate of [requestedSlot + offset, requestedSlot - offset]) {
+        if (candidate < 0 || candidate >= totalSlots) continue;
+
+        // Check if all required consecutive slots have at least one free mechanic
+        let canFit = true;
+        for (let s = 0; s < serviceDuration; s++) {
+          const slotToCheck = candidate + s;
+          if (slotToCheck >= totalSlots) { canFit = false; break; }
+
+          // Count how many mechanics are busy at this slot
+          const busyCount = dayAppointments.filter(a => {
+            const aptStart = getAppointmentSlot(a);
+            const aptDur = getAppointmentDuration(a);
+            return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
+          }).length;
+
+          if (busyCount >= mechanicCount) { canFit = false; break; }
+        }
+
+        if (canFit) {
+          const hour = Math.floor(candidate / SLOTS_PER_HOUR) + 7;
+          const minute = (candidate % SLOTS_PER_HOUR) * 15;
+          return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        }
+      }
+    }
+    return null; // No slot available
+  }, [mechanics, visibleAppointments]);
+
+  const handleCreateAppointment = async (data: any) => {
+    if (!user || !workshopId) return;
+
+    // Smart scheduling: find nearest available slot
+    const dateStr = data.date;
+    const requestedTime = data.time_slot || "09:00";
+    const availableSlot = findNearestAvailableSlot(dateStr, requestedTime, data.service || "");
+
+    if (!availableSlot) {
+      toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
+      return;
+    }
+
+    if (availableSlot !== requestedTime) {
+      toast.info(`Hora ajustada a ${availableSlot} (la hora solicitada estaba ocupada)`);
+    }
+
+    // Auto-create client if not exists
+    if (data.client_name && data.license_plate) {
+      try {
+        const plate = data.license_plate.toUpperCase();
+        const { data: existingByPlate } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("workshop_id", workshopId)
+          .eq("license_plate", plate)
+          .maybeSingle() as any;
+
+        if (!existingByPlate) {
+          let existingByPhone = null;
+          if (data.phone) {
+            const { data: phoneMatch } = await supabase
+              .from("clients")
+              .select("id")
+              .eq("workshop_id", workshopId)
+              .eq("phone", data.phone)
+              .maybeSingle() as any;
+            existingByPhone = phoneMatch;
+          }
+
+          if (!existingByPhone) {
+            await supabase.from("clients").insert({
+              name: data.client_name,
+              phone: data.phone ?? null,
+              license_plate: plate,
+              brand: data.brand ?? null,
+              model: data.model ?? null,
+              user_id: user.id,
+            } as any);
+          }
+        }
+      } catch (_) { /* best effort */ }
+    }
+
+    createMutation.mutate({ ...data, time_slot: availableSlot, status: "espera" }, {
       onSuccess: () => setReceptionOpen(false),
     });
   };
@@ -381,6 +454,7 @@ const WeeklyCalendar = () => {
         onOpenChange={setReceptionOpen}
         onSubmit={handleCreateAppointment}
         isLoading={createMutation.isPending}
+        defaultStatus="espera"
       />
     </DashboardLayout>
   );

@@ -7,14 +7,18 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, User, Phone, Loader2, Car, List, LayoutGrid } from "lucide-react";
+import { Plus, Search, User, Phone, Loader2, Car, List, LayoutGrid, Upload } from "lucide-react";
 import { useClients, useCreateClient, type Client } from "@/hooks/useClients";
 import { ClientDetailDialog } from "@/components/clients/ClientDetailDialog";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useWorkshop } from "@/contexts/WorkshopContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const avatarColors = [
   "bg-primary/15 text-primary",
@@ -28,22 +32,61 @@ function getInitials(name: string | null): string {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
+function parseCSV(text: string): Array<Record<string, string>> {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/['"]/g, ""));
+  return lines.slice(1).map(line => {
+    const values = line.split(/[,;\t]/).map(v => v.trim().replace(/^["']|["']$/g, ""));
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = values[i] ?? ""; });
+    return row;
+  }).filter(r => Object.values(r).some(v => v));
+}
+
+function mapImportRow(row: Record<string, string>): { name: string; phone: string; license_plate: string; brand: string; model: string } | null {
+  const name = row.nombre || row.name || row.cliente || row["nombre completo"] || "";
+  const phone = row.telefono || row.teléfono || row.phone || row.tel || row.móvil || row.movil || "";
+  const plate = (row.matricula || row.matrícula || row.license_plate || row.plate || row.matricula_vehiculo || "").toUpperCase();
+  const brand = row.marca || row.brand || "";
+  const model = row.modelo || row.model || "";
+  if (!name && !plate) return null;
+  return { name: name || "Sin nombre", phone, license_plate: plate || "SIN-MAT", brand, model };
+}
+
 const Clients = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: clients, isLoading } = useClients();
   const createClient = useCreateClient();
+  const { workshopId } = useWorkshop();
+  const { user } = useAuth();
 
-  // Handle ?search= query param from dashboard navigation
   useEffect(() => {
     const q = searchParams.get("search");
-    if (q) setSearch(q);
-  }, [searchParams]);
+    if (q) {
+      setSearch(q);
+      // Auto-open first matching client
+      if (clients?.length) {
+        const match = clients.find(c =>
+          (c.license_plate ?? "").toLowerCase() === q.toLowerCase() ||
+          (c.name ?? "").toLowerCase() === q.toLowerCase()
+        );
+        if (match) {
+          setSelectedClient(match);
+          setDetailOpen(true);
+        }
+      }
+    }
+  }, [searchParams, clients]);
 
   const filtered = (clients ?? []).filter(
     (c) =>
@@ -67,6 +110,76 @@ const Clients = () => {
     setDetailOpen(true);
   };
 
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setImporting(true);
+
+    try {
+      let rows: Array<Record<string, string>> = [];
+
+      if (file.name.endsWith(".csv") || file.name.endsWith(".txt")) {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+        const XLSX = await import("xlsx");
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { raw: false });
+        rows = jsonData.map(r => {
+          const mapped: Record<string, string> = {};
+          Object.entries(r).forEach(([k, v]) => { mapped[k.toLowerCase().trim()] = String(v ?? ""); });
+          return mapped;
+        });
+      } else {
+        toast.error("Formato no soportado. Usa CSV, TXT o Excel (.xlsx/.xls)");
+        setImporting(false);
+        return;
+      }
+
+      const mapped = rows.map(mapImportRow).filter(Boolean) as Array<{ name: string; phone: string; license_plate: string; brand: string; model: string }>;
+      if (!mapped.length) {
+        toast.error("No se encontraron clientes válidos en el archivo");
+        setImporting(false);
+        return;
+      }
+
+      let imported = 0;
+      let skipped = 0;
+
+      for (const client of mapped) {
+        // Check duplicate by plate
+        const { data: existing } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("workshop_id", workshopId)
+          .eq("license_plate", client.license_plate)
+          .maybeSingle() as any;
+
+        if (existing) { skipped++; continue; }
+
+        await supabase.from("clients").insert({
+          name: client.name,
+          phone: client.phone || null,
+          license_plate: client.license_plate,
+          brand: client.brand || null,
+          model: client.model || null,
+          user_id: user.id,
+        } as any);
+        imported++;
+      }
+
+      toast.success(`${imported} clientes importados, ${skipped} duplicados omitidos`);
+      window.location.reload();
+    } catch (err: any) {
+      toast.error("Error al importar: " + (err?.message ?? "Error desconocido"));
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <DashboardLayout title="Clientes" subtitle="Base de datos de clientes del taller">
       <div className="space-y-4">
@@ -84,6 +197,17 @@ const Clients = () => {
                 <List className="h-3.5 w-3.5" />
               </Button>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.txt,.xlsx,.xls"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              <Upload className="mr-2 h-4 w-4" />
+              {importing ? "Importando..." : "Importar"}
+            </Button>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nuevo cliente
@@ -164,7 +288,6 @@ const Clients = () => {
         )}
       </div>
 
-      {/* New client dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -202,7 +325,6 @@ const Clients = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Client detail dialog */}
       <ClientDetailDialog client={selectedClient} open={detailOpen} onOpenChange={setDetailOpen} />
     </DashboardLayout>
   );

@@ -61,7 +61,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
-      status: defaultStatus ?? "recepcionado",
+      status: defaultStatus ?? "espera",
       notes: [form.problem, form.notes].filter(Boolean).join(" | ") || null,
       created_by: "manual",
     });
@@ -79,8 +79,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">Recepcionar Vehículo</DialogTitle>
-          <DialogDescription>Registra un nuevo vehículo en el taller</DialogDescription>
+          <DialogTitle className="font-display">Nueva Cita</DialogTitle>
+          <DialogDescription>Agenda una nueva cita en el taller</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -162,7 +162,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Recepcionar"}</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Agendar cita"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
