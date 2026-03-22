@@ -79,8 +79,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">Recepcionar Vehículo</DialogTitle>
-          <DialogDescription>Registra un nuevo vehículo en el taller</DialogDescription>
+          <DialogTitle className="font-display">Nueva Cita</DialogTitle>
+          <DialogDescription>Agenda una nueva cita en el taller</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
