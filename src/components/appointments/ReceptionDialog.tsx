@@ -162,7 +162,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Recepcionar"}</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Agendar cita"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
