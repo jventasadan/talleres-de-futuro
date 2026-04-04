@@ -30,6 +30,11 @@ interface LaborDialogProps {
   autoHours?: number | null;
   items?: WorkOrderItem[];
   onConfirm: (laborCost: number, discount: number, hours: number, comment: string) => void;
+  clientName?: string;
+  licensePlate?: string;
+  brand?: string | null;
+  model?: string | null;
+  service?: string;
 }
 
 export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items = [], onConfirm }: LaborDialogProps) {
