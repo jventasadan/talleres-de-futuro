@@ -30,9 +30,14 @@ interface LaborDialogProps {
   autoHours?: number | null;
   items?: WorkOrderItem[];
   onConfirm: (laborCost: number, discount: number, hours: number, comment: string) => void;
+  clientName?: string;
+  licensePlate?: string;
+  brand?: string | null;
+  model?: string | null;
+  service?: string;
 }
 
-export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items = [], onConfirm }: LaborDialogProps) {
+export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items = [], onConfirm, clientName, licensePlate, brand, model, service }: LaborDialogProps) {
   const [hours, setHours] = useState(autoHours ? String(autoHours) : "1");
   const [discount, setDiscount] = useState("0");
   const [comment, setComment] = useState("");
@@ -76,7 +81,12 @@ export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items =
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display">Generar Factura</DialogTitle>
-          <DialogDescription>Revisa los conceptos de la orden antes de facturar</DialogDescription>
+          <DialogDescription>
+            {clientName && <span>{clientName} — </span>}
+            {licensePlate && <span className="font-mono">{licensePlate}</span>}
+            {(brand || model) && <span> — {[brand, model].filter(Boolean).join(" ")}</span>}
+            {service && <span> — {service}</span>}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

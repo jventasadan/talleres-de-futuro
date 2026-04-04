@@ -167,36 +167,59 @@ const Quotes = () => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
     let y = margin;
 
     const wName = settings?.company_name || "Mi Taller";
+    const wCif = settings?.cif || "";
+    const wAddress = [settings?.address, settings?.city, settings?.postal_code, settings?.province].filter(Boolean).join(", ");
+    const wPhone = settings?.phone || "";
+    const wEmail = settings?.email || "";
+    const vehicleInfo = [quote.brand, quote.model].filter(Boolean).join(" ");
 
     // Header
     doc.setFillColor(34, 197, 94);
-    doc.rect(0, 0, pageWidth, 35, "F");
+    doc.rect(0, 0, pageWidth, 40, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
+    doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
-    doc.text(wName, margin, 16);
-    doc.setFontSize(12);
-    doc.text("PRESUPUESTO", margin, 28);
+    doc.text(wName, margin, 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(220, 255, 220);
+    doc.text([wCif ? `CIF: ${wCif}` : "", wPhone ? `Tlf: ${wPhone}` : "", wEmail].filter(Boolean).join(" | "), margin, 27);
+    if (wAddress) doc.text(wAddress, margin, 33);
 
-    y = 45;
-
+    y = 50;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
     doc.setTextColor(30, 30, 30);
+    doc.text("PRESUPUESTO", margin, y);
+    y += 8;
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
     doc.text(`Fecha: ${format(new Date(quote.created_at), "dd/MM/yyyy")}`, margin, y);
     doc.text(`Estado: ${statusLabels[quote.status] ?? quote.status}`, margin + 100, y);
     y += 10;
 
+    // Client box
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(margin, y, contentWidth, vehicleInfo ? 33 : 28, 3, 3, "F");
+    y += 7;
     doc.setFont("helvetica", "bold");
-    doc.text("CLIENTE", margin, y);
+    doc.setFontSize(10);
+    doc.setTextColor(30, 30, 30);
+    doc.text("DATOS DEL CLIENTE", margin + 5, y);
     y += 6;
     doc.setFont("helvetica", "normal");
-    doc.text(`${quote.client_name} — ${quote.license_plate}`, margin, y);
-    if (quote.phone) { y += 5; doc.text(`Tel: ${quote.phone}`, margin, y); }
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Cliente: ${quote.client_name}`, margin + 5, y);
+    if (quote.phone) { doc.text(`Tel: ${quote.phone}`, margin + contentWidth * 0.55, y); }
     y += 5;
-    doc.text(`Servicio: ${quote.service}`, margin, y);
+    doc.text(`Matrícula: ${quote.license_plate}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
+    y += 5;
+    doc.text(`Servicio: ${quote.service}`, margin + 5, y);
     y += 12;
 
     // Summary
@@ -210,6 +233,15 @@ const Quotes = () => {
     y += 8;
     doc.setFontSize(14);
     doc.text(`TOTAL: ${Number(quote.total).toFixed(2)}€`, margin, y);
+
+    // Footer
+    const footerY = doc.internal.pageSize.getHeight() - 20;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text([wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · "), pageWidth / 2, footerY, { align: "center" });
 
     doc.save(`presupuesto-${quote.client_name.replace(/\s+/g, "_")}.pdf`);
   };

@@ -41,7 +41,42 @@ export function AppointmentDetailDialog({ appointment, open, onOpenChange }: Pro
 
   if (!appointment) return null;
 
-  const handleRecepcionar = () => {
+  const handleRecepcionar = async () => {
+    // Save/update client data in clients table
+    try {
+      const { data: { user } } = await (await import("@/integrations/supabase/client")).supabase.auth.getUser();
+      const supabaseClient = (await import("@/integrations/supabase/client")).supabase;
+      if (user && appointment.license_plate) {
+        const plate = appointment.license_plate.toUpperCase();
+        // Check if client already exists by plate
+        const { data: existing } = await supabaseClient
+          .from("clients")
+          .select("id")
+          .eq("license_plate", plate)
+          .maybeSingle() as any;
+
+        if (existing) {
+          // Update existing client with latest info
+          await (supabaseClient as any).from("clients").update({
+            name: appointment.client_name || undefined,
+            brand: appointment.brand || undefined,
+            model: appointment.model || undefined,
+            phone: appointment.phone || undefined,
+          }).eq("id", existing.id);
+        } else {
+          // Create new client
+          await (supabaseClient as any).from("clients").insert({
+            name: appointment.client_name || "Sin nombre",
+            license_plate: plate,
+            brand: appointment.brand || null,
+            model: appointment.model || null,
+            phone: appointment.phone || null,
+            user_id: user.id,
+          });
+        }
+      }
+    } catch (_) { /* best effort */ }
+
     updateStatus.mutate({ id: appointment.id, status: "recepcionado" }, {
       onSuccess: () => {
         toast.success("Vehículo recepcionado. Aparecerá en el tablero de órdenes.");

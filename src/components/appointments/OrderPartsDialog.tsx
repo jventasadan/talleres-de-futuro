@@ -227,21 +227,7 @@ export function OrderPartsDialog({ open, onOpenChange, appointmentId, workOrderI
               Añadir pieza
             </Button>
 
-            {/* Add labor */}
-            <div className="border-t pt-3 space-y-2">
-              <Label className="text-xs font-semibold">Añadir mano de obra</Label>
-              <div className="flex gap-2 items-end">
-                <div className="flex-1 space-y-1">
-                  <Label className="text-xs">Horas</Label>
-                  <Input type="number" min="0.5" step="0.5" value={laborForm.hours} onChange={(e) => setLaborForm({ hours: e.target.value })} />
-                </div>
-                <div className="text-xs text-muted-foreground pb-2">× {laborRate}€/h</div>
-                <Button onClick={handleAddLabor} disabled={addItem.isPending} variant="outline">
-                  <Plus className="mr-1 h-4 w-4" />
-                  Añadir
-                </Button>
-              </div>
-            </div>
+            {/* Labor section removed - labor is calculated automatically */}
           </div>
         )}
       </DialogContent>

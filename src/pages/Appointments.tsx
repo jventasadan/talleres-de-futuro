@@ -681,6 +681,9 @@ const Appointments = () => {
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Car className="h-3 w-3" />
                                 <span className="font-mono font-semibold">{apt.license_plate || "---"}</span>
+                                {(apt.brand || apt.model) && (
+                                  <span className="text-muted-foreground">· {[apt.brand, apt.model].filter(Boolean).join(" ")}</span>
+                                )}
                               </div>
                             </div>
 
@@ -838,6 +841,11 @@ const Appointments = () => {
           autoHours={laborDialogData.autoHours}
           items={laborDialogData.items ?? []}
           onConfirm={handleLaborConfirm}
+          clientName={laborDialogData.appointment.client_name}
+          licensePlate={laborDialogData.appointment.license_plate}
+          brand={laborDialogData.appointment.brand}
+          model={laborDialogData.appointment.model}
+          service={laborDialogData.appointment.service}
         />
       )}
 
