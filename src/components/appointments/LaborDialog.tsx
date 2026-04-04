@@ -37,7 +37,7 @@ interface LaborDialogProps {
   service?: string;
 }
 
-export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items = [], onConfirm }: LaborDialogProps) {
+export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items = [], onConfirm, clientName, licensePlate, brand, model, service }: LaborDialogProps) {
   const [hours, setHours] = useState(autoHours ? String(autoHours) : "1");
   const [discount, setDiscount] = useState("0");
   const [comment, setComment] = useState("");
