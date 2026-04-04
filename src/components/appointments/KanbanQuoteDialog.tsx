@@ -227,7 +227,9 @@ export function KanbanQuoteDialog({ open, onOpenChange, appointment, workOrderId
         <DialogHeader>
           <DialogTitle className="font-display">Generar Presupuesto</DialogTitle>
           <DialogDescription>
-            {appointment.client_name} — {appointment.license_plate} — {appointment.service}
+            {appointment.client_name} — {appointment.license_plate}
+            {(appointment.brand || appointment.model) && ` — ${[appointment.brand, appointment.model].filter(Boolean).join(" ")}`}
+            {" — "}{appointment.service}
           </DialogDescription>
         </DialogHeader>
 
