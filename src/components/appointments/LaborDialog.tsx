@@ -81,7 +81,12 @@ export function LaborDialog({ open, onOpenChange, partsTotal, autoHours, items =
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display">Generar Factura</DialogTitle>
-          <DialogDescription>Revisa los conceptos de la orden antes de facturar</DialogDescription>
+          <DialogDescription>
+            {clientName && <span>{clientName} — </span>}
+            {licensePlate && <span className="font-mono">{licensePlate}</span>}
+            {(brand || model) && <span> — {[brand, model].filter(Boolean).join(" ")}</span>}
+            {service && <span> — {service}</span>}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
