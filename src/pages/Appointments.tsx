@@ -681,6 +681,9 @@ const Appointments = () => {
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Car className="h-3 w-3" />
                                 <span className="font-mono font-semibold">{apt.license_plate || "---"}</span>
+                                {(apt.brand || apt.model) && (
+                                  <span className="text-muted-foreground">· {[apt.brand, apt.model].filter(Boolean).join(" ")}</span>
+                                )}
                               </div>
                             </div>
 
