@@ -34,7 +34,7 @@ export function StatsCards() {
     { title: "En espera", value: String(waitingCars), subtitle: "Vehículos recepcionados", icon: Car, color: "text-warning" },
     { title: "En reparación", value: String(inRepair), subtitle: "Ahora mismo", icon: Wrench, color: "text-info" },
     { title: "Listos hoy", value: String(readyToday), subtitle: `${todayAppointments} citas del día`, icon: CheckCircle, color: "text-success" },
-    { title: "Facturación", value: `${todayBilling.toFixed(0)}€`, subtitle: `${monthBilling.toFixed(0)}€ este mes`, icon: Euro, color: "text-primary" },
+    { title: "Citas hoy", value: String(todayAppointments), subtitle: "Programadas", icon: Calendar, color: "text-primary" },
   ];
 
   return (

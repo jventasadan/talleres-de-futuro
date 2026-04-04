@@ -156,9 +156,19 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   doc.setTextColor(100, 100, 100);
   doc.text(`Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}`, margin, y);
 
-  // Client data box
+  // Client data box - fetch brand/model from appointment
   y += 12;
-  const clientBoxH = comment ? 38 : 28;
+  let vehicleBrand = "";
+  let vehicleModel = "";
+  if (invoice.appointment_id) {
+    const { data: aptData } = await db.from("appointments").select("brand, model").eq("id", invoice.appointment_id).maybeSingle();
+    if (aptData) {
+      vehicleBrand = safeText(aptData.brand, "");
+      vehicleModel = safeText(aptData.model, "");
+    }
+  }
+  const vehicleInfo = [vehicleBrand, vehicleModel].filter(Boolean).join(" ");
+  const clientBoxH = comment ? 43 : (vehicleInfo ? 33 : 28);
   doc.setFillColor(245, 245, 245);
   doc.roundedRect(margin, y, contentWidth, clientBoxH, 3, 3, "F");
   y += 7;
@@ -171,7 +181,7 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   doc.setTextColor(60, 60, 60);
   doc.text(`Cliente: ${safeText(invoice.client_name)}`, margin + 5, y);
   y += 5;
-  doc.text(`Matrícula: ${safeText(invoice.license_plate)}`, margin + 5, y);
+  doc.text(`Matrícula: ${safeText(invoice.license_plate)}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
   y += 5;
   doc.text(`Servicio: ${safeText(invoice.service)}`, margin + 5, y);
   if (comment) {
