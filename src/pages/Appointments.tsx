@@ -838,6 +838,11 @@ const Appointments = () => {
           autoHours={laborDialogData.autoHours}
           items={laborDialogData.items ?? []}
           onConfirm={handleLaborConfirm}
+          clientName={laborDialogData.appointment.client_name}
+          licensePlate={laborDialogData.appointment.license_plate}
+          brand={laborDialogData.appointment.brand}
+          model={laborDialogData.appointment.model}
+          service={laborDialogData.appointment.service}
         />
       )}
 
