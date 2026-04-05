@@ -1,0 +1,1 @@
+ALTER TABLE public.substitution_vehicles ADD COLUMN IF NOT EXISTS client_phone text DEFAULT '';

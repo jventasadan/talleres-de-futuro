@@ -90,7 +90,7 @@ const VehicleHistory = () => {
         if (p) clientsByPlate[p] = c;
       });
 
-      // Group by license plate
+      // Group by license plate — use appointment data directly
       const plateMap: Record<string, VehicleRecord> = {};
       appointments.forEach((apt: any) => {
         const plate = (apt.license_plate || "").toUpperCase();
@@ -99,13 +99,18 @@ const VehicleHistory = () => {
         if (!plateMap[plate]) {
           plateMap[plate] = {
             license_plate: plate,
-            client_name: client?.name || apt.client_name || "Sin nombre",
-            brand: client?.brand || null,
-            model: client?.model || null,
+            client_name: apt.client_name || client?.name || "Sin nombre",
+            brand: apt.brand || client?.brand || null,
+            model: apt.model || client?.model || null,
             visit_count: 0,
             last_visit: apt.date || apt.created_at?.slice(0, 10) || "",
             last_service: apt.service || "",
           };
+        } else {
+          // Update with most recent non-empty values
+          if (apt.client_name && plateMap[plate].client_name === "Sin nombre") plateMap[plate].client_name = apt.client_name;
+          if (apt.brand && !plateMap[plate].brand) plateMap[plate].brand = apt.brand;
+          if (apt.model && !plateMap[plate].model) plateMap[plate].model = apt.model;
         }
         plateMap[plate].visit_count += 1;
       });

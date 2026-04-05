@@ -96,7 +96,7 @@ const updateAppointmentWithFallback = async (appointmentId: string, payload: Any
 };
 
 const Appointments = () => {
-  const [view, setView] = useState<"active" | "history">("active");
+  const [view] = useState<"active" | "history">("active");
   const [receptionOpen, setReceptionOpen] = useState(false);
   const [partsDialog, setPartsDialog] = useState<{ appointmentId: string; workOrderId: string | null } | null>(null);
   const [laborDialogData, setLaborDialogData] = useState<{ appointment: Appointment; partsTotal: number; laborFromItems: number; autoHours: number | null; workOrderId: string | null; items: any[] } | null>(null);
@@ -252,6 +252,19 @@ const Appointments = () => {
       if (!appointment.mechanic_id && !appointment.mechanic) {
         toast.error("Debes asignar un mecánico antes de pasar a EN REPARACIÓN");
         return;
+      }
+
+      // Check mechanic isn't already repairing another car
+      const mechId = appointment.mechanic_id;
+      if (mechId) {
+        const busyWithOther = (appointments ?? []).filter(
+          a => a.mechanic_id === mechId && a.status === "en_reparacion" && a.id !== appointment.id
+        );
+        if (busyWithOther.length > 0) {
+          const mechName = getMechanicName(appointment) || "El mecánico";
+          toast.error(`${mechName} ya tiene un vehículo en reparación (${busyWithOther[0].license_plate}). Debe terminar antes.`);
+          return;
+        }
       }
 
       try {
@@ -512,6 +525,14 @@ const Appointments = () => {
 
   const handleAssignMechanic = async (appointmentId: string, mechanic: { id: string; name: string }) => {
     try {
+      // Check if mechanic already has an active car in "en_reparacion"
+      const activeWithMechanic = (appointments ?? []).filter(
+        a => a.mechanic_id === mechanic.id && a.status === "en_reparacion" && a.id !== appointmentId
+      );
+      if (activeWithMechanic.length > 0) {
+        toast.error(`${mechanic.name} ya tiene un vehículo en reparación (${activeWithMechanic[0].license_plate}). Debe terminar antes de asignarle otro.`);
+        return;
+      }
       await updateAppointmentWithFallback(appointmentId, {
         mechanic_id: mechanic.id,
         mechanic: mechanic.name,
@@ -596,12 +617,6 @@ const Appointments = () => {
   return (
     <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de reparaciones del taller">
       <div className="space-y-5">
-        <div className="flex items-center justify-end">
-          <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-            <Button variant={view === "active" ? "default" : "ghost"} size="sm" onClick={() => setView("active")} className="text-xs rounded-lg">TABLERO ACTIVO</Button>
-            <Button variant={view === "history" ? "default" : "ghost"} size="sm" onClick={() => setView("history")} className="text-xs rounded-lg">HISTÓRICO</Button>
-          </div>
-        </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">

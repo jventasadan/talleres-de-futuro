@@ -42,6 +42,7 @@ const defaultForm = {
   model: "",
   km: "",
   assigned_client: "",
+  client_phone: "",
   return_date: "",
   status: "disponible",
   brand: "",
@@ -92,6 +93,7 @@ const CourtesyVehicles = () => {
       model: vehicle.model,
       km: vehicle.km,
       assigned_client: vehicle.assigned_client,
+      client_phone: (vehicle as any).client_phone ?? "",
       return_date: vehicle.return_date,
       status: vehicle.status,
       brand: (vehicle as any).brand ?? "",
@@ -108,6 +110,7 @@ const CourtesyVehicles = () => {
       model: form.model.trim(),
       km: form.km.trim(),
       assigned_client: form.assigned_client.trim(),
+      client_phone: form.client_phone.trim(),
       return_date: form.return_date,
       status: form.status,
       brand: form.brand.trim(),
@@ -181,6 +184,7 @@ const CourtesyVehicles = () => {
                       <TableHead>Marca</TableHead>
                       <TableHead>Modelo</TableHead>
                       <TableHead>Cliente</TableHead>
+                      <TableHead>Teléfono</TableHead>
                       <TableHead>F. Entrega</TableHead>
                       <TableHead>F. Devolución</TableHead>
                       <TableHead>Estado</TableHead>
@@ -194,6 +198,7 @@ const CourtesyVehicles = () => {
                         <TableCell>{(vehicle as any).brand || "-"}</TableCell>
                         <TableCell>{vehicle.model || "-"}</TableCell>
                         <TableCell>{vehicle.assigned_client || "Sin asignar"}</TableCell>
+                        <TableCell className="text-xs">{(vehicle as any).client_phone || "-"}</TableCell>
                         <TableCell>{(vehicle as any).delivery_date || "-"}</TableCell>
                         <TableCell>{vehicle.return_date || "-"}</TableCell>
                         <TableCell>
@@ -278,6 +283,15 @@ const CourtesyVehicles = () => {
                 value={form.assigned_client}
                 onChange={(e) => setForm((prev) => ({ ...prev, assigned_client: e.target.value }))}
                 placeholder="Nombre del cliente"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Teléfono del cliente</Label>
+              <Input
+                value={form.client_phone}
+                onChange={(e) => setForm((prev) => ({ ...prev, client_phone: e.target.value }))}
+                placeholder="+34 600 000 000"
               />
             </div>
 
