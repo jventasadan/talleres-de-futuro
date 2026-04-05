@@ -40,6 +40,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
     brand: "",
     model: "",
     phone: "",
+    email: "",
     km: "",
     service: "",
     problem: "",
