@@ -512,6 +512,14 @@ const Appointments = () => {
 
   const handleAssignMechanic = async (appointmentId: string, mechanic: { id: string; name: string }) => {
     try {
+      // Check if mechanic already has an active car in "en_reparacion"
+      const activeWithMechanic = (appointments ?? []).filter(
+        a => a.mechanic_id === mechanic.id && a.status === "en_reparacion" && a.id !== appointmentId
+      );
+      if (activeWithMechanic.length > 0) {
+        toast.error(`${mechanic.name} ya tiene un vehículo en reparación (${activeWithMechanic[0].license_plate}). Debe terminar antes de asignarle otro.`);
+        return;
+      }
       await updateAppointmentWithFallback(appointmentId, {
         mechanic_id: mechanic.id,
         mechanic: mechanic.name,
