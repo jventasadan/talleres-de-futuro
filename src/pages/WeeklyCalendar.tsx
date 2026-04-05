@@ -5,6 +5,10 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -184,22 +188,49 @@ const WeeklyCalendar = () => {
     return null; // No slot available
   }, [mechanics, visibleAppointments]);
 
+  const [pendingAppointment, setPendingAppointment] = useState<{ data: any; suggestedSlot: string } | null>(null);
+
   const handleCreateAppointment = async (data: any) => {
     if (!user || !workshopId) return;
 
     // Smart scheduling: find nearest available slot
     const dateStr = data.date;
     const requestedTime = data.time_slot || "09:00";
-    const availableSlot = findNearestAvailableSlot(dateStr, requestedTime, data.service || "");
+    const mechanicCount = (mechanics ?? []).length || 1;
 
-    if (!availableSlot) {
-      toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
+    // Count how many appointments overlap the requested time
+    const dayAppointments = visibleAppointments.filter(a => a.date === dateStr && !["entregado", "cancelado"].includes(a.status));
+    const [reqH, reqM] = requestedTime.split(":").map(Number);
+    const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
+    const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(data.service || "") / 15));
+
+    let slotConflict = false;
+    for (let s = 0; s < serviceDuration; s++) {
+      const slotToCheck = requestedSlot + s;
+      const busyCount = dayAppointments.filter(a => {
+        const aptStart = getAppointmentSlot(a);
+        const aptDur = getAppointmentDuration(a);
+        return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
+      }).length;
+      if (busyCount >= mechanicCount) { slotConflict = true; break; }
+    }
+
+    if (slotConflict) {
+      const availableSlot = findNearestAvailableSlot(dateStr, requestedTime, data.service || "");
+      if (!availableSlot) {
+        toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
+        return;
+      }
+      // Ask user to confirm the alternative slot
+      setPendingAppointment({ data, suggestedSlot: availableSlot });
       return;
     }
 
-    if (availableSlot !== requestedTime) {
-      toast.info(`Hora ajustada a ${availableSlot} (la hora solicitada estaba ocupada)`);
-    }
+    await confirmCreateAppointment(data, requestedTime);
+  };
+
+  const confirmCreateAppointment = async (data: any, timeSlot: string) => {
+    if (!user || !workshopId) return;
 
     // Auto-create client if not exists
     if (data.client_name && data.license_plate) {
@@ -238,8 +269,8 @@ const WeeklyCalendar = () => {
       } catch (_) { /* best effort */ }
     }
 
-    createMutation.mutate({ ...data, time_slot: availableSlot, status: "espera" }, {
-      onSuccess: () => setReceptionOpen(false),
+    createMutation.mutate({ ...data, time_slot: timeSlot, status: "espera" }, {
+      onSuccess: () => { setReceptionOpen(false); setPendingAppointment(null); },
     });
   };
 
@@ -456,6 +487,30 @@ const WeeklyCalendar = () => {
         isLoading={createMutation.isPending}
         defaultStatus="espera"
       />
+
+      {/* Slot conflict confirmation dialog */}
+      <AlertDialog open={!!pendingAppointment} onOpenChange={(open) => !open && setPendingAppointment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Horario no disponible</AlertDialogTitle>
+            <AlertDialogDescription>
+              La hora solicitada está ocupada (todos los mecánicos tienen citas). 
+              El hueco libre más cercano es a las <strong>{pendingAppointment?.suggestedSlot}</strong>. 
+              ¿Deseas agendar la cita a esa hora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingAppointment) {
+                confirmCreateAppointment(pendingAppointment.data, pendingAppointment.suggestedSlot);
+              }
+            }}>
+              Aceptar ({pendingAppointment?.suggestedSlot})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };

@@ -79,17 +79,29 @@ const VehicleHistory = () => {
         return;
       }
 
+      // Fetch clients to enrich with names
+      const { data: clientsData } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("workshop_id", workshopId) as any;
+      const clientsByPlate: Record<string, any> = {};
+      (clientsData ?? []).forEach((c: any) => {
+        const p = (c.license_plate || "").toUpperCase();
+        if (p) clientsByPlate[p] = c;
+      });
+
       // Group by license plate
       const plateMap: Record<string, VehicleRecord> = {};
       appointments.forEach((apt: any) => {
         const plate = (apt.license_plate || "").toUpperCase();
         if (!plate) return;
+        const client = clientsByPlate[plate];
         if (!plateMap[plate]) {
           plateMap[plate] = {
             license_plate: plate,
-            client_name: apt.client_name || "Sin nombre",
-            brand: apt.brand || null,
-            model: apt.model || null,
+            client_name: client?.name || apt.client_name || "Sin nombre",
+            brand: client?.brand || null,
+            model: client?.model || null,
             visit_count: 0,
             last_visit: apt.date || apt.created_at?.slice(0, 10) || "",
             last_service: apt.service || "",
