@@ -846,6 +846,16 @@ const Appointments = () => {
                                   >
                                     <Receipt className="h-3 w-3" />
                                   </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2 text-emerald-400"
+                                    title="Enviar email al cliente"
+                                    onClick={() => handleSendReadyEmail(apt)}
+                                  >
+                                    <Mail className="mr-1 h-3 w-3" />
+                                    Email
+                                  </Button>
                                 </>
                               )}
                             </div>
