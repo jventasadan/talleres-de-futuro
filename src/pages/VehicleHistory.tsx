@@ -29,6 +29,9 @@ interface HistoryEntry {
   service: string;
   status: string;
   client_name: string;
+  brand: string;
+  model: string;
+  km: string;
   labor_cost: number;
   parts_total: number;
   total: number;
@@ -47,13 +50,11 @@ const VehicleHistory = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const { workshopId } = useWorkshop();
 
-  // Load all vehicles on mount
   useEffect(() => {
     if (!workshopId) return;
     loadAllVehicles();
   }, [workshopId]);
 
-  // Auto-select plate from URL params
   useEffect(() => {
     const paramPlate = searchParams.get("plate");
     if (paramPlate && workshopId) {
@@ -62,6 +63,11 @@ const VehicleHistory = () => {
       loadHistory(paramPlate.toUpperCase());
     }
   }, [searchParams, workshopId]);
+
+  // Helper to get the client name from an appointment row, handling both 'client_name' and 'name' columns
+  const getAptClientName = (apt: any): string => {
+    return apt.client_name || apt.name || "Sin nombre";
+  };
 
   const loadAllVehicles = async () => {
     if (!workshopId) return;
@@ -79,36 +85,23 @@ const VehicleHistory = () => {
         return;
       }
 
-      // Fetch clients to enrich with names
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("workshop_id", workshopId) as any;
-      const clientsByPlate: Record<string, any> = {};
-      (clientsData ?? []).forEach((c: any) => {
-        const p = (c.license_plate || "").toUpperCase();
-        if (p) clientsByPlate[p] = c;
-      });
-
-      // Group by license plate — use appointment data directly
       const plateMap: Record<string, VehicleRecord> = {};
       appointments.forEach((apt: any) => {
         const plate = (apt.license_plate || "").toUpperCase();
         if (!plate) return;
-        const client = clientsByPlate[plate];
+        const name = getAptClientName(apt);
         if (!plateMap[plate]) {
           plateMap[plate] = {
             license_plate: plate,
-            client_name: apt.client_name || client?.name || "Sin nombre",
-            brand: apt.brand || client?.brand || null,
-            model: apt.model || client?.model || null,
+            client_name: name,
+            brand: apt.brand || null,
+            model: apt.model || null,
             visit_count: 0,
             last_visit: apt.date || apt.created_at?.slice(0, 10) || "",
             last_service: apt.service || "",
           };
         } else {
-          // Update with most recent non-empty values
-          if (apt.client_name && plateMap[plate].client_name === "Sin nombre") plateMap[plate].client_name = apt.client_name;
+          if (name !== "Sin nombre" && plateMap[plate].client_name === "Sin nombre") plateMap[plate].client_name = name;
           if (apt.brand && !plateMap[plate].brand) plateMap[plate].brand = apt.brand;
           if (apt.model && !plateMap[plate].model) plateMap[plate].model = apt.model;
         }
@@ -168,9 +161,12 @@ const VehicleHistory = () => {
           id: apt.id,
           date: apt.date || apt.created_at?.slice(0, 10) || "",
           order_number: `ORD-${apt.id.slice(0, 4).toUpperCase()}`,
-          service: apt.service || "Sin servicio",
+          service: apt.service || apt.service_type || "Sin servicio",
           status: apt.status || "pendiente",
-          client_name: apt.client_name || "Sin nombre",
+          client_name: getAptClientName(apt),
+          brand: apt.brand || "",
+          model: apt.model || "",
+          km: apt.km || "",
           labor_cost: inv ? Number(inv.labor_cost) : 0,
           parts_total: inv ? Number(inv.parts_total) : 0,
           total: inv ? Number(inv.total) : 0,
@@ -194,7 +190,7 @@ const VehicleHistory = () => {
 
   return (
     <DashboardLayout title="Historial de Vehículos" subtitle="Todos los vehículos que han pasado por el taller">
-      <div className="space-y-4 max-w-5xl">
+      <div className="space-y-4 max-w-6xl">
         <div className="flex gap-2">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -217,7 +213,6 @@ const VehicleHistory = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : !selectedPlate ? (
-          // Vehicle list view
           !filteredVehicles.length ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Car className="h-12 w-12 text-muted-foreground/40" />
@@ -265,7 +260,6 @@ const VehicleHistory = () => {
             </Card>
           )
         ) : (
-          // Detail view for selected plate
           detailLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -288,6 +282,8 @@ const VehicleHistory = () => {
                       <TableHead className="text-xs">Fecha</TableHead>
                       <TableHead className="text-xs">Orden</TableHead>
                       <TableHead className="text-xs">Cliente</TableHead>
+                      <TableHead className="text-xs">Vehículo</TableHead>
+                      <TableHead className="text-xs">Km</TableHead>
                       <TableHead className="text-xs">Reparación</TableHead>
                       <TableHead className="text-xs">Estado</TableHead>
                       <TableHead className="text-xs text-right">Coste</TableHead>
@@ -300,6 +296,10 @@ const VehicleHistory = () => {
                         <TableCell className="text-xs">{entry.date ? new Date(entry.date).toLocaleDateString("es-ES") : "—"}</TableCell>
                         <TableCell className="font-mono text-xs font-semibold text-primary">{entry.order_number}</TableCell>
                         <TableCell className="text-xs">{entry.client_name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {[entry.brand, entry.model].filter(Boolean).join(" ") || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">{entry.km || "—"}</TableCell>
                         <TableCell className="text-xs max-w-[200px] truncate">{entry.service}</TableCell>
                         <TableCell>
                           <Badge variant={entry.status === "entregado" ? "default" : "secondary"} className="text-[10px]">

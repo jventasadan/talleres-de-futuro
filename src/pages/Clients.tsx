@@ -74,19 +74,8 @@ const Clients = () => {
     const q = searchParams.get("search");
     if (q) {
       setSearch(q);
-      // Auto-open first matching client
-      if (clients?.length) {
-        const match = clients.find(c =>
-          (c.license_plate ?? "").toLowerCase() === q.toLowerCase() ||
-          (c.name ?? "").toLowerCase() === q.toLowerCase()
-        );
-        if (match) {
-          setSelectedClient(match);
-          setDetailOpen(true);
-        }
-      }
     }
-  }, [searchParams, clients]);
+  }, [searchParams]);
 
   const filtered = (clients ?? []).filter(
     (c) =>
@@ -106,8 +95,12 @@ const Clients = () => {
   };
 
   const handleClientClick = (client: Client) => {
-    setSelectedClient(client);
-    setDetailOpen(true);
+    if (client.license_plate) {
+      navigate(`/vehicle-history?plate=${encodeURIComponent(client.license_plate)}`);
+    } else {
+      setSelectedClient(client);
+      setDetailOpen(true);
+    }
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,11 +176,7 @@ const Clients = () => {
   return (
     <DashboardLayout title="Clientes" subtitle="Base de datos de clientes del taller">
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative max-w-sm flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre, teléfono, matrícula, marca..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
               <Button variant={viewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("grid")} className="h-7 w-7 p-0">

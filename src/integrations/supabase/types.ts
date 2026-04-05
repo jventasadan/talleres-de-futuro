@@ -57,6 +57,7 @@ export type Database = {
           created_by: string
           date: string
           id: string
+          km: string | null
           license_plate: string
           mechanic_id: string | null
           notes: string | null
@@ -74,6 +75,7 @@ export type Database = {
           created_by?: string
           date: string
           id?: string
+          km?: string | null
           license_plate: string
           mechanic_id?: string | null
           notes?: string | null
@@ -91,6 +93,7 @@ export type Database = {
           created_by?: string
           date?: string
           id?: string
+          km?: string | null
           license_plate?: string
           mechanic_id?: string | null
           notes?: string | null

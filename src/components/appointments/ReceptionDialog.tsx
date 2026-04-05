@@ -40,6 +40,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
     brand: "",
     model: "",
     phone: "",
+    km: "",
     service: "",
     problem: "",
     time_slot: "",
@@ -58,6 +59,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
       brand: form.brand || null,
       model: form.model || null,
       phone: form.phone || null,
+      km: form.km || null,
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
@@ -69,7 +71,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({ client_name: "", license_plate: "", brand: "", model: "", phone: "", service: "", problem: "", time_slot: "", notes: "" });
+      setForm({ client_name: "", license_plate: "", brand: "", model: "", phone: "", km: "", service: "", problem: "", time_slot: "", notes: "" });
       setDateObj(new Date());
     }
     onOpenChange(open);
@@ -106,10 +108,14 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
               <Input placeholder="Ej: Volkswagen" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Modelo</Label>
               <Input placeholder="Ej: Golf GTI" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Kilómetros</Label>
+              <Input placeholder="Ej: 125000" value={form.km} onChange={(e) => setForm(f => ({ ...f, km: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Tipo de servicio</Label>
