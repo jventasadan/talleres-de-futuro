@@ -297,10 +297,7 @@ const VehicleHistory = () => {
                         <TableCell className="font-mono text-xs font-semibold text-primary">{entry.order_number}</TableCell>
                         <TableCell className="text-xs">{entry.client_name}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {(() => {
-                            const apt = history.find(h => h.id === entry.id);
-                            return "—";
-                          })()}
+                          {[entry.brand, entry.model].filter(Boolean).join(" ") || "—"}
                         </TableCell>
                         <TableCell className="text-xs font-mono">{entry.km || "—"}</TableCell>
                         <TableCell className="text-xs max-w-[200px] truncate">{entry.service}</TableCell>
