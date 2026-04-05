@@ -428,6 +428,37 @@ const Appointments = () => {
     toast.success("Vehículo entregado correctamente");
   };
 
+  const handleSendReadyEmail = async (appointment: Appointment) => {
+    const email = (appointment as any).email;
+    if (!email) {
+      toast.error("Este cliente no tiene email registrado");
+      return;
+    }
+    try {
+      const { error } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "vehicle-ready",
+          recipientEmail: email,
+          idempotencyKey: `vehicle-ready-${appointment.id}`,
+          templateData: {
+            clientName: appointment.client_name,
+            licensePlate: appointment.license_plate,
+            service: appointment.service,
+            workshopName: companySettings?.company_name || "",
+            workshopPhone: companySettings?.phone || "",
+            workshopEmail: companySettings?.email || "",
+            workshopAddress: [companySettings?.address, companySettings?.city, companySettings?.postal_code].filter(Boolean).join(", "),
+            workshopCif: companySettings?.cif || "",
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success("Email enviado al cliente");
+    } catch (e: any) {
+      toast.error("Error al enviar email: " + (e.message || "desconocido"));
+    }
+  };
+
   const handleQuoteDecision = async (appointment: Appointment, quoteId: string, nextStatus: "aprobado" | "rechazado") => {
     try {
       if (nextStatus === "aprobado") {
