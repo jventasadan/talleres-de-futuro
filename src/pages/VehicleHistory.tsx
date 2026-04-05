@@ -29,6 +29,8 @@ interface HistoryEntry {
   service: string;
   status: string;
   client_name: string;
+  brand: string;
+  model: string;
   km: string;
   labor_cost: number;
   parts_total: number;
