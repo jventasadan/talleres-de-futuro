@@ -108,10 +108,14 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
               <Input placeholder="Ej: Volkswagen" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Modelo</Label>
               <Input placeholder="Ej: Golf GTI" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Kilómetros</Label>
+              <Input placeholder="Ej: 125000" value={form.km} onChange={(e) => setForm(f => ({ ...f, km: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Tipo de servicio</Label>
