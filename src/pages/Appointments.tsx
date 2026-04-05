@@ -641,45 +641,15 @@ const Appointments = () => {
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-mono font-bold text-primary">{orderNumber(apt.id)}</span>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3 w-3" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-52">
-                                  {NEXT_STATUS[apt.status] && (
-                                    <DropdownMenuItem onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}>
-                                      <ArrowRight className="mr-2 h-3 w-3" />
-                                      {STATUS_LABELS[apt.status] ?? `Mover a ${NEXT_STATUS[apt.status]}`}
-                                    </DropdownMenuItem>
-                                  )}
-                                  {apt.status === "en_reparacion" && (
-                                    <DropdownMenuItem onClick={() => void openQuoteDialogForAppointment(apt)}>
-                                      <FileText className="mr-2 h-3 w-3" />Generar presupuesto
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuItem onClick={() => void openPartsDialogForAppointment(apt)}>
-                                    <Wrench className="mr-2 h-3 w-3" />Gestionar piezas
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}>
-                                    <Camera className="mr-2 h-3 w-3" />Fotos
-                                  </DropdownMenuItem>
-                                  {(mechanics ?? []).length > 0 && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <div className="px-2 py-1 text-[10px] text-muted-foreground font-semibold uppercase">Asignar mecánico</div>
-                                      {(mechanics ?? []).map((m) => (
-                                        <DropdownMenuItem key={m.id} onClick={() => handleAssignMechanic(apt.id, m)}>
-                                          <UserCog className="mr-2 h-3 w-3" />{m.name}
-                                        </DropdownMenuItem>
-                                      ))}
-                                    </>
-                                  )}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => setDeleteConfirm(apt.id)} className="text-destructive">
-                                    <Trash2 className="mr-2 h-3 w-3" />Eliminar
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteConfirm(apt.id)}
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
 
                             <div className="space-y-1">
