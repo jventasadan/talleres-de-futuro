@@ -164,6 +164,8 @@ const VehicleHistory = () => {
           service: apt.service || apt.service_type || "Sin servicio",
           status: apt.status || "pendiente",
           client_name: getAptClientName(apt),
+          brand: apt.brand || "",
+          model: apt.model || "",
           km: apt.km || "",
           labor_cost: inv ? Number(inv.labor_cost) : 0,
           parts_total: inv ? Number(inv.parts_total) : 0,
