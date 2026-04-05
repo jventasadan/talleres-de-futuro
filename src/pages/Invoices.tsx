@@ -156,15 +156,16 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   doc.setTextColor(100, 100, 100);
   doc.text(`Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}`, margin, y);
 
-  // Client data box - fetch brand/model from appointment
+  // Client data box - fetch brand/model from clients table by plate
   y += 12;
   let vehicleBrand = "";
   let vehicleModel = "";
-  if (invoice.appointment_id) {
-    const { data: aptData } = await db.from("appointments").select("brand, model").eq("id", invoice.appointment_id).maybeSingle();
-    if (aptData) {
-      vehicleBrand = safeText(aptData.brand, "");
-      vehicleModel = safeText(aptData.model, "");
+  // Try fetching from clients table first
+  if (invoice.license_plate) {
+    const { data: clientData } = await db.from("clients").select("brand, model").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle();
+    if (clientData) {
+      vehicleBrand = safeText(clientData.brand, "");
+      vehicleModel = safeText(clientData.model, "");
     }
   }
   const vehicleInfo = [vehicleBrand, vehicleModel].filter(Boolean).join(" ");
