@@ -59,6 +59,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
       brand: form.brand || null,
       model: form.model || null,
       phone: form.phone || null,
+      km: form.km || null,
       service: form.service,
       date: format(dateObj, "yyyy-MM-dd"),
       time_slot: form.time_slot || "09:00",
@@ -70,7 +71,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setForm({ client_name: "", license_plate: "", brand: "", model: "", phone: "", service: "", problem: "", time_slot: "", notes: "" });
+      setForm({ client_name: "", license_plate: "", brand: "", model: "", phone: "", km: "", service: "", problem: "", time_slot: "", notes: "" });
       setDateObj(new Date());
     }
     onOpenChange(open);
