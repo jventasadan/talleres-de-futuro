@@ -61,8 +61,8 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           type: "client",
           id: c.id,
           label: c.name || "Sin nombre",
-          sub: c.license_plate || "",
-          url: `/clients?search=${encodeURIComponent(c.name || c.license_plate)}`,
+          sub: [c.license_plate, c.brand, c.model].filter(Boolean).join(" · "),
+          url: `/vehicle-history?plate=${encodeURIComponent(c.license_plate || "")}`,
         });
       }
     });
