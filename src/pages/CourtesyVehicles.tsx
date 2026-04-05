@@ -286,6 +286,15 @@ const CourtesyVehicles = () => {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label>Teléfono del cliente</Label>
+              <Input
+                value={form.client_phone}
+                onChange={(e) => setForm((prev) => ({ ...prev, client_phone: e.target.value }))}
+                placeholder="+34 600 000 000"
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Fecha de entrega</Label>

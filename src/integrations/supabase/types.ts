@@ -711,6 +711,7 @@ export type Database = {
         Row: {
           assigned_client: string | null
           brand: string | null
+          client_phone: string | null
           created_at: string
           delivery_date: string | null
           id: string
@@ -725,6 +726,7 @@ export type Database = {
         Insert: {
           assigned_client?: string | null
           brand?: string | null
+          client_phone?: string | null
           created_at?: string
           delivery_date?: string | null
           id?: string
@@ -739,6 +741,7 @@ export type Database = {
         Update: {
           assigned_client?: string | null
           brand?: string | null
+          client_phone?: string | null
           created_at?: string
           delivery_date?: string | null
           id?: string
