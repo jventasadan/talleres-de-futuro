@@ -254,6 +254,19 @@ const Appointments = () => {
         return;
       }
 
+      // Check mechanic isn't already repairing another car
+      const mechId = appointment.mechanic_id;
+      if (mechId) {
+        const busyWithOther = (appointments ?? []).filter(
+          a => a.mechanic_id === mechId && a.status === "en_reparacion" && a.id !== appointment.id
+        );
+        if (busyWithOther.length > 0) {
+          const mechName = getMechanicName(appointment) || "El mecánico";
+          toast.error(`${mechName} ya tiene un vehículo en reparación (${busyWithOther[0].license_plate}). Debe terminar antes.`);
+          return;
+        }
+      }
+
       try {
         await ensureWorkOrderForAppointment(appointment);
       } catch (error: any) {
