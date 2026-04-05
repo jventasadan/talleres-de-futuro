@@ -12,7 +12,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MoreVertical, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone, FileText, ArrowRight, Clock, CheckCircle, Receipt } from "lucide-react";
+import { Loader2, User, Car, Wrench, Plus, Camera, Trash2, UserCog, Phone, FileText, ArrowRight, Clock, CheckCircle, Receipt, Gauge, Mail } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
@@ -729,6 +730,18 @@ const Appointments = () => {
                                 </DropdownMenu>
                               )}
                               <div className="flex items-center gap-1">
+                                <Input
+                                  placeholder="Km"
+                                  className="h-6 w-20 text-[10px] px-1.5 font-mono"
+                                  defaultValue={(apt as any).km || ""}
+                                  onBlur={async (e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== ((apt as any).km || "")) {
+                                      await updateAppointmentWithFallback(apt.id, { km: val });
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon"
