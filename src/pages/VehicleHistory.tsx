@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Car, FileText } from "lucide-react";
+import { Loader2, Search, Car, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import {
@@ -15,11 +15,19 @@ import {
 interface VehicleRecord {
   license_plate: string;
   client_name: string;
+  email: string | null;
   brand: string | null;
   model: string | null;
+  km: string | null;
   visit_count: number;
   last_visit: string;
   last_service: string;
+}
+
+interface ClientGroup {
+  client_name: string;
+  email: string | null;
+  vehicles: VehicleRecord[];
 }
 
 interface HistoryEntry {
@@ -48,6 +56,7 @@ const VehicleHistory = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const { workshopId } = useWorkshop();
 
   useEffect(() => {
@@ -64,7 +73,6 @@ const VehicleHistory = () => {
     }
   }, [searchParams, workshopId]);
 
-  // Helper to get the client name from an appointment row, handling both 'client_name' and 'name' columns
   const getAptClientName = (apt: any): string => {
     return apt.client_name || apt.name || "Sin nombre";
   };
@@ -79,6 +87,17 @@ const VehicleHistory = () => {
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false }) as any;
 
+      // Also fetch clients for email fallback
+      const { data: clients } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("workshop_id", workshopId) as any;
+
+      const clientMap: Record<string, any> = {};
+      (clients ?? []).forEach((c: any) => {
+        if (c.license_plate) clientMap[c.license_plate.toUpperCase()] = c;
+      });
+
       if (!appointments?.length) {
         setVehicles([]);
         setLoading(false);
@@ -90,12 +109,15 @@ const VehicleHistory = () => {
         const plate = (apt.license_plate || "").toUpperCase();
         if (!plate) return;
         const name = getAptClientName(apt);
+        const client = clientMap[plate];
         if (!plateMap[plate]) {
           plateMap[plate] = {
             license_plate: plate,
             client_name: name,
-            brand: apt.brand || null,
-            model: apt.model || null,
+            email: apt.email || client?.email || null,
+            brand: apt.brand || client?.brand || null,
+            model: apt.model || client?.model || null,
+            km: apt.km || null,
             visit_count: 0,
             last_visit: apt.date || apt.created_at?.slice(0, 10) || "",
             last_service: apt.service || "",
@@ -104,6 +126,8 @@ const VehicleHistory = () => {
           if (name !== "Sin nombre" && plateMap[plate].client_name === "Sin nombre") plateMap[plate].client_name = name;
           if (apt.brand && !plateMap[plate].brand) plateMap[plate].brand = apt.brand;
           if (apt.model && !plateMap[plate].model) plateMap[plate].model = apt.model;
+          if (!plateMap[plate].email) plateMap[plate].email = apt.email || client?.email || null;
+          if (apt.km && !plateMap[plate].km) plateMap[plate].km = apt.km;
         }
         plateMap[plate].visit_count += 1;
       });
@@ -188,6 +212,35 @@ const VehicleHistory = () => {
     return v.license_plate.toLowerCase().includes(q) || v.client_name.toLowerCase().includes(q) || (v.brand || "").toLowerCase().includes(q);
   });
 
+  // Group by client name and sort alphabetically
+  const clientGroups = useMemo<ClientGroup[]>(() => {
+    const groups: Record<string, ClientGroup> = {};
+    filteredVehicles.forEach((v) => {
+      const key = v.client_name.toLowerCase();
+      if (!groups[key]) {
+        groups[key] = { client_name: v.client_name, email: v.email, vehicles: [] };
+      }
+      if (!groups[key].email && v.email) groups[key].email = v.email;
+      groups[key].vehicles.push(v);
+    });
+    return Object.values(groups).sort((a, b) => a.client_name.localeCompare(b.client_name, "es"));
+  }, [filteredVehicles]);
+
+  const toggleClient = (name: string) => {
+    setExpandedClients((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  // Auto-expand all groups on first render or when there's only one
+  useEffect(() => {
+    if (clientGroups.length <= 5) {
+      setExpandedClients(new Set(clientGroups.map(g => g.client_name)));
+    }
+  }, [clientGroups.length]);
+
   return (
     <DashboardLayout title="Historial de Vehículos" subtitle="Todos los vehículos que han pasado por el taller">
       <div className="space-y-4 max-w-6xl">
@@ -224,14 +277,17 @@ const VehicleHistory = () => {
             <Card>
               <CardContent className="p-0">
                 <div className="px-4 py-3 border-b bg-muted/30">
-                  <h3 className="font-display text-sm font-bold">{filteredVehicles.length} vehículo(s) registrado(s)</h3>
+                  <h3 className="font-display text-sm font-bold">{filteredVehicles.length} vehículo(s) · {clientGroups.length} cliente(s)</h3>
                 </div>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs">Matrícula</TableHead>
+                      <TableHead className="text-xs w-8"></TableHead>
                       <TableHead className="text-xs">Cliente</TableHead>
+                      <TableHead className="text-xs">Email</TableHead>
                       <TableHead className="text-xs">Vehículo</TableHead>
+                      <TableHead className="text-xs">Matrícula</TableHead>
+                      <TableHead className="text-xs">Km</TableHead>
                       <TableHead className="text-xs text-center">Visitas</TableHead>
                       <TableHead className="text-xs">Última visita</TableHead>
                       <TableHead className="text-xs">Último servicio</TableHead>
@@ -239,21 +295,47 @@ const VehicleHistory = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredVehicles.map((v) => (
-                      <TableRow key={v.license_plate} className="cursor-pointer hover:bg-accent/50" onClick={() => loadHistory(v.license_plate)}>
-                        <TableCell className="font-mono text-xs font-semibold text-primary">{v.license_plate}</TableCell>
-                        <TableCell className="text-xs">{v.client_name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary" className="text-[10px]">{v.visit_count}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">{v.last_visit ? new Date(v.last_visit).toLocaleDateString("es-ES") : "—"}</TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]">{v.last_service || "—"}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px]">Ver historial →</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {clientGroups.map((group) => {
+                      const isExpanded = expandedClients.has(group.client_name);
+                      const hasMultiple = group.vehicles.length > 1;
+                      return (
+                        <>
+                          {hasMultiple && (
+                            <TableRow
+                              key={`group-${group.client_name}`}
+                              className="cursor-pointer hover:bg-accent/50 bg-muted/20"
+                              onClick={() => toggleClient(group.client_name)}
+                            >
+                              <TableCell className="w-8">
+                                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                              </TableCell>
+                              <TableCell className="text-xs font-semibold" colSpan={2}>
+                                {group.client_name} <span className="text-muted-foreground font-normal">({group.vehicles.length} vehículos)</span>
+                              </TableCell>
+                              <TableCell colSpan={7} className="text-xs text-muted-foreground">{group.email || ""}</TableCell>
+                            </TableRow>
+                          )}
+                          {(hasMultiple ? isExpanded : true) && group.vehicles.map((v) => (
+                            <TableRow key={v.license_plate} className="cursor-pointer hover:bg-accent/50" onClick={() => loadHistory(v.license_plate)}>
+                              <TableCell className="w-8">{!hasMultiple && <Car className="h-3 w-3 text-muted-foreground" />}</TableCell>
+                              <TableCell className="text-xs font-medium">{v.client_name}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{v.email || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</TableCell>
+                              <TableCell className="font-mono text-xs font-semibold text-primary">{v.license_plate}</TableCell>
+                              <TableCell className="text-xs font-mono">{v.km || "—"}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className="text-[10px]">{v.visit_count}</Badge>
+                              </TableCell>
+                              <TableCell className="text-xs">{v.last_visit ? new Date(v.last_visit).toLocaleDateString("es-ES") : "—"}</TableCell>
+                              <TableCell className="text-xs truncate max-w-[150px]">{v.last_service || "—"}</TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px]">Ver historial →</Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

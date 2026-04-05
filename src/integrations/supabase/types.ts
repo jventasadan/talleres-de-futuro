@@ -56,6 +56,7 @@ export type Database = {
           created_at: string
           created_by: string
           date: string
+          email: string | null
           id: string
           km: string | null
           license_plate: string
@@ -74,6 +75,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           date: string
+          email?: string | null
           id?: string
           km?: string | null
           license_plate: string
@@ -92,6 +94,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           date?: string
+          email?: string | null
           id?: string
           km?: string | null
           license_plate?: string
@@ -132,6 +135,7 @@ export type Database = {
         Row: {
           brand: string | null
           created_at: string
+          email: string | null
           id: string
           license_plate: string
           model: string | null
@@ -144,6 +148,7 @@ export type Database = {
         Insert: {
           brand?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           license_plate: string
           model?: string | null
@@ -156,6 +161,7 @@ export type Database = {
         Update: {
           brand?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           license_plate?: string
           model?: string | null

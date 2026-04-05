@@ -1,0 +1,3 @@
+
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS email text DEFAULT NULL;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS email text DEFAULT NULL;
