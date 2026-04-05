@@ -42,6 +42,7 @@ const defaultForm = {
   model: "",
   km: "",
   assigned_client: "",
+  client_phone: "",
   return_date: "",
   status: "disponible",
   brand: "",
@@ -181,6 +182,7 @@ const CourtesyVehicles = () => {
                       <TableHead>Marca</TableHead>
                       <TableHead>Modelo</TableHead>
                       <TableHead>Cliente</TableHead>
+                      <TableHead>Teléfono</TableHead>
                       <TableHead>F. Entrega</TableHead>
                       <TableHead>F. Devolución</TableHead>
                       <TableHead>Estado</TableHead>
@@ -194,6 +196,7 @@ const CourtesyVehicles = () => {
                         <TableCell>{(vehicle as any).brand || "-"}</TableCell>
                         <TableCell>{vehicle.model || "-"}</TableCell>
                         <TableCell>{vehicle.assigned_client || "Sin asignar"}</TableCell>
+                        <TableCell className="text-xs">{(vehicle as any).client_phone || "-"}</TableCell>
                         <TableCell>{(vehicle as any).delivery_date || "-"}</TableCell>
                         <TableCell>{vehicle.return_date || "-"}</TableCell>
                         <TableCell>
