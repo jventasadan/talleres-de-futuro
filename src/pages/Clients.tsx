@@ -74,19 +74,8 @@ const Clients = () => {
     const q = searchParams.get("search");
     if (q) {
       setSearch(q);
-      // Auto-open first matching client
-      if (clients?.length) {
-        const match = clients.find(c =>
-          (c.license_plate ?? "").toLowerCase() === q.toLowerCase() ||
-          (c.name ?? "").toLowerCase() === q.toLowerCase()
-        );
-        if (match) {
-          setSelectedClient(match);
-          setDetailOpen(true);
-        }
-      }
     }
-  }, [searchParams, clients]);
+  }, [searchParams]);
 
   const filtered = (clients ?? []).filter(
     (c) =>
