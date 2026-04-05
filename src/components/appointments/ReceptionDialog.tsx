@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarIcon, Phone } from "lucide-react";
+import { CalendarIcon, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -87,7 +87,7 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
           <DialogDescription>Agenda una nueva cita en el taller</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Nombre del cliente</Label>
               <Input placeholder="Ej: Carlos García" value={form.client_name} onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))} required />
@@ -97,6 +97,13 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
               <div className="relative">
                 <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Ej: 612345678" className="pl-9" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input type="email" placeholder="Ej: cliente@email.com" className="pl-9" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
               </div>
             </div>
           </div>
