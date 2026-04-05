@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users } from "lucide-react";
+import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users, TrendingUp } from "lucide-react";
 import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
 import { usePartsCatalog, useImportPartsCatalog, useDeletePartsCatalog } from "@/hooks/usePartsCatalog";
 import { useWorkshop } from "@/contexts/WorkshopContext";
+import { useInvoices } from "@/hooks/useInvoices";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parsePartsFile } from "@/lib/partsImport";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
@@ -24,7 +25,28 @@ const SettingsPage = () => {
   const importParts = useImportPartsCatalog();
   const deleteCatalog = useDeletePartsCatalog();
   const { workshopComplete } = useWorkshop();
+  const { data: invoices } = useInvoices();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const monthlyRevenue = useMemo(() => {
+    if (!invoices?.length) return [];
+    const now = new Date();
+    const months: { label: string; total: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const label = d.toLocaleDateString("es-ES", { month: "short", year: "numeric" });
+      const total = invoices
+        .filter((inv: any) => {
+          const invDate = new Date(inv.created_at);
+          return invDate.getFullYear() === year && invDate.getMonth() === month;
+        })
+        .reduce((sum: number, inv: any) => sum + Number(inv.total ?? 0), 0);
+      months.push({ label, total });
+    }
+    return months;
+  }, [invoices]);
 
   const [form, setForm] = useState({
     company_name: "",
@@ -110,6 +132,7 @@ const SettingsPage = () => {
             <TabsTrigger value="tarifas" className="gap-2"><Euro className="h-3.5 w-3.5" />Tarifas</TabsTrigger>
             <TabsTrigger value="catalogo" className="gap-2"><Package className="h-3.5 w-3.5" />Catálogo</TabsTrigger>
             <TabsTrigger value="mecanicos" className="gap-2"><Users className="h-3.5 w-3.5" />Mecánicos</TabsTrigger>
+            <TabsTrigger value="facturacion" className="gap-2"><TrendingUp className="h-3.5 w-3.5" />Facturación</TabsTrigger>
             <TabsTrigger value="ia" className="gap-2"><Phone className="h-3.5 w-3.5" />IA</TabsTrigger>
           </TabsList>
 
@@ -257,6 +280,43 @@ const SettingsPage = () => {
 
           <TabsContent value="mecanicos">
             <MechanicsManager />
+          </TabsContent>
+
+          <TabsContent value="facturacion">
+            <Card className="border-border/30">
+              <CardHeader>
+                <CardTitle className="font-display text-base">Ingresos mensuales</CardTitle>
+                <CardDescription>Resumen de facturación de los últimos 6 meses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {monthlyRevenue.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay facturas registradas aún.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {monthlyRevenue.map((m) => {
+                      const maxTotal = Math.max(...monthlyRevenue.map(r => r.total), 1);
+                      const pct = Math.round((m.total / maxTotal) * 100);
+                      return (
+                        <div key={m.label} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="capitalize font-medium">{m.label}</span>
+                            <span className="font-mono font-semibold">{m.total.toFixed(2)} €</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <Separator className="my-2" />
+                    <div className="flex items-center justify-between text-sm font-bold">
+                      <span>Total 6 meses</span>
+                      <span className="font-mono">{monthlyRevenue.reduce((s, m) => s + m.total, 0).toFixed(2)} €</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="ia">
