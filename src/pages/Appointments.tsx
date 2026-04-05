@@ -743,9 +743,20 @@ const Appointments = () => {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               )}
-                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                <span>{apt.time_slot}</span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}
+                                  title="Fotos"
+                                >
+                                  <Camera className="h-3 w-3" />
+                                </Button>
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{apt.time_slot}</span>
+                                </div>
                               </div>
                             </div>
 

@@ -5,6 +5,10 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -483,6 +487,30 @@ const WeeklyCalendar = () => {
         isLoading={createMutation.isPending}
         defaultStatus="espera"
       />
+
+      {/* Slot conflict confirmation dialog */}
+      <AlertDialog open={!!pendingAppointment} onOpenChange={(open) => !open && setPendingAppointment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Horario no disponible</AlertDialogTitle>
+            <AlertDialogDescription>
+              La hora solicitada está ocupada (todos los mecánicos tienen citas). 
+              El hueco libre más cercano es a las <strong>{pendingAppointment?.suggestedSlot}</strong>. 
+              ¿Deseas agendar la cita a esa hora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingAppointment) {
+                confirmCreateAppointment(pendingAppointment.data, pendingAppointment.suggestedSlot);
+              }
+            }}>
+              Aceptar ({pendingAppointment?.suggestedSlot})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
