@@ -20,7 +20,7 @@ const db = supabase as any;
 const isSchemaMismatchError = (error: any) => {
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "").toLowerCase();
-  return code === "42703" || message.includes("does not exist");
+  return code === "42703" || code === "PGRST204" || message.includes("does not exist") || message.includes("could not find") || message.includes("schema cache");
 };
 
 const extractMissingColumn = (error: any): string | null => {

@@ -204,8 +204,9 @@ const Quotes = () => {
     y += 10;
 
     // Client box
+    const notesExtraH = quote.notes ? Math.ceil(quote.notes.length / 60) * 5 + 7 : 0;
     doc.setFillColor(245, 245, 245);
-    doc.roundedRect(margin, y, contentWidth, vehicleInfo ? 33 : 28, 3, 3, "F");
+    doc.roundedRect(margin, y, contentWidth, (vehicleInfo ? 33 : 28) + notesExtraH, 3, 3, "F");
     y += 7;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -220,6 +221,15 @@ const Quotes = () => {
     doc.text(`Matrícula: ${quote.license_plate}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
     y += 5;
     doc.text(`Servicio: ${quote.service}`, margin + 5, y);
+    if (quote.notes) {
+      y += 7;
+      doc.setFont("helvetica", "bold");
+      doc.text("Notas:", margin + 5, y);
+      doc.setFont("helvetica", "normal");
+      const notesLines = doc.splitTextToSize(quote.notes, contentWidth - 33);
+      doc.text(notesLines, margin + 20, y);
+      y += notesLines.length * 4;
+    }
     y += 12;
 
     // Summary
