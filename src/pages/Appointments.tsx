@@ -32,6 +32,7 @@ import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
 import { KanbanQuoteDialog } from "@/components/appointments/KanbanQuoteDialog";
 import { SendEmailDialog } from "@/components/appointments/SendEmailDialog";
+import { buildKilometersPayload } from "@/lib/appointment-utils";
 
 const KANBAN_COLUMNS = [
   { key: "recepcionado", label: "RECEPCIONADO", borderColor: "border-purple-500", bgGlow: "from-purple-500/5 to-transparent" },
@@ -97,6 +98,59 @@ const updateAppointmentWithFallback = async (appointmentId: string, payload: Any
     if (!isSchemaMismatchError(error) || !missingColumn || !(missingColumn in attemptPayload)) throw error;
     delete attemptPayload[missingColumn];
   }
+};
+
+const deleteAppointmentBundle = async (appointmentId: string) => {
+  const [{ data: workOrders, error: workOrdersError }, { data: quoteRecords, error: quotesError }] = await Promise.all([
+    (supabase as any).from("work_orders").select("id").eq("appointment_id", appointmentId),
+    (supabase as any).from("quotes").select("id").eq("appointment_id", appointmentId),
+  ]);
+
+  if (workOrdersError) throw workOrdersError;
+  if (quotesError) throw quotesError;
+
+  const workOrderIds = (workOrders ?? []).map((workOrder: { id: string }) => workOrder.id).filter(Boolean);
+  const quoteIds = (quoteRecords ?? []).map((quote: { id: string }) => quote.id).filter(Boolean);
+
+  if (workOrderIds.length > 0) {
+    const [{ error: workOrderItemsError }, { error: workOrderPartsError }] = await Promise.all([
+      (supabase as any).from("work_order_items").delete().in("work_order_id", workOrderIds),
+      (supabase as any).from("work_order_parts").delete().in("work_order_id", workOrderIds),
+    ]);
+
+    if (workOrderItemsError) throw workOrderItemsError;
+    if (workOrderPartsError) throw workOrderPartsError;
+  }
+
+  if (quoteIds.length > 0) {
+    const { error: quoteLinesError } = await (supabase as any)
+      .from("quote_lines")
+      .delete()
+      .in("quote_id", quoteIds);
+
+    if (quoteLinesError) throw quoteLinesError;
+  }
+
+  const [{ error: photosError }, { error: orderPartsError }] = await Promise.all([
+    (supabase as any).from("appointment_photos").delete().eq("appointment_id", appointmentId),
+    (supabase as any).from("order_parts").delete().eq("appointment_id", appointmentId),
+  ]);
+
+  if (photosError) throw photosError;
+  if (orderPartsError) throw orderPartsError;
+
+  if (quoteIds.length > 0) {
+    const { error: deleteQuotesError } = await (supabase as any).from("quotes").delete().in("id", quoteIds);
+    if (deleteQuotesError) throw deleteQuotesError;
+  }
+
+  if (workOrderIds.length > 0) {
+    const { error: deleteWorkOrdersError } = await (supabase as any).from("work_orders").delete().in("id", workOrderIds);
+    if (deleteWorkOrdersError) throw deleteWorkOrdersError;
+  }
+
+  const { error: deleteAppointmentError } = await (supabase as any).from("appointments").delete().eq("id", appointmentId);
+  if (deleteAppointmentError) throw deleteAppointmentError;
 };
 
 const Appointments = () => {
@@ -519,14 +573,23 @@ const Appointments = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("appointments").delete().eq("id", id) as any;
-    if (error) {
-      toast.error("Error al eliminar: " + error.message);
-    } else {
+    try {
+      await deleteAppointmentBundle(id);
+      setWorkOrderMap((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+        queryClient.invalidateQueries({ queryKey: ["quotes"] }),
+      ]);
       toast.success("Orden eliminada");
-      window.location.reload();
+    } catch (error: any) {
+      toast.error("Error al eliminar: " + (error?.message ?? "Error desconocido"));
+    } finally {
+      setDeleteConfirm(null);
     }
-    setDeleteConfirm(null);
   };
 
   const handleAssignMechanic = async (appointmentId: string, mechanic: { id: string; name: string }) => {
@@ -666,8 +729,12 @@ const Appointments = () => {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                type="button"
                                 className="h-6 w-6 text-destructive hover:text-destructive"
-                                onClick={() => setDeleteConfirm(apt.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteConfirm(apt.id);
+                                }}
                                 title="Eliminar"
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -805,13 +872,7 @@ const Appointments = () => {
                                       const val = e.target.value.trim();
                                       if (val) {
                                         try {
-                                          const { error } = await supabase
-                                            .from("appointments")
-                                            .update({ km: val } as any)
-                                            .eq("id", apt.id)
-                                            .select("id")
-                                            .single();
-                                          if (error) throw error;
+                                          await updateAppointmentWithFallback(apt.id, buildKilometersPayload(val));
                                           queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Km guardados");
                                         } catch (err: any) {
@@ -963,8 +1024,8 @@ const Appointments = () => {
             <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Eliminar</AlertDialogAction>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
