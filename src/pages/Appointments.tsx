@@ -26,6 +26,7 @@ import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OrderPartsDialog } from "@/components/appointments/OrderPartsDialog";
+import { getEstimatedMinutes } from "@/lib/serviceEstimates";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
