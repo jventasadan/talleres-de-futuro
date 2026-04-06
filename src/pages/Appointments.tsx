@@ -117,6 +117,7 @@ const Appointments = () => {
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
+  const queryClient = useQueryClient();
 
   // Fetch work_order map for all active appointments
   const fetchWorkOrderMap = useCallback(async () => {
