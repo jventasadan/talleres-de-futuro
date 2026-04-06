@@ -858,6 +858,41 @@ const Appointments = () => {
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Entregar vehículo
                                   </Button>
+                                  {apt.email && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[10px] px-2"
+                                      onClick={async () => {
+                                        try {
+                                          const { error } = await supabase.functions.invoke('send-transactional-email', {
+                                            body: {
+                                              templateName: 'vehicle-ready',
+                                              recipientEmail: apt.email,
+                                              idempotencyKey: `vehicle-ready-${apt.id}`,
+                                              templateData: {
+                                                clientName: apt.client_name,
+                                                licensePlate: apt.license_plate,
+                                                brand: apt.brand || "",
+                                                model: apt.model || "",
+                                                workshopName: companySettings?.company_name || "",
+                                                workshopPhone: companySettings?.phone || "",
+                                                workshopEmail: companySettings?.email || "",
+                                                workshopAddress: companySettings?.address || "",
+                                              },
+                                            },
+                                          });
+                                          if (error) throw error;
+                                          toast.success("Email enviado al cliente");
+                                        } catch (err: any) {
+                                          toast.error("Error al enviar email: " + (err?.message ?? ""));
+                                        }
+                                      }}
+                                    >
+                                      <Mail className="mr-1 h-3 w-3" />
+                                      Enviar email
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
