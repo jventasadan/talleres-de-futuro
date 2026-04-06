@@ -130,10 +130,11 @@ export function useCourtesyVehicles() {
 
 export function useCreateCourtesyVehicle() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (payload: Omit<CourtesyVehicle, "id">) => {
-      const data = await insertWithFallback({ ...payload });
+      const data = await insertWithFallback({ ...payload, workshop_id: workshopId });
       return normalizeCourtesyVehicle((data ?? payload) as Record<string, any>);
     },
     onSuccess: () => {

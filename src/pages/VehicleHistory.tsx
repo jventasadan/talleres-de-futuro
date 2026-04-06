@@ -393,10 +393,15 @@ const VehicleHistory = () => {
                         </TableCell>
                         <TableCell>
                           {entry.invoice_number ? (
-                            <span className="flex items-center gap-1 text-xs text-primary">
-                              <FileText className="h-3 w-3" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] px-1 text-primary"
+                              onClick={() => window.open(`/invoices?search=${encodeURIComponent(entry.invoice_number!)}`, "_self")}
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
                               {entry.invoice_number}
-                            </span>
+                            </Button>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}

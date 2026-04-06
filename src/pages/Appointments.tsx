@@ -672,6 +672,40 @@ const Appointments = () => {
                                   <span className="text-muted-foreground">· {[apt.brand, apt.model].filter(Boolean).join(" ")}</span>
                                 )}
                               </div>
+                              {/* Email field */}
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Mail className="h-3 w-3" />
+                                <Input
+                                  key={`email-${apt.id}-${apt.email || ""}`}
+                                  placeholder="Email cliente"
+                                  className="h-5 text-[10px] px-1.5 border-none bg-transparent p-0 focus-visible:ring-0"
+                                  defaultValue={apt.email || ""}
+                                  onBlur={async (e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (apt.email || "")) {
+                                      try {
+                                        await updateAppointmentWithFallback(apt.id, { email: val });
+                                        // Also update client email
+                                        if (val && apt.license_plate) {
+                                          const { data: clientData } = await supabase
+                                            .from("clients")
+                                            .select("id")
+                                            .eq("workshop_id", workshopId)
+                                            .eq("license_plate", apt.license_plate.toUpperCase())
+                                            .maybeSingle() as any;
+                                          if (clientData?.id) {
+                                            await supabase.from("clients").update({ email: val } as any).eq("id", clientData.id);
+                                          }
+                                        }
+                                        toast.success("Email guardado");
+                                      } catch (err: any) {
+                                        toast.error("Error al guardar email: " + (err?.message ?? ""));
+                                      }
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
                             </div>
 
                             <div className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs font-medium">{apt.service || "Sin servicio"}</div>
