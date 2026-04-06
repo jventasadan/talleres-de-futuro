@@ -765,24 +765,31 @@ const Appointments = () => {
                                 </DropdownMenu>
                               )}
                               <div className="flex items-center gap-1">
-                                <Input
-                                  key={`km-${apt.id}-${apt.km || ""}`}
-                                  placeholder="Km"
-                                  className="h-6 w-20 text-[10px] px-1.5 font-mono"
-                                  defaultValue={apt.km || ""}
-                                  onBlur={async (e) => {
-                                    const val = e.target.value.trim();
-                                    if (val !== (apt.km || "")) {
-                                      try {
-                                        await updateAppointmentWithFallback(apt.id, { km: val });
-                                        toast.success("Km guardados");
-                                      } catch (err: any) {
-                                        toast.error("Error al guardar km: " + (err?.message ?? ""));
+                                {apt.km ? (
+                                  <div className="flex items-center gap-1 h-6 px-1.5 text-[10px] font-mono text-muted-foreground">
+                                    <Gauge className="h-3 w-3" />
+                                    <span>{apt.km} km</span>
+                                  </div>
+                                ) : (
+                                  <Input
+                                    key={`km-${apt.id}`}
+                                    placeholder="Km"
+                                    className="h-6 w-20 text-[10px] px-1.5 font-mono"
+                                    defaultValue=""
+                                    onBlur={async (e) => {
+                                      const val = e.target.value.trim();
+                                      if (val) {
+                                        try {
+                                          await updateAppointmentWithFallback(apt.id, { km: val });
+                                          toast.success("Km guardados");
+                                        } catch (err: any) {
+                                          toast.error("Error al guardar km: " + (err?.message ?? ""));
+                                        }
                                       }
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
