@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -116,6 +117,7 @@ const Appointments = () => {
   const createInvoice = useCreateInvoice();
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
+  const queryClient = useQueryClient();
 
   // Fetch work_order map for all active appointments
   const fetchWorkOrderMap = useCallback(async () => {
@@ -700,6 +702,7 @@ const Appointments = () => {
                                               await supabase.from("clients").update({ email: val } as any).eq("id", clientData.id);
                                             }
                                           }
+                                          queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Email guardado");
                                         } catch (err: any) {
                                           toast.error("Error al guardar email: " + (err?.message ?? ""));
@@ -785,6 +788,7 @@ const Appointments = () => {
                                       if (val) {
                                         try {
                                           await updateAppointmentWithFallback(apt.id, { km: val });
+                                          queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Km guardados");
                                         } catch (err: any) {
                                           toast.error("Error al guardar km: " + (err?.message ?? ""));

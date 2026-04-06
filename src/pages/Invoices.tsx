@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -288,7 +289,8 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
 }
 
 const Invoices = () => {
-  const [search, setSearch] = useState("");
+  const [urlParams] = useSearchParams();
+  const [search, setSearch] = useState(urlParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState<"all" | "emitida" | "pagada">("all");
   const { data: invoices, isLoading } = useInvoices();
   const { data: settings } = useCompanySettings();
