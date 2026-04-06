@@ -17,6 +17,7 @@ import MechanicChat from "./pages/MechanicChat";
 import CourtesyVehicles from "./pages/CourtesyVehicles";
 import VehicleHistory from "./pages/VehicleHistory";
 import SettingsPage from "./pages/Settings";
+import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
