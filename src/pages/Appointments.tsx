@@ -869,43 +869,7 @@ const Appointments = () => {
                                       variant="outline"
                                       size="sm"
                                       className="h-6 text-[10px] px-2"
-                                      onClick={async () => {
-                                        try {
-                                          const cloudUrl = import.meta.env.VITE_SUPABASE_URL || "https://swumbruebgokkoevxggs.supabase.co";
-                                          const { data: { session } } = await supabase.auth.getSession();
-                                          const token = session?.access_token;
-                                          const res = await fetch(`${cloudUrl}/functions/v1/send-transactional-email`, {
-                                            method: "POST",
-                                            headers: {
-                                              "Content-Type": "application/json",
-                                              "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3dW1icnVlYmdva2tvZXZ4Z2dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMjY4NzksImV4cCI6MjA4ODkwMjg3OX0.DV5NB7ZeM264HzO793wdWevixa6z0dVORgLcIqVEyGs",
-                                              ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-                                            },
-                                            body: JSON.stringify({
-                                              templateName: 'vehicle-ready',
-                                              recipientEmail: apt.email,
-                                              idempotencyKey: `vehicle-ready-${apt.id}`,
-                                              templateData: {
-                                                clientName: apt.client_name,
-                                                licensePlate: apt.license_plate,
-                                                brand: apt.brand || "",
-                                                model: apt.model || "",
-                                                workshopName: companySettings?.company_name || "",
-                                                workshopPhone: companySettings?.phone || "",
-                                                workshopEmail: companySettings?.email || "",
-                                                workshopAddress: companySettings?.address || "",
-                                              },
-                                            }),
-                                          });
-                                          if (!res.ok) {
-                                            const body = await res.text();
-                                            throw new Error(body || `HTTP ${res.status}`);
-                                          }
-                                          toast.success("Email enviado al cliente");
-                                        } catch (err: any) {
-                                          toast.error("Error al enviar email: " + (err?.message ?? ""));
-                                        }
-                                      }}
+                                      onClick={() => setEmailAppointment(apt)}
                                     >
                                       <Mail className="mr-1 h-3 w-3" />
                                       Enviar email
