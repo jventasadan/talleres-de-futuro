@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
