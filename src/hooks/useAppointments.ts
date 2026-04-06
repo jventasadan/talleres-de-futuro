@@ -281,7 +281,6 @@ export function useCreateAppointment() {
         email: appointment.email ?? null,
         Email: appointment.email ?? null,
         km: appointment.km ?? null,
-        Kilometros: normalizeKilometros(appointment.km),
         vehicle_id: appointment.vehicle_id ?? null,
         // workshop_id is set automatically by DB trigger
       };
@@ -334,7 +333,6 @@ export function useUpdateAppointment() {
       }
       if (updates.km !== undefined) {
         payload.km = updates.km;
-        payload.Kilometros = normalizeKilometros(updates.km);
       }
       if (updates.mechanic_id !== undefined) payload.mechanic_id = updates.mechanic_id;
       if (updates.mechanic !== undefined) payload.mechanic = updates.mechanic;
