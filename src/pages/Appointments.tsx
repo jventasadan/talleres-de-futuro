@@ -675,36 +675,40 @@ const Appointments = () => {
                               {/* Email field */}
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Mail className="h-3 w-3" />
-                                <Input
-                                  key={`email-${apt.id}-${apt.email || ""}`}
-                                  placeholder="Email cliente"
-                                  className="h-5 text-[10px] px-1.5 border-none bg-transparent p-0 focus-visible:ring-0"
-                                  defaultValue={apt.email || ""}
-                                  onBlur={async (e) => {
-                                    const val = e.target.value.trim();
-                                    if (val !== (apt.email || "")) {
-                                      try {
-                                        await updateAppointmentWithFallback(apt.id, { email: val });
-                                        // Also update client email
-                                        if (val && apt.license_plate) {
-                                          const { data: clientData } = await supabase
-                                            .from("clients")
-                                            .select("id")
-                                            .eq("workshop_id", workshopId)
-                                            .eq("license_plate", apt.license_plate.toUpperCase())
-                                            .maybeSingle() as any;
-                                          if (clientData?.id) {
-                                            await supabase.from("clients").update({ email: val } as any).eq("id", clientData.id);
+                                {apt.email ? (
+                                  <span className="text-[10px] truncate">{apt.email}</span>
+                                ) : (
+                                  <Input
+                                    key={`email-${apt.id}`}
+                                    placeholder="Email cliente"
+                                    className="h-5 text-[10px] px-1.5 border-none bg-transparent p-0 focus-visible:ring-0"
+                                    defaultValue=""
+                                    onBlur={async (e) => {
+                                      const val = e.target.value.trim();
+                                      if (val) {
+                                        try {
+                                          await updateAppointmentWithFallback(apt.id, { email: val });
+                                          // Also update client email
+                                          if (apt.license_plate) {
+                                            const { data: clientData } = await supabase
+                                              .from("clients")
+                                              .select("id")
+                                              .eq("workshop_id", workshopId)
+                                              .eq("license_plate", apt.license_plate.toUpperCase())
+                                              .maybeSingle() as any;
+                                            if (clientData?.id) {
+                                              await supabase.from("clients").update({ email: val } as any).eq("id", clientData.id);
+                                            }
                                           }
+                                          toast.success("Email guardado");
+                                        } catch (err: any) {
+                                          toast.error("Error al guardar email: " + (err?.message ?? ""));
                                         }
-                                        toast.success("Email guardado");
-                                      } catch (err: any) {
-                                        toast.error("Error al guardar email: " + (err?.message ?? ""));
                                       }
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
                               </div>
                             </div>
 
@@ -765,24 +769,31 @@ const Appointments = () => {
                                 </DropdownMenu>
                               )}
                               <div className="flex items-center gap-1">
-                                <Input
-                                  key={`km-${apt.id}-${apt.km || ""}`}
-                                  placeholder="Km"
-                                  className="h-6 w-20 text-[10px] px-1.5 font-mono"
-                                  defaultValue={apt.km || ""}
-                                  onBlur={async (e) => {
-                                    const val = e.target.value.trim();
-                                    if (val !== (apt.km || "")) {
-                                      try {
-                                        await updateAppointmentWithFallback(apt.id, { km: val });
-                                        toast.success("Km guardados");
-                                      } catch (err: any) {
-                                        toast.error("Error al guardar km: " + (err?.message ?? ""));
+                                {apt.km ? (
+                                  <div className="flex items-center gap-1 h-6 px-1.5 text-[10px] font-mono text-muted-foreground">
+                                    <Gauge className="h-3 w-3" />
+                                    <span>{apt.km} km</span>
+                                  </div>
+                                ) : (
+                                  <Input
+                                    key={`km-${apt.id}`}
+                                    placeholder="Km"
+                                    className="h-6 w-20 text-[10px] px-1.5 font-mono"
+                                    defaultValue=""
+                                    onBlur={async (e) => {
+                                      const val = e.target.value.trim();
+                                      if (val) {
+                                        try {
+                                          await updateAppointmentWithFallback(apt.id, { km: val });
+                                          toast.success("Km guardados");
+                                        } catch (err: any) {
+                                          toast.error("Error al guardar km: " + (err?.message ?? ""));
+                                        }
                                       }
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -847,6 +858,41 @@ const Appointments = () => {
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Entregar vehículo
                                   </Button>
+                                  {apt.email && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-6 text-[10px] px-2"
+                                      onClick={async () => {
+                                        try {
+                                          const { error } = await supabase.functions.invoke('send-transactional-email', {
+                                            body: {
+                                              templateName: 'vehicle-ready',
+                                              recipientEmail: apt.email,
+                                              idempotencyKey: `vehicle-ready-${apt.id}`,
+                                              templateData: {
+                                                clientName: apt.client_name,
+                                                licensePlate: apt.license_plate,
+                                                brand: apt.brand || "",
+                                                model: apt.model || "",
+                                                workshopName: companySettings?.company_name || "",
+                                                workshopPhone: companySettings?.phone || "",
+                                                workshopEmail: companySettings?.email || "",
+                                                workshopAddress: companySettings?.address || "",
+                                              },
+                                            },
+                                          });
+                                          if (error) throw error;
+                                          toast.success("Email enviado al cliente");
+                                        } catch (err: any) {
+                                          toast.error("Error al enviar email: " + (err?.message ?? ""));
+                                        }
+                                      }}
+                                    >
+                                      <Mail className="mr-1 h-3 w-3" />
+                                      Enviar email
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
