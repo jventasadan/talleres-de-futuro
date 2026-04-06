@@ -22,6 +22,8 @@ export interface Appointment {
   brand?: string | null;
   model?: string | null;
   phone?: string | null;
+  email?: string | null;
+  km?: string | null;
   problem?: string | null;
   appointment_start?: string | null;
   appointment_end?: string | null;
@@ -103,6 +105,8 @@ const mapAppointmentRow = (row: AnyRecord): Appointment => {
     brand: row.brand ?? null,
     model: row.model ?? null,
     phone: row.phone ?? null,
+    email: row.email ?? null,
+    km: row.km ?? null,
     problem: row.problem ?? null,
     appointment_start: row.appointment_start ?? null,
     appointment_end: row.appointment_end ?? null,
@@ -261,6 +265,8 @@ export function useCreateAppointment() {
         mechanic: appointment.mechanic ?? null,
         brand: appointment.brand ?? null,
         model: appointment.model ?? null,
+        email: appointment.email ?? null,
+        km: appointment.km ?? null,
         vehicle_id: appointment.vehicle_id ?? null,
         // workshop_id is set automatically by DB trigger
       };
@@ -305,6 +311,8 @@ export function useUpdateAppointment() {
       if (updates.status !== undefined) payload.status = updates.status;
       if (updates.brand !== undefined) payload.brand = updates.brand;
       if (updates.model !== undefined) payload.model = updates.model;
+      if (updates.email !== undefined) payload.email = updates.email;
+      if (updates.km !== undefined) payload.km = updates.km;
       if (updates.mechanic_id !== undefined) payload.mechanic_id = updates.mechanic_id;
       if (updates.mechanic !== undefined) payload.mechanic = updates.mechanic;
 

@@ -74,6 +74,7 @@ export function usePartsCatalog() {
 
 export function useImportPartsCatalog() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (rows: ParsedPartRow[]) => {
@@ -88,7 +89,7 @@ export function useImportPartsCatalog() {
           name: part.name,
           ref: part.ref,
           price: part.price,
-          // workshop_id set by DB trigger if column exists
+          workshop_id: workshopId,
         }));
         const { error } = await db.from("parts_catalog").insert(batch);
         if (error) throw error;
