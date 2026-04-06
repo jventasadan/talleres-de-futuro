@@ -311,6 +311,8 @@ export function useUpdateAppointment() {
       if (updates.status !== undefined) payload.status = updates.status;
       if (updates.brand !== undefined) payload.brand = updates.brand;
       if (updates.model !== undefined) payload.model = updates.model;
+      if (updates.email !== undefined) payload.email = updates.email;
+      if (updates.km !== undefined) payload.km = updates.km;
       if (updates.mechanic_id !== undefined) payload.mechanic_id = updates.mechanic_id;
       if (updates.mechanic !== undefined) payload.mechanic = updates.mechanic;
 
