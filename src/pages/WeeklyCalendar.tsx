@@ -259,6 +259,7 @@ const WeeklyCalendar = () => {
             await supabase.from("clients").insert({
               name: data.client_name,
               phone: data.phone ?? null,
+              email: data.email ?? null,
               license_plate: plate,
               brand: data.brand ?? null,
               model: data.model ?? null,

@@ -161,16 +161,22 @@ const insertAppointmentWithFallback = async (payload: AnyRecord) => {
   let lastError: any;
 
   for (let i = 0; i < 12; i += 1) {
+    console.log(`[insertFallback] attempt ${i}, keys:`, Object.keys(attemptPayload));
     const { data, error } = await supabase
       .from("appointments")
       .insert(attemptPayload as any)
       .select("*")
       .maybeSingle();
 
-    if (!error) return data;
+    if (!error) {
+      console.log("[insertFallback] success, data:", JSON.stringify(data));
+      return data;
+    }
 
     lastError = error;
+    console.log(`[insertFallback] error:`, error.message, error.code);
     const missingColumn = extractMissingColumn(error);
+    console.log(`[insertFallback] missingColumn:`, missingColumn);
 
     if (!isSchemaMismatchError(error) || !missingColumn) break;
     if (!(missingColumn in attemptPayload)) break;
@@ -271,7 +277,9 @@ export function useCreateAppointment() {
         // workshop_id is set automatically by DB trigger
       };
 
+      console.log("[useCreateAppointment] payload before insert:", JSON.stringify(payload));
       const data = await insertAppointmentWithFallback(payload);
+      console.log("[useCreateAppointment] result after insert:", JSON.stringify(data));
       return mapAppointmentRow((data ?? payload) as AnyRecord);
     },
     onSuccess: () => {
