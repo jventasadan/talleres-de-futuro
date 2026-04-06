@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
+import { buildKilometersPayload } from "@/lib/appointment-utils";
 import { toast } from "sonner";
 
 export interface Appointment {
@@ -113,7 +114,7 @@ const mapAppointmentRow = (row: AnyRecord): Appointment => {
     model: row.model ?? null,
     phone: row.phone ?? null,
     email: row.email ?? row.Email ?? null,
-    km: row.km ?? (row.Kilometros != null ? String(row.Kilometros) : null),
+    km: row.km ?? row.kilometros ?? (row.Kilometros != null ? String(row.Kilometros) : null),
     problem: row.problem ?? null,
     appointment_start: row.appointment_start ?? null,
     appointment_end: row.appointment_end ?? null,
@@ -280,7 +281,7 @@ export function useCreateAppointment() {
         model: appointment.model ?? null,
         email: appointment.email ?? null,
         Email: appointment.email ?? null,
-        km: appointment.km ?? null,
+        ...buildKilometersPayload(appointment.km),
         vehicle_id: appointment.vehicle_id ?? null,
         // workshop_id is set automatically by DB trigger
       };
@@ -332,7 +333,7 @@ export function useUpdateAppointment() {
         payload.Email = updates.email;
       }
       if (updates.km !== undefined) {
-        payload.km = updates.km;
+        Object.assign(payload, buildKilometersPayload(updates.km));
       }
       if (updates.mechanic_id !== undefined) payload.mechanic_id = updates.mechanic_id;
       if (updates.mechanic !== undefined) payload.mechanic = updates.mechanic;

@@ -4,11 +4,18 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Search, Plus, User, Car } from "lucide-react";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { useCreateAppointment } from "@/hooks/useAppointments";
 import { useClients } from "@/hooks/useClients";
 import { useAllAppointments } from "@/hooks/useAppointments";
+import { useMechanics } from "@/hooks/useMechanics";
+import { findNearestAvailableSlot, hasMechanicAvailability } from "@/lib/appointment-utils";
+import { toast } from "sonner";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -28,11 +35,13 @@ interface SearchResult {
 
 export function DashboardLayout({ children, title, subtitle, showSearch = true, showRecepcionar = true }: DashboardLayoutProps) {
   const [receptionOpen, setReceptionOpen] = useState(false);
+  const [pendingAppointment, setPendingAppointment] = useState<{ data: any; suggestedSlot: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const createMutation = useCreateAppointment();
   const { data: clients } = useClients();
   const { data: appointments } = useAllAppointments();
+  const { data: mechanics } = useMechanics();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -85,10 +94,48 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
     return r.slice(0, 8);
   })();
 
-  const handleCreate = (data: any) => {
-    createMutation.mutate(data, {
-      onSuccess: () => setReceptionOpen(false),
+  const confirmCreate = (data: any, timeSlot: string) => {
+    createMutation.mutate({ ...data, time_slot: timeSlot }, {
+      onSuccess: () => {
+        setReceptionOpen(false);
+        setPendingAppointment(null);
+      },
     });
+  };
+
+  const handleCreate = (data: any) => {
+    const requestedTime = data.time_slot || "09:00";
+    const mechanicCount = (mechanics ?? []).length || 1;
+
+    if (data.date && data.service) {
+      const hasAvailability = hasMechanicAvailability({
+        appointments: appointments ?? [],
+        date: data.date,
+        requestedTime,
+        serviceName: data.service || "",
+        mechanicCount,
+      });
+
+      if (!hasAvailability) {
+        const availableSlot = findNearestAvailableSlot({
+          appointments: appointments ?? [],
+          date: data.date,
+          requestedTime,
+          serviceName: data.service || "",
+          mechanicCount,
+        });
+
+        if (!availableSlot) {
+          toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
+          return;
+        }
+
+        setPendingAppointment({ data, suggestedSlot: availableSlot });
+        return;
+      }
+    }
+
+    confirmCreate(data, requestedTime);
   };
 
   const handleResultClick = (result: SearchResult) => {
@@ -161,6 +208,32 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
         onSubmit={handleCreate}
         isLoading={createMutation.isPending}
       />
+
+      <AlertDialog open={!!pendingAppointment} onOpenChange={(open) => !open && setPendingAppointment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Horario no disponible</AlertDialogTitle>
+            <AlertDialogDescription>
+              La hora solicitada está ocupada (todos los mecánicos tienen citas).
+              El hueco libre más cercano es a las <strong>{pendingAppointment?.suggestedSlot}</strong>.
+              ¿Deseas agendar la cita a esa hora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                if (pendingAppointment) {
+                  confirmCreate(pendingAppointment.data, pendingAppointment.suggestedSlot);
+                }
+              }}
+            >
+              Aceptar ({pendingAppointment?.suggestedSlot})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }

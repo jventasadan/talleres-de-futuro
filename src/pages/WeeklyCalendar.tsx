@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { getEstimatedMinutes } from "@/lib/serviceEstimates";
+import { findNearestAvailableSlot, getServiceDurationSlots, getTimeSlotIndex, hasMechanicAvailability } from "@/lib/appointment-utils";
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
 const SLOTS_PER_HOUR = 4;
@@ -110,14 +110,11 @@ const WeeklyCalendar = () => {
   }, [mechanics, todayAppointments]);
 
   const getAppointmentSlot = (apt: Appointment): number => {
-    const time = apt.time_slot || "09:00";
-    const [h, m] = time.split(":").map(Number);
-    return ((h - 7) * SLOTS_PER_HOUR) + Math.floor((m || 0) / 15);
+    return getTimeSlotIndex(apt.time_slot);
   };
 
   const getAppointmentDuration = (apt: Appointment): number => {
-    const minutes = getEstimatedMinutes(apt.service || "");
-    return Math.max(2, Math.ceil(minutes / 15));
+    return getServiceDurationSlots(apt.service || "");
   };
 
   const statusDot: Record<string, string> = {
@@ -148,44 +145,14 @@ const WeeklyCalendar = () => {
   };
 
   // Find nearest available slot considering mechanic availability
-  const findNearestAvailableSlot = useCallback((date: string, requestedTime: string, serviceName: string) => {
-    const mechanicCount = (mechanics ?? []).length || 1;
-    const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(serviceName) / 15));
-    const dayAppointments = visibleAppointments.filter(a => a.date === date && !["entregado", "cancelado"].includes(a.status));
-
-    const [reqH, reqM] = requestedTime.split(":").map(Number);
-    const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
-
-    // Try from requested slot forward, then backward
-    const totalSlots = HOURS.length * SLOTS_PER_HOUR;
-    for (let offset = 0; offset < totalSlots; offset++) {
-      for (const candidate of [requestedSlot + offset, requestedSlot - offset]) {
-        if (candidate < 0 || candidate >= totalSlots) continue;
-
-        // Check if all required consecutive slots have at least one free mechanic
-        let canFit = true;
-        for (let s = 0; s < serviceDuration; s++) {
-          const slotToCheck = candidate + s;
-          if (slotToCheck >= totalSlots) { canFit = false; break; }
-
-          // Count how many mechanics are busy at this slot
-          const busyCount = dayAppointments.filter(a => {
-            const aptStart = getAppointmentSlot(a);
-            const aptDur = getAppointmentDuration(a);
-            return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
-          }).length;
-
-          if (busyCount >= mechanicCount) { canFit = false; break; }
-        }
-
-        if (canFit) {
-          const hour = Math.floor(candidate / SLOTS_PER_HOUR) + 7;
-          const minute = (candidate % SLOTS_PER_HOUR) * 15;
-          return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-        }
-      }
-    }
-    return null; // No slot available
+  const findNearestSlot = useCallback((date: string, requestedTime: string, serviceName: string) => {
+    return findNearestAvailableSlot({
+      appointments: visibleAppointments,
+      date,
+      requestedTime,
+      serviceName,
+      mechanicCount: (mechanics ?? []).length || 1,
+    });
   }, [mechanics, visibleAppointments]);
 
   const [pendingAppointment, setPendingAppointment] = useState<{ data: any; suggestedSlot: string } | null>(null);
@@ -198,25 +165,16 @@ const WeeklyCalendar = () => {
     const requestedTime = data.time_slot || "09:00";
     const mechanicCount = (mechanics ?? []).length || 1;
 
-    // Count how many appointments overlap the requested time
-    const dayAppointments = visibleAppointments.filter(a => a.date === dateStr && !["entregado", "cancelado"].includes(a.status));
-    const [reqH, reqM] = requestedTime.split(":").map(Number);
-    const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
-    const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(data.service || "") / 15));
+    const hasAvailability = hasMechanicAvailability({
+      appointments: visibleAppointments,
+      date: dateStr,
+      requestedTime,
+      serviceName: data.service || "",
+      mechanicCount,
+    });
 
-    let slotConflict = false;
-    for (let s = 0; s < serviceDuration; s++) {
-      const slotToCheck = requestedSlot + s;
-      const busyCount = dayAppointments.filter(a => {
-        const aptStart = getAppointmentSlot(a);
-        const aptDur = getAppointmentDuration(a);
-        return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
-      }).length;
-      if (busyCount >= mechanicCount) { slotConflict = true; break; }
-    }
-
-    if (slotConflict) {
-      const availableSlot = findNearestAvailableSlot(dateStr, requestedTime, data.service || "");
+    if (!hasAvailability) {
+      const availableSlot = findNearestSlot(dateStr, requestedTime, data.service || "");
       if (!availableSlot) {
         toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
         return;
