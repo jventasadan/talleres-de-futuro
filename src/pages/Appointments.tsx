@@ -542,6 +542,7 @@ const Appointments = () => {
         mechanic_id: mechanic.id,
         mechanic: mechanic.name,
       });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
       toast.success("Mecánico asignado");
     } catch (error: any) {
       toast.error("Error al asignar mecánico: " + (error?.message ?? "Error desconocido"));
