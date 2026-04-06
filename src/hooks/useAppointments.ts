@@ -76,6 +76,13 @@ const normalizeTime = (value: unknown): string | null => {
   return null;
 };
 
+const normalizeKilometros = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const mapStatus = (status: string | null | undefined) => {
   if (!status) return "recepcionado";
   if (status === "reparado") return "listo";
@@ -105,8 +112,8 @@ const mapAppointmentRow = (row: AnyRecord): Appointment => {
     brand: row.brand ?? null,
     model: row.model ?? null,
     phone: row.phone ?? null,
-    email: row.email ?? null,
-    km: row.km ?? null,
+    email: row.email ?? row.Email ?? null,
+    km: row.km ?? (row.Kilometros != null ? String(row.Kilometros) : null),
     problem: row.problem ?? null,
     appointment_start: row.appointment_start ?? null,
     appointment_end: row.appointment_end ?? null,
@@ -272,7 +279,9 @@ export function useCreateAppointment() {
         brand: appointment.brand ?? null,
         model: appointment.model ?? null,
         email: appointment.email ?? null,
+        Email: appointment.email ?? null,
         km: appointment.km ?? null,
+        Kilometros: normalizeKilometros(appointment.km),
         vehicle_id: appointment.vehicle_id ?? null,
         // workshop_id is set automatically by DB trigger
       };
@@ -319,8 +328,14 @@ export function useUpdateAppointment() {
       if (updates.status !== undefined) payload.status = updates.status;
       if (updates.brand !== undefined) payload.brand = updates.brand;
       if (updates.model !== undefined) payload.model = updates.model;
-      if (updates.email !== undefined) payload.email = updates.email;
-      if (updates.km !== undefined) payload.km = updates.km;
+      if (updates.email !== undefined) {
+        payload.email = updates.email;
+        payload.Email = updates.email;
+      }
+      if (updates.km !== undefined) {
+        payload.km = updates.km;
+        payload.Kilometros = normalizeKilometros(updates.km);
+      }
       if (updates.mechanic_id !== undefined) payload.mechanic_id = updates.mechanic_id;
       if (updates.mechanic !== undefined) payload.mechanic = updates.mechanic;
 
