@@ -702,6 +702,7 @@ const Appointments = () => {
                                               await supabase.from("clients").update({ email: val } as any).eq("id", clientData.id);
                                             }
                                           }
+                                          queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Email guardado");
                                         } catch (err: any) {
                                           toast.error("Error al guardar email: " + (err?.message ?? ""));
@@ -787,6 +788,7 @@ const Appointments = () => {
                                       if (val) {
                                         try {
                                           await updateAppointmentWithFallback(apt.id, { km: val });
+                                          queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Km guardados");
                                         } catch (err: any) {
                                           toast.error("Error al guardar km: " + (err?.message ?? ""));
