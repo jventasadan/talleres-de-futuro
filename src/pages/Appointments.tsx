@@ -946,6 +946,30 @@ const Appointments = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {emailAppointment && (
+        <SendEmailDialog
+          open={!!emailAppointment}
+          onOpenChange={(open) => !open && setEmailAppointment(null)}
+          appointment={{
+            id: emailAppointment.id,
+            client_name: emailAppointment.client_name,
+            email: emailAppointment.email!,
+            phone: emailAppointment.phone,
+            license_plate: emailAppointment.license_plate,
+            brand: emailAppointment.brand,
+            model: emailAppointment.model,
+            service: emailAppointment.service,
+            km: emailAppointment.km,
+          }}
+          workshop={{
+            company_name: companySettings?.company_name,
+            phone: companySettings?.phone,
+            email: companySettings?.email,
+            address: companySettings?.address,
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 };
