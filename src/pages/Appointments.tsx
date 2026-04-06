@@ -30,6 +30,7 @@ import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
 import { KanbanQuoteDialog } from "@/components/appointments/KanbanQuoteDialog";
+import { SendEmailDialog } from "@/components/appointments/SendEmailDialog";
 
 const KANBAN_COLUMNS = [
   { key: "recepcionado", label: "RECEPCIONADO", borderColor: "border-purple-500", bgGlow: "from-purple-500/5 to-transparent" },
@@ -106,6 +107,7 @@ const Appointments = () => {
   const [expandedPhotos, setExpandedPhotos] = useState<string | null>(null);
   const [quoteAppointment, setQuoteAppointment] = useState<Appointment | null>(null);
   const [workOrderMap, setWorkOrderMap] = useState<Record<string, string>>({});
+  const [emailAppointment, setEmailAppointment] = useState<Appointment | null>(null);
 
   const { data: appointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
