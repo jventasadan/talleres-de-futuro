@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkshop } from "@/contexts/WorkshopContext";
@@ -26,6 +26,7 @@ import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OrderPartsDialog } from "@/components/appointments/OrderPartsDialog";
+import { getEstimatedMinutes } from "@/lib/serviceEstimates";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
@@ -542,6 +543,7 @@ const Appointments = () => {
         mechanic_id: mechanic.id,
         mechanic: mechanic.name,
       });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
       toast.success("Mecánico asignado");
     } catch (error: any) {
       toast.error("Error al asignar mecánico: " + (error?.message ?? "Error desconocido"));
@@ -549,20 +551,34 @@ const Appointments = () => {
   };
 
   const handleCreate = async (data: AnyRecord) => {
-    // Check mechanic capacity
+    // Duration-aware capacity check (same logic as WeeklyCalendar)
     if (data.date && data.time_slot && workshopId) {
       const mechanicCount = (mechanics ?? []).length;
       if (mechanicCount > 0) {
-        const { count } = await supabase
-          .from("appointments")
-          .select("id", { count: "exact", head: true })
-          .eq("workshop_id", workshopId)
-          .eq("date", data.date)
-          .eq("time_slot", data.time_slot)
-          .not("status", "in", '("cancelado","entregado")') as any;
-        
-        if ((count ?? 0) >= mechanicCount) {
-          toast.error(`No hay mecánicos disponibles en esa franja horaria (${mechanicCount} mecánicos, ${count} citas)`);
+        const SLOTS_PER_HOUR = 4;
+        const dayAppts = (appointments ?? []).filter(
+          a => a.date === data.date && !["cancelado", "entregado"].includes(a.status)
+        );
+
+        const [reqH, reqM] = (data.time_slot as string).split(":").map(Number);
+        const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
+        const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(data.service || "") / 15));
+
+        let slotConflict = false;
+        for (let s = 0; s < serviceDuration; s++) {
+          const slotToCheck = requestedSlot + s;
+          const busyCount = dayAppts.filter(a => {
+            const time = a.time_slot || "09:00";
+            const [h, m] = time.split(":").map(Number);
+            const aptStart = ((h - 7) * SLOTS_PER_HOUR) + Math.floor((m || 0) / 15);
+            const aptDur = Math.max(2, Math.ceil(getEstimatedMinutes(a.service || "") / 15));
+            return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
+          }).length;
+          if (busyCount >= mechanicCount) { slotConflict = true; break; }
+        }
+
+        if (slotConflict) {
+          toast.error(`No hay mecánicos disponibles en esa franja horaria. Todos los mecánicos están ocupados teniendo en cuenta la duración del servicio.`);
           return;
         }
       }
@@ -789,7 +805,13 @@ const Appointments = () => {
                                       const val = e.target.value.trim();
                                       if (val) {
                                         try {
-                                          await updateAppointmentWithFallback(apt.id, { km: val });
+                                          const { error } = await supabase
+                                            .from("appointments")
+                                            .update({ km: val } as any)
+                                            .eq("id", apt.id)
+                                            .select("id")
+                                            .single();
+                                          if (error) throw error;
                                           queryClient.invalidateQueries({ queryKey: ["appointments"] });
                                           toast.success("Km guardados");
                                         } catch (err: any) {
