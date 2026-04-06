@@ -732,13 +732,19 @@ const Appointments = () => {
                               )}
                               <div className="flex items-center gap-1">
                                 <Input
+                                  key={`km-${apt.id}-${apt.km || ""}`}
                                   placeholder="Km"
                                   className="h-6 w-20 text-[10px] px-1.5 font-mono"
-                                  defaultValue={(apt as any).km || ""}
+                                  defaultValue={apt.km || ""}
                                   onBlur={async (e) => {
                                     const val = e.target.value.trim();
-                                    if (val !== ((apt as any).km || "")) {
-                                      await updateAppointmentWithFallback(apt.id, { km: val });
+                                    if (val !== (apt.km || "")) {
+                                      try {
+                                        await updateAppointmentWithFallback(apt.id, { km: val });
+                                        toast.success("Km guardados");
+                                      } catch (err: any) {
+                                        toast.error("Error al guardar km: " + (err?.message ?? ""));
+                                      }
                                     }
                                   }}
                                   onClick={(e) => e.stopPropagation()}
