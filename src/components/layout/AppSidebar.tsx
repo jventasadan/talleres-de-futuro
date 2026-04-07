@@ -59,8 +59,12 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
-            <Wrench className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25 overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+            ) : (
+              <Wrench className="h-5 w-5 text-primary-foreground" />
+            )}
           </div>
           {!collapsed && (
             <div className="flex flex-col">
