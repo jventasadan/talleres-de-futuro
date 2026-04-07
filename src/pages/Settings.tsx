@@ -116,14 +116,14 @@ const SettingsPage = () => {
     setLogoUploading(true);
     try {
       const ext = file.name.split(".").pop() || "png";
-      const path = `logos/${user.id}/logo.${ext}`;
+      const path = `${user.id}/logo.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from("appointment-photos")
+        .from("logos")
         .upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
-        .from("appointment-photos")
+        .from("logos")
         .getPublicUrl(path);
 
       const logoUrl = urlData.publicUrl + "?t=" + Date.now();
@@ -133,6 +133,15 @@ const SettingsPage = () => {
     } finally {
       setLogoUploading(false);
       if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    try {
+      saveSettings.mutate({ logo_url: null } as any);
+      toast.success("Logo eliminado");
+    } catch (err: any) {
+      toast.error("Error al eliminar logo: " + (err?.message ?? "Error desconocido"));
     }
   };
 
@@ -221,10 +230,17 @@ const SettingsPage = () => {
                     </div>
                     <div className="space-y-2">
                       <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
-                        {logoUploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
-                        {(settings as any)?.logo_url ? "Cambiar logo" : "Subir logo"}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
+                          {logoUploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
+                          {(settings as any)?.logo_url ? "Cambiar logo" : "Subir logo"}
+                        </Button>
+                        {(settings as any)?.logo_url && (
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleLogoDelete}>
+                            <Trash2 className="mr-1 h-3 w-3" />Eliminar
+                          </Button>
+                        )}
+                      </div>
                       <p className="text-[10px] text-muted-foreground">PNG, JPG o SVG. Máximo 2MB.</p>
                     </div>
                   </div>

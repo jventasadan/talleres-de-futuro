@@ -149,6 +149,20 @@ const deleteAppointmentBundle = async (appointmentId: string) => {
   }
 
   if (workOrderIds.length > 0) {
+    // Delete invoices (and their lines) that reference these work orders
+    const { data: linkedInvoices } = await (supabase as any)
+      .from("invoices")
+      .select("id")
+      .in("work_order_id", workOrderIds);
+    const invoiceIds = (linkedInvoices ?? []).map((inv: { id: string }) => inv.id).filter(Boolean);
+    if (invoiceIds.length > 0) {
+      await Promise.all([
+        (supabase as any).from("invoice_lines").delete().in("invoice_id", invoiceIds).then((r: any) => r, () => ({ error: null })),
+        (supabase as any).from("invoice_items").delete().in("invoice_id", invoiceIds).then((r: any) => r, () => ({ error: null })),
+      ]);
+      await (supabase as any).from("invoices").delete().in("id", invoiceIds);
+    }
+
     const { error: deleteWorkOrdersError } = await (supabase as any).from("work_orders").delete().in("id", workOrderIds);
     if (deleteWorkOrdersError) throw deleteWorkOrdersError;
   }
@@ -587,6 +601,8 @@ const Appointments = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["appointments"] }),
         queryClient.invalidateQueries({ queryKey: ["quotes"] }),
+        queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["work_orders"] }),
       ]);
       toast.success("Orden eliminada");
     } catch (error: any) {
