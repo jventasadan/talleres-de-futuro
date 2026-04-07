@@ -192,6 +192,7 @@ export type Database = {
           email: string | null
           id: string
           labor_rate: number | null
+          logo_url: string | null
           owner_user_id: string | null
           phone: string | null
           postal_code: string | null
@@ -209,6 +210,7 @@ export type Database = {
           email?: string | null
           id?: string
           labor_rate?: number | null
+          logo_url?: string | null
           owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -226,6 +228,7 @@ export type Database = {
           email?: string | null
           id?: string
           labor_rate?: number | null
+          logo_url?: string | null
           owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
