@@ -17,6 +17,7 @@ export interface CompanySettings {
   email: string;
   labor_rate: number;
   default_vat: number;
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }

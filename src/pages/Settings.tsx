@@ -8,14 +8,16 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users, TrendingUp } from "lucide-react";
+import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users, TrendingUp, ImageIcon } from "lucide-react";
 import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
 import { usePartsCatalog, useImportPartsCatalog, useDeletePartsCatalog } from "@/hooks/usePartsCatalog";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { useInvoices } from "@/hooks/useInvoices";
+import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parsePartsFile } from "@/lib/partsImport";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const SettingsPage = () => {
