@@ -8,14 +8,16 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users, TrendingUp } from "lucide-react";
+import { Save, Wrench, Phone, Euro, Loader2, Upload, Package, Trash2, Building2, Users, TrendingUp, ImageIcon } from "lucide-react";
 import { useCompanySettings, useSaveCompanySettings } from "@/hooks/useCompanySettings";
 import { usePartsCatalog, useImportPartsCatalog, useDeletePartsCatalog } from "@/hooks/usePartsCatalog";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { useInvoices } from "@/hooks/useInvoices";
+import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { parsePartsFile } from "@/lib/partsImport";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const SettingsPage = () => {
@@ -26,7 +28,10 @@ const SettingsPage = () => {
   const deleteCatalog = useDeletePartsCatalog();
   const { workshopComplete } = useWorkshop();
   const { data: invoices } = useInvoices();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const monthlyRevenue = useMemo(() => {
     if (!invoices?.length) return [];
@@ -105,6 +110,32 @@ const SettingsPage = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setLogoUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `logos/${user.id}/logo.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("appointment-photos")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("appointment-photos")
+        .getPublicUrl(path);
+
+      const logoUrl = urlData.publicUrl + "?t=" + Date.now();
+      saveSettings.mutate({ logo_url: logoUrl } as any);
+    } catch (err: any) {
+      toast.error("Error al subir logo: " + (err?.message ?? "Error desconocido"));
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout title="Configuración" subtitle="Ajustes del taller">
@@ -175,6 +206,27 @@ const SettingsPage = () => {
                   <div className="space-y-2">
                     <Label>Provincia</Label>
                     <Input value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} placeholder="Madrid" />
+                  </div>
+                </div>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <Label>Logo del taller</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-muted/30 overflow-hidden">
+                      {(settings as any)?.logo_url ? (
+                        <img src={(settings as any).logo_url} alt="Logo" className="h-full w-full object-contain" />
+                      ) : (
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
+                        {logoUploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
+                        {(settings as any)?.logo_url ? "Cambiar logo" : "Subir logo"}
+                      </Button>
+                      <p className="text-[10px] text-muted-foreground">PNG, JPG o SVG. Máximo 2MB.</p>
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end pt-2">

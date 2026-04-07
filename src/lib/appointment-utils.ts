@@ -27,6 +27,7 @@ export function buildKilometersPayload(value: string | null | undefined) {
   return {
     km: normalized,
     kilometros: normalized,
+    Kilometros: normalized,
   };
 }
 

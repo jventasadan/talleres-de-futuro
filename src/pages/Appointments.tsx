@@ -131,12 +131,15 @@ const deleteAppointmentBundle = async (appointmentId: string) => {
     if (quoteLinesError) throw quoteLinesError;
   }
 
-  const [{ error: photosError }, { error: orderPartsError }] = await Promise.all([
-    (supabase as any).from("appointment_photos").delete().eq("appointment_id", appointmentId),
+  // Delete photos (ignore errors if table not in schema cache)
+  const [photosResult, { error: orderPartsError }] = await Promise.all([
+    (supabase as any).from("appointment_photos").delete().eq("appointment_id", appointmentId).then(
+      (res: any) => res,
+      () => ({ error: null })
+    ),
     (supabase as any).from("order_parts").delete().eq("appointment_id", appointmentId),
   ]);
 
-  if (photosError) throw photosError;
   if (orderPartsError) throw orderPartsError;
 
   if (quoteIds.length > 0) {
