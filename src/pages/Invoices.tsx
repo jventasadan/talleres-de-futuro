@@ -157,36 +157,48 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   doc.setTextColor(100, 100, 100);
   doc.text(`Fecha: ${new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}`, margin, y);
 
-  // Client data box - fetch brand/model from clients + km from appointment
+  // Client data box - fetch brand/model/phone/email from clients + km from appointment
   y += 12;
   let vehicleBrand = "";
   let vehicleModel = "";
   let vehicleKm = "";
+  let clientPhone = "";
+  let clientEmail = "";
   if (invoice.license_plate) {
+    // Resolve appointment_id (directly or via work_order)
+    let resolvedAppointmentId = invoice.appointment_id;
+    if (!resolvedAppointmentId && invoice.work_order_id) {
+      const { data: woData } = await db.from("work_orders").select("appointment_id").eq("id", invoice.work_order_id).maybeSingle();
+      resolvedAppointmentId = woData?.appointment_id ?? null;
+    }
+
     const [clientResult, appointmentResult] = await Promise.all([
-      db.from("clients").select("brand, model").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
-      invoice.appointment_id
-        ? db.from("appointments").select("km").eq("id", invoice.appointment_id).maybeSingle()
-        : invoice.work_order_id
-          ? db.from("work_orders").select("appointment_id").eq("id", invoice.work_order_id).maybeSingle().then(async (woRes: any) => {
-              if (woRes.data?.appointment_id) {
-                return db.from("appointments").select("km").eq("id", woRes.data.appointment_id).maybeSingle();
-              }
-              return { data: null };
-            })
-          : Promise.resolve({ data: null }),
+      db.from("clients").select("brand, model, phone, email").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
+      resolvedAppointmentId
+        ? db.from("appointments").select("km, email").eq("id", resolvedAppointmentId).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
     if (clientResult.data) {
       vehicleBrand = safeText(clientResult.data.brand, "");
       vehicleModel = safeText(clientResult.data.model, "");
+      clientPhone = safeText(clientResult.data.phone, "");
+      clientEmail = safeText(clientResult.data.email, "");
     }
     if (appointmentResult?.data) {
       vehicleKm = safeText(appointmentResult.data.km, "");
+      if (!clientEmail) clientEmail = safeText(appointmentResult.data.email, "");
     }
   }
   const vehicleInfo = [vehicleBrand, vehicleModel].filter(Boolean).join(" ");
   const hasVehicleDetails = vehicleInfo || vehicleKm;
-  const clientBoxH = comment ? 48 : (hasVehicleDetails ? 38 : 28);
+  const hasContactInfo = clientPhone || clientEmail;
+  // Calculate box height dynamically
+  let clientBoxLines = 3; // header + client + matrícula
+  if (hasVehicleDetails) clientBoxLines += 1;
+  if (vehicleKm) clientBoxLines += 1;
+  if (hasContactInfo) clientBoxLines += 1;
+  if (comment) clientBoxLines += 2;
+  const clientBoxH = 10 + clientBoxLines * 5;
   doc.setFillColor(245, 245, 245);
   doc.roundedRect(margin, y, contentWidth, clientBoxH, 3, 3, "F");
   y += 7;
@@ -198,6 +210,13 @@ async function generateProfessionalPdf(invoice: Invoice, settings: any, workshop
   doc.setFont("helvetica", "normal");
   doc.setTextColor(60, 60, 60);
   doc.text(`Cliente: ${safeText(invoice.client_name)}`, margin + 5, y);
+  if (hasContactInfo) {
+    y += 5;
+    const contactParts = [];
+    if (clientPhone) contactParts.push(`Tlf: ${clientPhone}`);
+    if (clientEmail) contactParts.push(`Email: ${clientEmail}`);
+    doc.text(contactParts.join("  |  "), margin + 5, y);
+  }
   y += 5;
   doc.text(`Matrícula: ${safeText(invoice.license_plate)}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
   if (vehicleKm) {
