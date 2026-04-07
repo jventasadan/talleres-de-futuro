@@ -28,7 +28,10 @@ const SettingsPage = () => {
   const deleteCatalog = useDeletePartsCatalog();
   const { workshopComplete } = useWorkshop();
   const { data: invoices } = useInvoices();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const monthlyRevenue = useMemo(() => {
     if (!invoices?.length) return [];
