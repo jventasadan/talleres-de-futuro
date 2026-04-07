@@ -208,6 +208,27 @@ const SettingsPage = () => {
                     <Input value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} placeholder="Madrid" />
                   </div>
                 </div>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <Label>Logo del taller</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-muted/30 overflow-hidden">
+                      {(settings as any)?.logo_url ? (
+                        <img src={(settings as any).logo_url} alt="Logo" className="h-full w-full object-contain" />
+                      ) : (
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
+                        {logoUploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
+                        {(settings as any)?.logo_url ? "Cambiar logo" : "Subir logo"}
+                      </Button>
+                      <p className="text-[10px] text-muted-foreground">PNG, JPG o SVG. Máximo 2MB.</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="flex justify-end pt-2">
                   <Button onClick={handleSave} disabled={saveSettings.isPending}>
                     {saveSettings.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
