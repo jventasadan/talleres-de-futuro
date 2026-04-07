@@ -110,6 +110,32 @@ const SettingsPage = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setLogoUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `logos/${user.id}/logo.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("appointment-photos")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("appointment-photos")
+        .getPublicUrl(path);
+
+      const logoUrl = urlData.publicUrl + "?t=" + Date.now();
+      saveSettings.mutate({ logo_url: logoUrl } as any);
+    } catch (err: any) {
+      toast.error("Error al subir logo: " + (err?.message ?? "Error desconocido"));
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout title="Configuración" subtitle="Ajustes del taller">
