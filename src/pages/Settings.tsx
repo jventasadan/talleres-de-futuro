@@ -20,6 +20,65 @@ import { MechanicsManager } from "@/components/settings/MechanicsManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const MAX_LOGO_DIMENSION = 512;
+
+const fileToDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("No se pudo leer el archivo"));
+    };
+
+    reader.onerror = () => {
+      reject(reader.error ?? new Error("No se pudo leer el archivo"));
+    };
+
+    reader.readAsDataURL(file);
+  });
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("No se pudo procesar la imagen"));
+    image.src = src;
+  });
+
+const createInlineLogoUrl = async (file: File) => {
+  const dataUrl = await fileToDataUrl(file);
+
+  if (file.type === "image/svg+xml") {
+    return dataUrl;
+  }
+
+  const image = await loadImage(dataUrl);
+  const scale = Math.min(1, MAX_LOGO_DIMENSION / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("No se pudo preparar el logo");
+  }
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL("image/webp", 0.85);
+};
+
+const isMissingLogosBucketError = (message?: string | null) => /bucket not found/i.test(message ?? "");
+
 const SettingsPage = () => {
   const { data: settings, isLoading } = useCompanySettings();
   const saveSettings = useSaveCompanySettings();
@@ -120,14 +179,23 @@ const SettingsPage = () => {
       const { error: uploadError } = await supabase.storage
         .from("logos")
         .upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
+
+      if (uploadError) {
+        if (!isMissingLogosBucketError(uploadError.message)) {
+          throw uploadError;
+        }
+
+        const inlineLogoUrl = await createInlineLogoUrl(file);
+        await saveSettings.mutateAsync({ logo_url: inlineLogoUrl } as any);
+        return;
+      }
 
       const { data: urlData } = supabase.storage
         .from("logos")
         .getPublicUrl(path);
 
       const logoUrl = urlData.publicUrl + "?t=" + Date.now();
-      saveSettings.mutate({ logo_url: logoUrl } as any);
+      await saveSettings.mutateAsync({ logo_url: logoUrl } as any);
     } catch (err: any) {
       toast.error("Error al subir logo: " + (err?.message ?? "Error desconocido"));
     } finally {
