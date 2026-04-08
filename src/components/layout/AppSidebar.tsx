@@ -15,7 +15,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCompanySettings } from "@/hooks/useCompanySettings";
+import { useLogoUrl } from "@/hooks/useLogoUrl";
 
 import {
   Sidebar,
@@ -52,8 +52,7 @@ export function AppSidebar() {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
   const { user, signOut } = useAuth();
-  const { data: companySettings } = useCompanySettings();
-  const logoUrl = (companySettings as any)?.logo_url;
+  const { logoUrl } = useLogoUrl();
 
   return (
     <Sidebar collapsible="icon">
