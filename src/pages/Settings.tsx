@@ -19,6 +19,7 @@ import { parsePartsFile } from "@/lib/partsImport";
 import { MechanicsManager } from "@/components/settings/MechanicsManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLogoUrl } from "@/hooks/useLogoUrl";
 
 const MAX_LOGO_DIMENSION = 512;
 
@@ -91,6 +92,7 @@ const SettingsPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const { logoUrl: currentLogoUrl, saveLogo } = useLogoUrl();
 
   const monthlyRevenue = useMemo(() => {
     if (!invoices?.length) return [];
@@ -174,28 +176,9 @@ const SettingsPage = () => {
     if (!file || !user?.id) return;
     setLogoUploading(true);
     try {
-      const ext = file.name.split(".").pop() || "png";
-      const path = `${user.id}/logo.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("logos")
-        .upload(path, file, { upsert: true });
-
-      if (uploadError) {
-        if (!isMissingLogosBucketError(uploadError.message)) {
-          throw uploadError;
-        }
-
-        const inlineLogoUrl = await createInlineLogoUrl(file);
-        await saveSettings.mutateAsync({ logo_url: inlineLogoUrl } as any);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from("logos")
-        .getPublicUrl(path);
-
-      const logoUrl = urlData.publicUrl + "?t=" + Date.now();
-      await saveSettings.mutateAsync({ logo_url: logoUrl } as any);
+      const inlineLogoUrl = await createInlineLogoUrl(file);
+      saveLogo(inlineLogoUrl);
+      toast.success("Logo guardado");
     } catch (err: any) {
       toast.error("Error al subir logo: " + (err?.message ?? "Error desconocido"));
     } finally {
@@ -206,7 +189,7 @@ const SettingsPage = () => {
 
   const handleLogoDelete = async () => {
     try {
-      saveSettings.mutate({ logo_url: null } as any);
+      saveLogo(null);
       toast.success("Logo eliminado");
     } catch (err: any) {
       toast.error("Error al eliminar logo: " + (err?.message ?? "Error desconocido"));
@@ -290,8 +273,8 @@ const SettingsPage = () => {
                   <Label>Logo del taller</Label>
                   <div className="flex items-center gap-4">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-muted/30 overflow-hidden">
-                      {(settings as any)?.logo_url ? (
-                        <img src={(settings as any).logo_url} alt="Logo" className="h-full w-full object-contain" />
+                      {currentLogoUrl ? (
+                        <img src={currentLogoUrl} alt="Logo" className="h-full w-full object-contain" />
                       ) : (
                         <ImageIcon className="h-8 w-8 text-muted-foreground" />
                       )}
@@ -301,9 +284,9 @@ const SettingsPage = () => {
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={logoUploading}>
                           {logoUploading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
-                          {(settings as any)?.logo_url ? "Cambiar logo" : "Subir logo"}
+                          {currentLogoUrl ? "Cambiar logo" : "Subir logo"}
                         </Button>
-                        {(settings as any)?.logo_url && (
+                        {currentLogoUrl && (
                           <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleLogoDelete}>
                             <Trash2 className="mr-1 h-3 w-3" />Eliminar
                           </Button>
