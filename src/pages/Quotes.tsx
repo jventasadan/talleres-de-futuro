@@ -24,6 +24,8 @@ import { SERVICES, getEstimatedMinutes, formatDuration } from "@/lib/serviceEsti
 import { format } from "date-fns";
 import { jsPDF } from "jspdf";
 
+const db = supabase as any;
+
 const statusStyles: Record<string, string> = {
   pendiente: "bg-warning/15 text-warning border-warning/30",
   aceptado: "bg-success/15 text-success border-success/30",
