@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ import { useCreateAppointment } from "@/hooks/useAppointments";
 import { SERVICES, getEstimatedMinutes, formatDuration } from "@/lib/serviceEstimates";
 import { format } from "date-fns";
 import { jsPDF } from "jspdf";
+
+const db = supabase as any;
 
 const statusStyles: Record<string, string> = {
   pendiente: "bg-warning/15 text-warning border-warning/30",
@@ -163,7 +166,22 @@ const Quotes = () => {
     });
   };
 
-  const handleDownloadPdf = (quote: Quote) => {
+  const handleDownloadPdf = async (quote: Quote) => {
+    // Fetch quote lines from DB
+    const { data: quoteLines } = await db
+      .from("quote_lines")
+      .select("*")
+      .eq("quote_id", quote.id)
+      .order("created_at", { ascending: true });
+
+    const fetchedLines = (quoteLines ?? []) as Array<{
+      description: string;
+      quantity: number;
+      unit_price: number;
+      total: number;
+      line_type: string;
+    }>;
+
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
@@ -205,8 +223,10 @@ const Quotes = () => {
 
     // Client box
     const notesExtraH = quote.notes ? Math.ceil(quote.notes.length / 60) * 5 + 7 : 0;
+    let clientBoxH = (vehicleInfo ? 33 : 28) + notesExtraH;
+    if (quote.phone) clientBoxH += 5;
     doc.setFillColor(245, 245, 245);
-    doc.roundedRect(margin, y, contentWidth, (vehicleInfo ? 33 : 28) + notesExtraH, 3, 3, "F");
+    doc.roundedRect(margin, y, contentWidth, clientBoxH, 3, 3, "F");
     y += 7;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -216,8 +236,11 @@ const Quotes = () => {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(60, 60, 60);
     doc.text(`Cliente: ${quote.client_name}`, margin + 5, y);
-    if (quote.phone) { doc.text(`Tel: ${quote.phone}`, margin + contentWidth * 0.55, y); }
     y += 5;
+    if (quote.phone) {
+      doc.text(`Tel: ${quote.phone}`, margin + 5, y);
+      y += 5;
+    }
     doc.text(`Matrícula: ${quote.license_plate}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
     y += 5;
     doc.text(`Servicio: ${quote.service}`, margin + 5, y);
@@ -232,17 +255,85 @@ const Quotes = () => {
     }
     y += 12;
 
-    // Summary
+    // Items table (like invoice)
+    const partLines = fetchedLines.filter((l) => l.line_type === "part");
+    const laborLines = fetchedLines.filter((l) => l.line_type === "labor");
+
+    const tableLines = fetchedLines;
+    const colX = {
+      name: margin,
+      qty: margin + contentWidth * 0.5,
+      discount: margin + contentWidth * 0.6,
+      price: margin + contentWidth * 0.72,
+      total: margin + contentWidth * 0.87,
+    };
+    doc.setFillColor(34, 197, 94);
+    doc.rect(margin, y - 5, contentWidth, 8, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(`Mano de obra: ${Number(quote.labor_cost).toFixed(2)}€ (${quote.estimated_hours}h × ${quote.labor_rate}€/h)`, margin, y);
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("DESCRIPCIÓN", colX.name + 3, y);
+    doc.text("CANT.", colX.qty, y);
+    doc.text("DTO.", colX.discount, y);
+    doc.text("P. UNIT.", colX.price, y);
+    doc.text("TOTAL", colX.total, y);
     y += 6;
-    doc.text(`Piezas: ${Number(quote.parts_total).toFixed(2)}€`, margin, y);
-    y += 6;
-    doc.text(`IVA (${Number(quote.tax_rate)}%): ${(Number(quote.total) - (Number(quote.labor_cost) + Number(quote.parts_total))).toFixed(2)}€`, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(50, 50, 50);
+
+    if (!tableLines.length) {
+      doc.setFontSize(9);
+      doc.text("No hay conceptos añadidos", colX.name + 3, y + 1);
+      y += 7;
+    } else {
+      tableLines.forEach((line, index) => {
+        if (index % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(margin, y - 3, contentWidth, 7, "F");
+        }
+        doc.setFontSize(9);
+        doc.text(String(line.description || "Concepto"), colX.name + 3, y + 1);
+        doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
+        doc.text("—", colX.discount + 1, y + 1);
+        doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
+        doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
+        y += 7;
+      });
+    }
+
+    // Summary
+    y += 3;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, margin + contentWidth, y);
     y += 8;
-    doc.setFontSize(14);
-    doc.text(`TOTAL: ${Number(quote.total).toFixed(2)}€`, margin, y);
+
+    const partsNet = partLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
+    const laborNet = laborLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
+    const taxableBase = partsNet + laborNet;
+    const taxAmount = Number(((taxableBase * Number(quote.tax_rate)) / 100).toFixed(2));
+    const displayTotal = Number((taxableBase + taxAmount).toFixed(2));
+
+    const totalsX = margin + contentWidth * 0.62;
+    const valuesX = margin + contentWidth * 0.85;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Piezas:", totalsX, y);
+    doc.text(`${partsNet.toFixed(2)} €`, valuesX, y);
+    y += 6;
+    doc.text("Mano de obra:", totalsX, y);
+    doc.text(`${laborNet.toFixed(2)} €`, valuesX, y);
+    y += 6;
+    doc.text(`IVA (${Number(quote.tax_rate)}%):`, totalsX, y);
+    doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
+    y += 8;
+    doc.setFillColor(34, 197, 94);
+    doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text("TOTAL:", totalsX, y + 3);
+    doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
 
     // Footer
     const footerY = doc.internal.pageSize.getHeight() - 20;

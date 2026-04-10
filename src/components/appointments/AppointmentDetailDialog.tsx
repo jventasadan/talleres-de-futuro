@@ -133,13 +133,13 @@ export function AppointmentDetailDialog({ appointment, open, onOpenChange }: Pro
         </div>
 
         <div className="flex gap-2 mt-2">
-          {appointment.status === "espera" && (
+          {(appointment.status === "espera" || appointment.status === "pending") && (
             <Button onClick={handleRecepcionar} className="flex-1" disabled={updateStatus.isPending}>
               <ArrowRight className="mr-2 h-4 w-4" />
               Recepcionar vehículo
             </Button>
           )}
-          <Button variant="outline" onClick={() => onOpenChange(false)} className={appointment.status === "espera" ? "" : "w-full"}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className={(appointment.status === "espera" || appointment.status === "pending") ? "" : "w-full"}>
             Cerrar
           </Button>
         </div>
