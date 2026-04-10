@@ -364,6 +364,7 @@ const VehicleHistory = () => {
                       <TableHead className="text-xs">Fecha</TableHead>
                       <TableHead className="text-xs">Orden</TableHead>
                       <TableHead className="text-xs">Cliente</TableHead>
+                      <TableHead className="text-xs">Matrícula</TableHead>
                       <TableHead className="text-xs">Vehículo</TableHead>
                       <TableHead className="text-xs">Km</TableHead>
                       <TableHead className="text-xs">Reparación</TableHead>
@@ -378,6 +379,7 @@ const VehicleHistory = () => {
                         <TableCell className="text-xs">{entry.date ? new Date(entry.date).toLocaleDateString("es-ES") : "—"}</TableCell>
                         <TableCell className="font-mono text-xs font-semibold text-primary">{entry.order_number}</TableCell>
                         <TableCell className="text-xs">{entry.client_name}</TableCell>
+                        <TableCell className="font-mono text-xs font-semibold">{selectedPlate}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {[entry.brand, entry.model].filter(Boolean).join(" ") || "—"}
                         </TableCell>
