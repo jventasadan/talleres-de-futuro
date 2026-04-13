@@ -20,6 +20,106 @@ const safeText = (value: unknown, fallback = "") =>
     .replace(/[\r\n]+/g, " ")
     .trim() || fallback;
 
+async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null): Promise<{
+  lines: PdfLine[];
+  comment: string;
+  vehicleInfo: string;
+  vehicleKm: string;
+  clientPhone: string;
+  clientEmail: string;
+}> {
+  const empty = { lines: [], comment: "", vehicleInfo: "", vehicleKm: "", clientPhone: "", clientEmail: "" };
+  if (!workshopId) return empty;
+
+  const [invoiceLinesResult, workOrderItemsResult, workOrderResult] = await Promise.all([
+    db.from("invoice_lines").select("*").eq("invoice_id", invoice.id).order("created_at", { ascending: true }),
+    invoice.work_order_id
+      ? db.from("work_order_items").select("*").eq("work_order_id", invoice.work_order_id).order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    invoice.work_order_id
+      ? db.from("work_orders").select("comentario_factura, appointment_id").eq("id", invoice.work_order_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  const invoiceLines = (invoiceLinesResult.data ?? []) as any[];
+  const workOrderItems = (workOrderItemsResult.data ?? []) as any[];
+  const comment = safeText(workOrderResult.data?.comentario_factura ?? "", "");
+
+  // Resolve vehicle & contact info
+  let vehicleInfo = "";
+  let vehicleKm = "";
+  let clientPhone = "";
+  let clientEmail = "";
+
+  const resolvedAppointmentId = invoice.appointment_id ?? workOrderResult.data?.appointment_id ?? null;
+
+  const [clientResult, appointmentResult] = await Promise.all([
+    db.from("clients").select("brand, model, phone, email").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
+    resolvedAppointmentId
+      ? db.from("appointments").select("km, email").eq("id", resolvedAppointmentId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  if (clientResult.data) {
+    vehicleInfo = [safeText(clientResult.data.brand), safeText(clientResult.data.model)].filter(Boolean).join(" ");
+    clientPhone = safeText(clientResult.data.phone);
+    clientEmail = safeText(clientResult.data.email);
+  }
+  if (appointmentResult?.data) {
+    vehicleKm = safeText(appointmentResult.data.km);
+    if (!clientEmail) clientEmail = safeText(appointmentResult.data.email);
+  }
+
+  const mapLine = (line: any, fromInvoiceLines: boolean): PdfLine => {
+    if (fromInvoiceLines) {
+      const descMatch = String(line.description ?? "").match(/\(-?(\d+(?:\.\d+)?)%\)\s*$/);
+      const discountFromDesc = descMatch ? Number(descMatch[1]) : 0;
+      return {
+        description: safeText(line.description, "Concepto"),
+        quantity: Number(line.quantity ?? 1),
+        unit_price: Number(line.unit_price ?? 0),
+        total: Number(line.total ?? 0),
+        line_type: line.line_type === "labor" ? "labor" : line.line_type === "discount" ? "discount" : "part",
+        discount_percent: discountFromDesc,
+      };
+    }
+    return {
+      description: safeText(line.description ?? line.descripcion, "Concepto"),
+      quantity: Number(line.quantity ?? line.cantidad ?? 1),
+      unit_price: Number(line.unit_price ?? line.precio_unitario ?? 0),
+      total: Number(line.total ?? 0),
+      line_type: (line.item_type ?? line.tipo ?? "pieza") === "mano_obra" ? "labor" : "part",
+      discount_percent: Number(line.discount_percent ?? line.descuento ?? 0),
+    };
+  };
+
+  const lines: PdfLine[] = invoiceLines.length > 0
+    ? invoiceLines.map((l: any) => mapLine(l, true))
+    : workOrderItems.map((l: any) => mapLine(l, false));
+
+  return { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail };
+}
+
+async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: string | null) {
+  const { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail } =
+    await fetchInvoicePdfData(invoice, workshopId);
+
+  generatePdf({
+    title: `FACTURA ${invoice.invoice_number}`,
+    date: new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }),
+    filename: `${invoice.invoice_number}.pdf`,
+    clientName: invoice.client_name,
+    licensePlate: invoice.license_plate,
+    service: invoice.service,
+    vehicleInfo: vehicleInfo || undefined,
+    vehicleKm: vehicleKm || undefined,
+    clientPhone: clientPhone || undefined,
+    clientEmail: clientEmail || undefined,
+    comment: comment || undefined,
+    lines,
+    taxRate: Number(invoice.tax_rate ?? 21),
+  }, settings ?? {});
+}
 
 const Invoices = () => {
   const [urlParams] = useSearchParams();
@@ -131,16 +231,7 @@ const Invoices = () => {
                                 <CheckCircle className="h-3.5 w-3.5" />
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => generatePdf({
-                              title: `FACTURA ${inv.invoice_number}`,
-                              date: new Date(inv.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }),
-                              filename: `${inv.invoice_number}.pdf`,
-                              clientName: inv.client_name,
-                              licensePlate: inv.license_plate,
-                              service: inv.service,
-                              lines: [],
-                              taxRate: Number(inv.tax_rate ?? 21),
-                            }, settings ?? {})} title="Descargar factura PDF">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadPdf(inv, settings, workshopId)} title="Descargar factura PDF">
                               <Download className="h-3.5 w-3.5" />
                             </Button>
                           </div>
