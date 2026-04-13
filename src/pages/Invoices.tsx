@@ -5,12 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Download, CheckCircle, Search } from "lucide-react";
+import { Loader2, FileText, Download, CheckCircle, Search, Pencil } from "lucide-react";
 import { useInvoices, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { generatePdf, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
+import { EditInvoiceDialog } from "@/components/invoices/EditInvoiceDialog";
 
 const db = supabase as any;
 
@@ -131,6 +132,7 @@ const Invoices = () => {
   const { data: settings } = useCompanySettings();
   const { workshopId } = useWorkshop();
   const updateStatus = useUpdateInvoiceStatus();
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   const filtered = (invoices ?? []).filter((inv) => {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
@@ -233,6 +235,11 @@ const Invoices = () => {
                                 <CheckCircle className="h-3.5 w-3.5" />
                               </Button>
                             )}
+                            {inv.status === "emitida" && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingInvoice(inv)} title="Editar factura">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadPdf(inv, settings, workshopId)} title="Descargar factura PDF">
                               <Download className="h-3.5 w-3.5" />
                             </Button>
@@ -247,6 +254,12 @@ const Invoices = () => {
           </Card>
         )}
       </div>
+
+      <EditInvoiceDialog
+        invoice={editingInvoice}
+        open={!!editingInvoice}
+        onOpenChange={(open) => !open && setEditingInvoice(null)}
+      />
     </DashboardLayout>
   );
 };
