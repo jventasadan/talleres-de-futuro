@@ -132,6 +132,7 @@ const Invoices = () => {
   const { data: settings } = useCompanySettings();
   const { workshopId } = useWorkshop();
   const updateStatus = useUpdateInvoiceStatus();
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   const filtered = (invoices ?? []).filter((inv) => {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
