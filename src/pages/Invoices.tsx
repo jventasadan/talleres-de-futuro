@@ -11,6 +11,7 @@ import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
+import { generatePdf, buildPdfHeader, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
 
 const db = supabase as any;
 
