@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Download, CheckCircle, Search } from "lucide-react";
+import { Loader2, FileText, Download, CheckCircle, Search, Pencil } from "lucide-react";
 import { useInvoices, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useInvoices";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useWorkshop } from "@/contexts/WorkshopContext";
