@@ -58,7 +58,7 @@ const WeeklyCalendar = () => {
     return (allAppointments ?? []).filter(a => !["entregado", "cancelado"].includes(a.status));
   }, [allAppointments]);
 
-  useState(() => {
+  useEffect(() => {
     if (searchParams.get("today") === "true") {
       setCurrentDate(new Date());
       setViewMode("taller");
