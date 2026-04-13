@@ -254,6 +254,12 @@ const Invoices = () => {
           </Card>
         )}
       </div>
+
+      <EditInvoiceDialog
+        invoice={editingInvoice}
+        open={!!editingInvoice}
+        onOpenChange={(open) => !open && setEditingInvoice(null)}
+      />
     </DashboardLayout>
   );
 };
