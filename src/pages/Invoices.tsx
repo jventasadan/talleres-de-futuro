@@ -33,7 +33,7 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   if (!workshopId) return empty;
 
   const [invoiceLinesResult, workOrderItemsResult, workOrderResult] = await Promise.all([
-    db.from("invoice_lines").select("*").eq("invoice_id", invoice.id).order("created_at", { ascending: true }),
+    db.from("invoice_lines").select("*").eq("invoice_id", invoice.id),
     invoice.work_order_id
       ? db.from("work_order_items").select("*").eq("work_order_id", invoice.work_order_id).order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
