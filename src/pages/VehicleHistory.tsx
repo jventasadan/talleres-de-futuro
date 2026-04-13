@@ -114,10 +114,10 @@ const VehicleHistory = () => {
           plateMap[plate] = {
             license_plate: plate,
             client_name: name,
-            email: apt.email || client?.email || null,
+            email: apt.email || apt.Email || client?.email || null,
             brand: apt.brand || client?.brand || null,
             model: apt.model || client?.model || null,
-            km: apt.km || null,
+            km: apt.km || apt.kilometros || (apt.Kilometros != null ? String(apt.Kilometros) : null) || null,
             visit_count: 0,
             last_visit: apt.date || apt.created_at?.slice(0, 10) || "",
             last_service: apt.service || "",
@@ -126,8 +126,9 @@ const VehicleHistory = () => {
           if (name !== "Sin nombre" && plateMap[plate].client_name === "Sin nombre") plateMap[plate].client_name = name;
           if (apt.brand && !plateMap[plate].brand) plateMap[plate].brand = apt.brand;
           if (apt.model && !plateMap[plate].model) plateMap[plate].model = apt.model;
-          if (!plateMap[plate].email) plateMap[plate].email = apt.email || client?.email || null;
-          if (apt.km && !plateMap[plate].km) plateMap[plate].km = apt.km;
+          if (!plateMap[plate].email) plateMap[plate].email = apt.email || apt.Email || client?.email || null;
+          const aptKm = apt.km || apt.kilometros || (apt.Kilometros != null ? String(apt.Kilometros) : null);
+          if (aptKm && !plateMap[plate].km) plateMap[plate].km = aptKm;
         }
         plateMap[plate].visit_count += 1;
       });
