@@ -235,6 +235,11 @@ const Invoices = () => {
                                 <CheckCircle className="h-3.5 w-3.5" />
                               </Button>
                             )}
+                            {inv.status === "emitida" && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingInvoice(inv)} title="Editar factura">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadPdf(inv, settings, workshopId)} title="Descargar factura PDF">
                               <Download className="h-3.5 w-3.5" />
                             </Button>
