@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { generatePdf, buildPdfHeader, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
+import { generatePdf, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +24,7 @@ import { usePartsCatalog, type PartsCatalogItem } from "@/hooks/usePartsCatalog"
 import { useCreateAppointment } from "@/hooks/useAppointments";
 import { SERVICES, getEstimatedMinutes, formatDuration } from "@/lib/serviceEstimates";
 import { format } from "date-fns";
-import { jsPDF } from "jspdf";
+
 
 const db = supabase as any;
 
@@ -168,7 +168,6 @@ const Quotes = () => {
   };
 
   const handleDownloadPdf = async (quote: Quote) => {
-    // Fetch quote lines from DB
     const { data: quoteLines } = await db
       .from("quote_lines")
       .select("*")
@@ -183,169 +182,31 @@ const Quotes = () => {
       line_type: string;
     }>;
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const contentWidth = pageWidth - margin * 2;
-    let y = margin;
+    const pdfLines: PdfLine[] = fetchedLines.map((l) => ({
+      description: l.description || "Concepto",
+      quantity: Number(l.quantity ?? 1),
+      unit_price: Number(l.unit_price ?? 0),
+      total: Number(l.total ?? 0),
+      line_type: l.line_type === "labor" ? "labor" : "part",
+      discount_percent: 0,
+    }));
 
-    const wName = settings?.company_name || "Mi Taller";
-    const wCif = settings?.cif || "";
-    const wAddress = [settings?.address, settings?.city, settings?.postal_code, settings?.province].filter(Boolean).join(", ");
-    const wPhone = settings?.phone || "";
-    const wEmail = settings?.email || "";
     const vehicleInfo = [quote.brand, quote.model].filter(Boolean).join(" ");
 
-    // Header
-    doc.setFillColor(34, 197, 94);
-    doc.rect(0, 0, pageWidth, 40, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(255, 255, 255);
-    doc.text(wName, margin, 18);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(220, 255, 220);
-    doc.text([wCif ? `CIF: ${wCif}` : "", wPhone ? `Tlf: ${wPhone}` : "", wEmail].filter(Boolean).join(" | "), margin, 27);
-    if (wAddress) doc.text(wAddress, margin, 33);
-
-    y = 50;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(30, 30, 30);
-    doc.text("PRESUPUESTO", margin, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Fecha: ${format(new Date(quote.created_at), "dd/MM/yyyy")}`, margin, y);
-    doc.text(`Estado: ${statusLabels[quote.status] ?? quote.status}`, margin + 100, y);
-    y += 10;
-
-    // Client box
-    const notesExtraH = quote.notes ? Math.ceil(quote.notes.length / 60) * 5 + 7 : 0;
-    let clientBoxH = (vehicleInfo ? 33 : 28) + notesExtraH;
-    if (quote.phone) clientBoxH += 5;
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(margin, y, contentWidth, clientBoxH, 3, 3, "F");
-    y += 7;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(30, 30, 30);
-    doc.text("DATOS DEL CLIENTE", margin + 5, y);
-    y += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(60, 60, 60);
-    doc.text(`Cliente: ${quote.client_name}`, margin + 5, y);
-    y += 5;
-    if (quote.phone) {
-      doc.text(`Tel: ${quote.phone}`, margin + 5, y);
-      y += 5;
-    }
-    doc.text(`Matrícula: ${quote.license_plate}${vehicleInfo ? ` — ${vehicleInfo}` : ""}`, margin + 5, y);
-    y += 5;
-    doc.text(`Servicio: ${quote.service}`, margin + 5, y);
-    if (quote.notes) {
-      y += 7;
-      doc.setFont("helvetica", "bold");
-      doc.text("Notas:", margin + 5, y);
-      doc.setFont("helvetica", "normal");
-      const notesLines = doc.splitTextToSize(quote.notes, contentWidth - 33);
-      doc.text(notesLines, margin + 20, y);
-      y += notesLines.length * 4;
-    }
-    y += 12;
-
-    // Items table (like invoice)
-    const partLines = fetchedLines.filter((l) => l.line_type === "part");
-    const laborLines = fetchedLines.filter((l) => l.line_type === "labor");
-
-    const tableLines = fetchedLines;
-    const colX = {
-      name: margin,
-      qty: margin + contentWidth * 0.5,
-      discount: margin + contentWidth * 0.6,
-      price: margin + contentWidth * 0.72,
-      total: margin + contentWidth * 0.87,
-    };
-    doc.setFillColor(34, 197, 94);
-    doc.rect(margin, y - 5, contentWidth, 8, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text("DESCRIPCIÓN", colX.name + 3, y);
-    doc.text("CANT.", colX.qty, y);
-    doc.text("DTO.", colX.discount, y);
-    doc.text("P. UNIT.", colX.price, y);
-    doc.text("TOTAL", colX.total, y);
-    y += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 50, 50);
-
-    if (!tableLines.length) {
-      doc.setFontSize(9);
-      doc.text("No hay conceptos añadidos", colX.name + 3, y + 1);
-      y += 7;
-    } else {
-      tableLines.forEach((line, index) => {
-        if (index % 2 === 0) {
-          doc.setFillColor(250, 250, 250);
-          doc.rect(margin, y - 3, contentWidth, 7, "F");
-        }
-        doc.setFontSize(9);
-        doc.text(String(line.description || "Concepto"), colX.name + 3, y + 1);
-        doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
-        doc.text("—", colX.discount + 1, y + 1);
-        doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
-        doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
-        y += 7;
-      });
-    }
-
-    // Summary
-    y += 3;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, y, margin + contentWidth, y);
-    y += 8;
-
-    const partsNet = partLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
-    const laborNet = laborLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
-    const taxableBase = partsNet + laborNet;
-    const taxAmount = Number(((taxableBase * Number(quote.tax_rate)) / 100).toFixed(2));
-    const displayTotal = Number((taxableBase + taxAmount).toFixed(2));
-
-    const totalsX = margin + contentWidth * 0.62;
-    const valuesX = margin + contentWidth * 0.85;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text("Piezas:", totalsX, y);
-    doc.text(`${partsNet.toFixed(2)} €`, valuesX, y);
-    y += 6;
-    doc.text("Mano de obra:", totalsX, y);
-    doc.text(`${laborNet.toFixed(2)} €`, valuesX, y);
-    y += 6;
-    doc.text(`IVA (${Number(quote.tax_rate)}%):`, totalsX, y);
-    doc.text(`${taxAmount.toFixed(2)} €`, valuesX, y);
-    y += 8;
-    doc.setFillColor(34, 197, 94);
-    doc.roundedRect(totalsX - 5, y - 5, contentWidth * 0.45, 12, 2, 2, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(255, 255, 255);
-    doc.text("TOTAL:", totalsX, y + 3);
-    doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
-
-    // Footer
-    const footerY = doc.internal.pageSize.getHeight() - 20;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text([wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · "), pageWidth / 2, footerY, { align: "center" });
-
-    doc.save(`presupuesto-${quote.client_name.replace(/\s+/g, "_")}.pdf`);
+    generatePdf({
+      title: "PRESUPUESTO",
+      date: format(new Date(quote.created_at), "dd/MM/yyyy"),
+      filename: `presupuesto-${quote.client_name.replace(/\s+/g, "_")}.pdf`,
+      clientName: quote.client_name,
+      licensePlate: quote.license_plate,
+      service: quote.service,
+      vehicleInfo: vehicleInfo || undefined,
+      clientPhone: quote.phone || undefined,
+      comment: quote.notes || undefined,
+      extraHeaderRight: `Estado: ${statusLabels[quote.status] ?? quote.status}`,
+      lines: pdfLines,
+      taxRate: Number(quote.tax_rate ?? 21),
+    }, settings ?? {});
   };
 
   return (
