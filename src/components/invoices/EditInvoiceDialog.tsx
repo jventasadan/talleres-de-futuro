@@ -46,11 +46,13 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
 
   const loadLines = async (invoiceId: string) => {
     setLoadingLines(true);
-    const { data } = await db
+    const { data, error } = await db
       .from("invoice_lines")
       .select("description, quantity, unit_price, line_type")
       .eq("invoice_id", invoiceId)
       .order("created_at", { ascending: true });
+
+    console.log("[EditInvoice] loadLines invoiceId:", invoiceId, "data:", data, "error:", error);
 
     if (data?.length) {
       setLines(data.map((l: any) => ({
