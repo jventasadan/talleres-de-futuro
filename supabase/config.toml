@@ -13,3 +13,5 @@ project_id = "swumbruebgokkoevxggs"
     verify_jwt = true
   [functions.send-transactional-email]
     verify_jwt = false
+  [functions.mechanic-chat]
+    verify_jwt = false
