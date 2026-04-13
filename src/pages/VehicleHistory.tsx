@@ -83,14 +83,14 @@ const VehicleHistory = () => {
     try {
       const { data: appointments } = await supabase
         .from("appointments")
-        .select("id, license_plate, client_name, name, email, brand, model, km, date, created_at, service, status")
+        .select("*")
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false }) as any;
 
       // Also fetch clients for email fallback
       const { data: clients } = await supabase
         .from("clients")
-        .select("license_plate, email, brand, model")
+        .select("*")
         .eq("workshop_id", workshopId) as any;
 
       const clientMap: Record<string, any> = {};
