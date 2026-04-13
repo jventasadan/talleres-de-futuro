@@ -54,11 +54,13 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   const resolvedAppointmentId = invoice.appointment_id ?? workOrderResult.data?.appointment_id ?? null;
 
   const [clientResult, appointmentResult] = await Promise.all([
-    db.from("clients").select("brand, model, phone, email").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
+    db.from("clients").select("brand, model, phone, email, license_plate").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
     resolvedAppointmentId
       ? db.from("appointments").select("km, email").eq("id", resolvedAppointmentId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+
+  console.log("[Invoice PDF] license_plate:", JSON.stringify(invoice.license_plate), "clientResult:", JSON.stringify(clientResult.data), "error:", clientResult.error?.message);
 
   if (clientResult.data) {
     vehicleInfo = [safeText(clientResult.data.brand), safeText(clientResult.data.model)].filter(Boolean).join(" ");
