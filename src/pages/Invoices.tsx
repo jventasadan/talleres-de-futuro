@@ -15,14 +15,6 @@ import { generatePdf, buildPdfHeader, type PdfLine, type PdfSettings } from "@/l
 
 const db = supabase as any;
 
-type PdfLine = {
-  description: string;
-  quantity: number;
-  unit_price: number;
-  total: number;
-  line_type: "part" | "labor" | "discount";
-  discount_percent: number;
-};
 
 const safeText = (value: unknown, fallback = "") =>
   String(value ?? fallback)
