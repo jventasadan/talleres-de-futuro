@@ -86,7 +86,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           id: a.id,
           label: `${a.client_name} · ${a.license_plate}`,
           sub: `${a.service} (${a.date})`,
-          url: "/appointments",
+          url: `/vehicle-history?plate=${encodeURIComponent(a.license_plate || "")}`,
         });
       }
     });
