@@ -46,25 +46,30 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
 
   const loadLines = async (invoiceId: string) => {
     setLoadingLines(true);
-    const { data, error } = await db
-      .from("invoice_lines")
-      .select("description, quantity, unit_price, line_type")
-      .eq("invoice_id", invoiceId)
-      .order("created_at", { ascending: true });
 
-    console.log("[EditInvoice] loadLines invoiceId:", invoiceId, "data:", data, "error:", error);
+    try {
+      const { data, error } = await db
+        .from("invoice_lines")
+        .select("id, description, quantity, unit_price, line_type")
+        .eq("invoice_id", invoiceId);
 
-    if (data?.length) {
-      setLines(data.map((l: any) => ({
-        description: l.description ?? "",
-        quantity: Number(l.quantity ?? 1),
-        unit_price: Number(l.unit_price ?? 0),
-        line_type: l.line_type ?? "part",
-      })));
-    } else {
+      if (error) throw error;
+
+      if (data?.length) {
+        setLines(data.map((l: any) => ({
+          description: l.description ?? "",
+          quantity: Number(l.quantity ?? 1),
+          unit_price: Number(l.unit_price ?? 0),
+          line_type: l.line_type ?? "part",
+        })));
+      } else {
+        setLines([{ description: "", quantity: 1, unit_price: 0, line_type: "part" }]);
+      }
+    } catch {
       setLines([{ description: "", quantity: 1, unit_price: 0, line_type: "part" }]);
+    } finally {
+      setLoadingLines(false);
     }
-    setLoadingLines(false);
   };
 
   const updateLine = (idx: number, field: keyof EditableLine, value: string | number) => {
