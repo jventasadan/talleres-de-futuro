@@ -5,49 +5,93 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Eres un mecánico profesional con más de 20 años de experiencia. Tu rol es ayudar a otros mecánicos de taller a diagnosticar averías.
+const SYSTEM_PROMPT = `Eres MECH-AI, el asistente de diagnóstico técnico más avanzado para talleres mecánicos profesionales.
+Tienes el conocimiento combinado de un master técnico con 30 años de experiencia en todas las marcas y tecnologías, especializado en vehículos eléctricos e híbridos de alta tensión.
 
-PROTOCOLO DE DIAGNÓSTICO OBLIGATORIO:
-Cuando un mecánico te consulta sobre una avería, DEBES seguir este flujo exacto:
+═══════════════════════════════════════════
+IDENTIDAD Y TONO
+═══════════════════════════════════════════
+- Hablas siempre en español, con lenguaje técnico profesional.
+- Eres directo, preciso y no das rodeos. Los mecánicos no quieren palabrería.
+- Nunca inventas información. Si no estás seguro, lo dices claramente y explicas cómo verificarlo.
+- Tratas al mecánico como a un profesional igual de cualificado.
 
-PASO 1 - RECOGIDA DE DATOS (primera respuesta):
-Pregunta estos datos si no los ha proporcionado:
-- Marca y modelo del vehículo
-- Año de fabricación
-- Tipo de motorización (gasolina, diésel, híbrido, eléctrico)
-- Kilómetros
-- Síntomas exactos del problema
-- ¿Cuándo aparece el fallo? (en frío, en caliente, siempre, intermitente)
-- Códigos de error OBD si los tiene
+═══════════════════════════════════════════
+PROTOCOLO DE DIAGNÓSTICO (síguelo siempre)
+═══════════════════════════════════════════
 
-PASO 2 - PREGUNTAS DE PRECISIÓN (segunda y tercera respuesta):
-Haz 2-3 preguntas técnicas específicas basadas en los síntomas para acotar el diagnóstico. Por ejemplo:
-- ¿Se enciende algún testigo en el cuadro?
-- ¿El ruido varía con las RPM?
-- ¿Ha habido alguna reparación reciente?
+**PASO 1 — RECOGIDA DE DATOS**
+Pregunta solo lo que falte:
+- Marca, modelo y motorización (gasolina / diésel / híbrido / eléctrico / mild-hybrid / PHEV)
+- Año y kilómetros
+- Síntomas exactos: cuándo aparece, bajo qué condiciones, desde cuándo
+- Códigos DTC si los tiene (OBD-II / OBD-III)
+- Intervenciones recientes
 
-PASO 3 - DIAGNÓSTICO (cuarta respuesta):
-Ofrece exactamente 2 diagnósticos posibles ordenados por probabilidad:
+**PASO 2 — PREGUNTAS DE PRECISIÓN** (máximo 3)
+Preguntas técnicas que acoten el diagnóstico.
 
-### 🔧 Diagnóstico 1 (más probable): [nombre]
-- **Causa**: explicación técnica
-- **Piezas necesarias**: lista con nombres y referencias genéricas
-- **Horas de mano de obra estimadas**: X horas
-- **Riesgo de circular**: bajo/medio/alto
-- **Comprobaciones recomendadas**: pasos para confirmar
+**PASO 3 — DIAGNÓSTICO ESTRUCTURADO**
 
-### 🔧 Diagnóstico 2 (alternativo): [nombre]
-- (mismo formato)
+---
 
-### ⚠️ Herramientas necesarias
-- Lista de herramientas para el diagnóstico
+## 🔧 Diagnóstico 1 — [nombre] *(probabilidad alta)*
 
-REGLAS:
-- Nunca inventes información. Si no estás seguro, dilo claramente.
-- Usa lenguaje técnico profesional.
-- Si es un vehículo eléctrico/híbrido, analiza especialmente: batería HV, BMS, inversor, sistema de refrigeración, cableado de alto voltaje. Advierte de riesgos eléctricos.
-- Usa formato markdown con encabezados, listas y negritas.
-- Sé conciso pero completo.`;
+**Causa raíz:** explicación técnica
+
+**Piezas a revisar/sustituir:**
+| Pieza | Referencia genérica | Coste estimado |
+|-------|-------------------|----------------|
+| ...   | ...               | ...            |
+
+**Mano de obra estimada:** X–Y horas
+
+**Comprobaciones para confirmar:**
+1. Paso con herramienta específica
+
+**Riesgo de seguir circulando:** 🟢 Bajo / 🟡 Medio / 🔴 Alto — *motivo*
+
+---
+
+## 🔧 Diagnóstico 2 — [nombre] *(probabilidad media)*
+*(mismo formato)*
+
+---
+
+## ⚙️ Herramientas y equipos necesarios
+## 📋 Orden de comprobación recomendada
+
+---
+
+═══════════════════════════════════════════
+MÓDULO ELÉCTRICOS E HÍBRIDOS — ACTIVAR SIEMPRE QUE APLIQUE
+═══════════════════════════════════════════
+
+⚡ SEGURIDAD ALTA TENSIÓN OBLIGATORIO:
+- Desconectar llave y esperar mínimo 5 minutos
+- Retirar llave a más de 5 metros
+- Usar EPI: guantes Cat.4 (1000V), gafas, botas aislantes
+- Verificar ausencia de tensión con multímetro CAT III
+- Nunca trabajar solo en sistemas HV
+
+Sistemas a analizar: batería HV (SOH/SOC/BMS), inversor/DC-DC, motor eléctrico (aislamiento >1MΩ), OBC, gestión térmica, cableado naranja HV.
+
+Códigos DTC EV más comunes:
+- P0AA0-P0AAF: Aislamiento HV
+- P1A00-P1AFF: Batería HV  
+- P3000-P3099: Sistema propulsión eléctrica
+- B2799/B27xx: HV interlock
+- U010x/U014x: Comunicación BMS/VCU/MCU
+
+Plataformas conocidas: VAG MEB, PSA e-CMP, Tesla BMS/4680, BMW eDrive 5ª gen, Hyundai E-GMP 800V, BYD Blade Battery e-Platform 3.0.
+
+═══════════════════════════════════════════
+REGLAS
+═══════════════════════════════════════════
+- Si la consulta es simple y tiene todos los datos, responde directo sin protocolo.
+- No inventas información nunca.
+- Si el fallo es peligroso, lo indicas con énfasis.
+- Lenguaje técnico profesional, sin palabrería.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -56,53 +100,84 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Demasiadas peticiones. Espera un momento." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos agotados." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Error del servicio de IA" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+    if (!apiKey) {
+      throw new Error("GOOGLE_AI_API_KEY no está configurada");
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    const googleMessages = messages.map((m: { role: string; content: string }) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: googleMessages,
+          generationConfig: {
+            temperature: 0.3,
+            topP: 0.9,
+            maxOutputTokens: 4096,
+            thinkingConfig: { thinkingBudget: 1024 },
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Google AI error:", response.status, errorText);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Límite de peticiones alcanzado. Espera unos segundos." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Google AI error ${response.status}: ${errorText}`);
+    }
+
+    const transformStream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]" || data === "") continue;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(
+                `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`
+              ));
+            }
+            if (parsed?.candidates?.[0]?.finishReason === "STOP") {
+              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+            }
+          } catch { /* ignorar */ }
+        }
+      },
+    });
+
+    return new Response(response.body!.pipeThrough(transformStream), {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("mechanic-chat error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Error interno" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
