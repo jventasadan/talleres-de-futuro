@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   format, startOfWeek, startOfMonth, endOfMonth, addDays, subWeeks, addWeeks,
   subMonths, addMonths, isSameDay, isSameMonth, eachDayOfInterval,
@@ -58,7 +58,7 @@ const WeeklyCalendar = () => {
     return (allAppointments ?? []).filter(a => !["entregado", "cancelado"].includes(a.status));
   }, [allAppointments]);
 
-  useState(() => {
+  useEffect(() => {
     if (searchParams.get("today") === "true") {
       setCurrentDate(new Date());
       setViewMode("taller");
