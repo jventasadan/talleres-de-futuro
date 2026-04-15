@@ -51,6 +51,7 @@ export type Database = {
       }
       appointments: {
         Row: {
+          brand: string | null
           client_id: string | null
           client_name: string
           created_at: string
@@ -61,6 +62,7 @@ export type Database = {
           km: string | null
           license_plate: string
           mechanic_id: string | null
+          model: string | null
           notes: string | null
           service: string
           status: string
@@ -70,6 +72,7 @@ export type Database = {
           workshop_id: string | null
         }
         Insert: {
+          brand?: string | null
           client_id?: string | null
           client_name: string
           created_at?: string
@@ -80,6 +83,7 @@ export type Database = {
           km?: string | null
           license_plate: string
           mechanic_id?: string | null
+          model?: string | null
           notes?: string | null
           service: string
           status?: string
@@ -89,6 +93,7 @@ export type Database = {
           workshop_id?: string | null
         }
         Update: {
+          brand?: string | null
           client_id?: string | null
           client_name?: string
           created_at?: string
@@ -99,6 +104,7 @@ export type Database = {
           km?: string | null
           license_plate?: string
           mechanic_id?: string | null
+          model?: string | null
           notes?: string | null
           service?: string
           status?: string
