@@ -63,15 +63,21 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
 
   console.log("[Invoice PDF] license_plate:", JSON.stringify(invoice.license_plate), "clientResult:", JSON.stringify(clientResult.data), "error:", clientResult.error?.message);
 
+  let vehicleBrand = "";
+  let vehicleModel = "";
   if (clientResult.data) {
-    vehicleInfo = [safeText(clientResult.data.brand), safeText(clientResult.data.model)].filter(Boolean).join(" ");
+    vehicleBrand = safeText(clientResult.data.brand);
+    vehicleModel = safeText(clientResult.data.model);
     clientPhone = safeText(clientResult.data.phone);
     clientEmail = safeText(clientResult.data.email);
   }
   if (appointmentResult?.data) {
     vehicleKm = safeText(appointmentResult.data.km);
     if (!clientEmail) clientEmail = safeText(appointmentResult.data.email);
+    if (!vehicleBrand) vehicleBrand = safeText(appointmentResult.data.brand);
+    if (!vehicleModel) vehicleModel = safeText(appointmentResult.data.model);
   }
+  vehicleInfo = [vehicleBrand, vehicleModel].filter(Boolean).join(" ");
 
   const mapLine = (line: any, fromInvoiceLines: boolean): PdfLine => {
     if (fromInvoiceLines) {
