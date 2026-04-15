@@ -57,7 +57,7 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   const [clientResult, appointmentResult] = await Promise.all([
     db.from("clients").select("brand, model, phone, email, license_plate").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
     resolvedAppointmentId
-      ? db.from("appointments").select("km, email").eq("id", resolvedAppointmentId).maybeSingle()
+      ? db.from("appointments").select("km, email, brand, model").eq("id", resolvedAppointmentId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
