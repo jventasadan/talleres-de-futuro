@@ -63,8 +63,8 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
 
   console.log("[Invoice PDF] license_plate:", JSON.stringify(invoice.license_plate), "clientResult:", JSON.stringify(clientResult.data), "error:", clientResult.error?.message);
 
-  let vehicleBrand = "";
-  let vehicleModel = "";
+ let vehicleBrand = invoice.brand || "";
+ let vehicleModel = invoice.model || "";
   if (clientResult.data) {
     vehicleBrand = safeText(clientResult.data.brand);
     vehicleModel = safeText(clientResult.data.model);
