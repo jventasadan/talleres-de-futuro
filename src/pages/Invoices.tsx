@@ -10,7 +10,7 @@ import { useInvoices, useUpdateInvoiceStatus, type Invoice } from "@/hooks/useIn
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { supabase } from "@/integrations/supabase/client";
-import { generatePdf, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
+import { generatePdf, generatePdfWithLogo, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
 import { EditInvoiceDialog } from "@/components/invoices/EditInvoiceDialog";
 
 const db = supabase as any;
