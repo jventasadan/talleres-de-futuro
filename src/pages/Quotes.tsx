@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { generatePdf, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
+import { generatePdf, generatePdfWithLogo, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -193,7 +193,7 @@ const Quotes = () => {
 
     const vehicleInfo = [quote.brand, quote.model].filter(Boolean).join(" ");
 
-    generatePdf({
+    await generatePdfWithLogo({
       title: "PRESUPUESTO",
       date: format(new Date(quote.created_at), "dd/MM/yyyy"),
       filename: `presupuesto-${quote.client_name.replace(/\s+/g, "_")}.pdf`,
@@ -206,7 +206,7 @@ const Quotes = () => {
       extraHeaderRight: `Estado: ${statusLabels[quote.status] ?? quote.status}`,
       lines: pdfLines,
       taxRate: Number(quote.tax_rate ?? 21),
-    }, settings ?? {});
+    }, { ...(settings ?? {}), logo_url: settings?.logo_url ?? undefined });
   };
 
   return (
