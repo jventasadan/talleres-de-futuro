@@ -113,7 +113,7 @@ async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: st
   const { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail } =
     await fetchInvoicePdfData(invoice, workshopId);
 
-  generatePdf({
+  await generatePdfWithLogo({
     title: `FACTURA ${invoice.invoice_number}`,
     date: new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }),
     filename: `${invoice.invoice_number}.pdf`,
@@ -127,7 +127,7 @@ async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: st
     comment: comment || undefined,
     lines,
     taxRate: Number(invoice.tax_rate ?? 21),
-  }, settings ?? {});
+  }, { ...(settings ?? {}), logo_url: settings?.logo_url ?? undefined });
 }
 
 const Invoices = () => {
