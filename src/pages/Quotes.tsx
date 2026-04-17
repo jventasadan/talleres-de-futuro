@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { generatePdf, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
+import { generatePdf, generatePdfWithLogo, type PdfLine, type PdfSettings } from "@/lib/pdf-utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
