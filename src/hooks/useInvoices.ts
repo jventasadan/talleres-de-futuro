@@ -19,6 +19,8 @@ export interface Invoice {
   status: string;
   created_at: string;
   workshop_id: string | null;
+  brand: string | null;
+  model: string | null;
 }
 
 export interface InvoiceLine {
