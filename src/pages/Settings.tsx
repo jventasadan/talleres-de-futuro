@@ -176,8 +176,7 @@ const SettingsPage = () => {
     if (!file || !user?.id) return;
     setLogoUploading(true);
     try {
-      const inlineLogoUrl = await createInlineLogoUrl(file);
-      saveLogo(inlineLogoUrl);
+      await saveLogo(file);
       toast.success("Logo guardado");
     } catch (err: any) {
       toast.error("Error al subir logo: " + (err?.message ?? "Error desconocido"));
@@ -189,7 +188,7 @@ const SettingsPage = () => {
 
   const handleLogoDelete = async () => {
     try {
-      saveLogo(null);
+      await saveLogo(null);
       toast.success("Logo eliminado");
     } catch (err: any) {
       toast.error("Error al eliminar logo: " + (err?.message ?? "Error desconocido"));
