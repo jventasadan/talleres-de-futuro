@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-const BUCKET = "logos";
+const BUCKET = "logos"; // storage bucket for workshop logos
 
 export function useLogoUrl() {
   const { user } = useAuth();
