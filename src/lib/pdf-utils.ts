@@ -11,6 +11,7 @@ export interface PdfSettings {
   email?: string;
   labor_rate?: number;
   default_vat?: number;
+  logo_url?: string;
 }
 
 export interface PdfLine {
