@@ -149,13 +149,13 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 px-6 backdrop-blur-sm">
-            <SidebarTrigger className="-ml-2" />
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-2 sm:gap-4 border-b border-border/50 bg-background/80 px-3 sm:px-6 backdrop-blur-sm">
+            <SidebarTrigger className="-ml-1 sm:-ml-2" />
             {showSearch && (
               <div className="relative flex-1 max-w-md" ref={searchRef}>
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar cliente, matrícula, orden..."
+                  placeholder="Buscar cliente, matrícula..."
                   className="pl-9 bg-secondary border-border/50"
                   value={searchQuery}
                   onChange={(e) => {
@@ -191,14 +191,14 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
             {showRecepcionar && (
               <Button
                 onClick={() => setReceptionOpen(true)}
-                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold px-2 sm:px-4"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Recepcionar Vehículo
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Recepcionar Vehículo</span>
               </Button>
             )}
           </header>
-          <main className="flex-1 p-6 animate-fade-in">{children}</main>
+          <main className="flex-1 p-3 sm:p-6 animate-fade-in">{children}</main>
         </div>
       </div>
 
