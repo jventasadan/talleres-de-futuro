@@ -18,6 +18,8 @@ export interface CompanySettings {
   labor_rate: number;
   default_vat: number;
   logo_url: string | null;
+  opening_time: string | null;
+  closing_time: string | null;
   created_at: string;
   updated_at: string;
 }
