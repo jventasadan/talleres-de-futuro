@@ -123,6 +123,8 @@ const SettingsPage = () => {
     city: "",
     postal_code: "",
     province: "",
+    opening_time: "",
+    closing_time: "",
     labor_rate: "35",
     default_vat: "21",
   });
@@ -138,6 +140,8 @@ const SettingsPage = () => {
         city: settings.city ?? "",
         postal_code: settings.postal_code ?? "",
         province: settings.province ?? "",
+        opening_time: settings.opening_time ?? "",
+        closing_time: settings.closing_time ?? "",
         labor_rate: String(settings.labor_rate ?? 35),
         default_vat: String(settings.default_vat ?? 21),
       });
@@ -154,6 +158,8 @@ const SettingsPage = () => {
       city: form.city,
       postal_code: form.postal_code,
       province: form.province,
+      opening_time: form.opening_time,
+      closing_time: form.closing_time,
       labor_rate: Number(form.labor_rate) || 35,
       default_vat: Number(form.default_vat) || 21,
     });
@@ -265,6 +271,23 @@ const SettingsPage = () => {
                   <div className="space-y-2">
                     <Label>Provincia</Label>
                     <Input value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} placeholder="Madrid" />
+                  </div>
+                </div>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <div>
+                    <Label>Horario del taller</Label>
+                    <p className="text-xs text-muted-foreground">Hora habitual de apertura y cierre</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Apertura</Label>
+                      <Input type="time" value={form.opening_time} onChange={(e) => setForm(f => ({ ...f, opening_time: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cierre</Label>
+                      <Input type="time" value={form.closing_time} onChange={(e) => setForm(f => ({ ...f, closing_time: e.target.value }))} />
+                    </div>
                   </div>
                 </div>
                 <Separator className="my-4" />
