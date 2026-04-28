@@ -138,3 +138,19 @@ export function useDeleteMechanic() {
     onError: (e: any) => toast.error("Error: " + (e?.message ?? "Error desconocido")),
   });
 }
+
+export function useUpdateMechanicActive() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase.from("mechanics").update({ active }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mechanics"] });
+      toast.success("Estado del mecánico actualizado");
+    },
+    onError: (e: any) => toast.error("Error: " + (e?.message ?? "Error desconocido")),
+  });
+}
