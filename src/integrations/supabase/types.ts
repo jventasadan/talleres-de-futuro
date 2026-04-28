@@ -192,6 +192,7 @@ export type Database = {
           address: string | null
           cif: string | null
           city: string | null
+          closing_time: string | null
           company_name: string | null
           created_at: string
           default_vat: number | null
@@ -199,6 +200,7 @@ export type Database = {
           id: string
           labor_rate: number | null
           logo_url: string | null
+          opening_time: string | null
           owner_user_id: string | null
           phone: string | null
           postal_code: string | null
@@ -210,6 +212,7 @@ export type Database = {
           address?: string | null
           cif?: string | null
           city?: string | null
+          closing_time?: string | null
           company_name?: string | null
           created_at?: string
           default_vat?: number | null
@@ -217,6 +220,7 @@ export type Database = {
           id?: string
           labor_rate?: number | null
           logo_url?: string | null
+          opening_time?: string | null
           owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -228,6 +232,7 @@ export type Database = {
           address?: string | null
           cif?: string | null
           city?: string | null
+          closing_time?: string | null
           company_name?: string | null
           created_at?: string
           default_vat?: number | null
@@ -235,6 +240,7 @@ export type Database = {
           id?: string
           labor_rate?: number | null
           logo_url?: string | null
+          opening_time?: string | null
           owner_user_id?: string | null
           phone?: string | null
           postal_code?: string | null
