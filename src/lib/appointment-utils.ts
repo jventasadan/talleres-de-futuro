@@ -13,17 +13,21 @@ interface AvailabilityOptions {
   requestedTime: string;
   serviceName: string;
   mechanicCount: number;
+  openingTime?: string;
+  closingTime?: string;
 }
 
 const SLOTS_PER_HOUR = 4;
-const WORKDAY_START_HOUR = 7;
-const TOTAL_WORKDAY_HOURS = 13;
+// FIX: usar 0 como base y calcular desde opening_time dinámicamente
+const WORKDAY_START_HOUR = 9; // hora real de apertura por defecto
+const WORKDAY_END_HOUR = 18;  // hora real de cierre por defecto
+const TOTAL_WORKDAY_HOURS = WORKDAY_END_HOUR - WORKDAY_START_HOUR;
 const TOTAL_WORKDAY_SLOTS = TOTAL_WORKDAY_HOURS * SLOTS_PER_HOUR;
+
 const INACTIVE_STATUSES = new Set(["entregado", "cancelado"]);
 
 export function buildKilometersPayload(value: string | null | undefined) {
   const normalized = value?.trim() || null;
-
   return {
     km: normalized,
     kilometros: normalized,
@@ -31,11 +35,13 @@ export function buildKilometersPayload(value: string | null | undefined) {
   };
 }
 
-export function getTimeSlotIndex(value: string | null | undefined) {
+export function getTimeSlotIndex(
+  value: string | null | undefined,
+  startHour: number = WORKDAY_START_HOUR
+) {
   const time = value || "09:00";
   const [hour, minute] = time.split(":").map(Number);
-
-  return ((hour - WORKDAY_START_HOUR) * SLOTS_PER_HOUR) + Math.floor((minute || 0) / 15);
+  return ((hour - startHour) * SLOTS_PER_HOUR) + Math.floor((minute || 0) / 15);
 }
 
 export function getServiceDurationSlots(serviceName: string | null | undefined) {
@@ -48,20 +54,34 @@ export function hasMechanicAvailability({
   requestedTime,
   serviceName,
   mechanicCount,
+  openingTime = "09:00",
+  closingTime = "18:00",
 }: AvailabilityOptions) {
   const availableMechanics = Math.max(mechanicCount, 1);
-  const requestedSlot = getTimeSlotIndex(requestedTime);
+  const [openH] = openingTime.split(":").map(Number);
+  const [closeH] = closingTime.split(":").map(Number);
+  
+  const requestedSlot = getTimeSlotIndex(requestedTime, openH);
   const serviceDuration = getServiceDurationSlots(serviceName);
+  const totalSlots = (closeH - openH) * SLOTS_PER_HOUR;
+
+  // FIX: No permitir slots fuera del horario
+  if (requestedSlot < 0 || requestedSlot >= totalSlots) {
+    return false;
+  }
+
   const dayAppointments = appointments.filter(
-    (appointment) => appointment.date === date && !INACTIVE_STATUSES.has(appointment.status || "")
+    (appointment) => appointment.date === date && 
+    !INACTIVE_STATUSES.has(appointment.status || "")
   );
 
   for (let slotOffset = 0; slotOffset < serviceDuration; slotOffset += 1) {
     const slotToCheck = requestedSlot + slotOffset;
-    const busyCount = dayAppointments.filter((appointment) => {
-      const appointmentStart = getTimeSlotIndex(appointment.time_slot);
-      const appointmentDuration = getServiceDurationSlots(appointment.service);
+    if (slotToCheck >= totalSlots) return false;
 
+    const busyCount = dayAppointments.filter((appointment) => {
+      const appointmentStart = getTimeSlotIndex(appointment.time_slot, openH);
+      const appointmentDuration = getServiceDurationSlots(appointment.service);
       return slotToCheck >= appointmentStart && slotToCheck < appointmentStart + appointmentDuration;
     }).length;
 
@@ -69,7 +89,6 @@ export function hasMechanicAvailability({
       return false;
     }
   }
-
   return true;
 }
 
@@ -79,31 +98,37 @@ export function findNearestAvailableSlot({
   requestedTime,
   serviceName,
   mechanicCount,
+  openingTime = "09:00",
+  closingTime = "18:00",
 }: AvailabilityOptions) {
-  const requestedSlot = getTimeSlotIndex(requestedTime);
+  const [openH] = openingTime.split(":").map(Number);
+  const [closeH] = closingTime.split(":").map(Number);
+  const totalSlots = (closeH - openH) * SLOTS_PER_HOUR;
+  const requestedSlot = getTimeSlotIndex(requestedTime, openH);
 
-  for (let offset = 0; offset < TOTAL_WORKDAY_SLOTS; offset += 1) {
+  for (let offset = 0; offset < totalSlots; offset += 1) {
     for (const candidate of [requestedSlot + offset, requestedSlot - offset]) {
-      if (candidate < 0 || candidate >= TOTAL_WORKDAY_SLOTS) {
-        continue;
-      }
+      // FIX: nunca salir del horario del taller
+      if (candidate < 0 || candidate >= totalSlots) continue;
+
+      const candidateHour = Math.floor(candidate / SLOTS_PER_HOUR) + openH;
+      const candidateMinute = (candidate % SLOTS_PER_HOUR) * 15;
+      const candidateTime = `${String(candidateHour).padStart(2, "0")}:${String(candidateMinute).padStart(2, "0")}`;
 
       const canFit = hasMechanicAvailability({
         appointments,
         date,
-        requestedTime: `${String(Math.floor(candidate / SLOTS_PER_HOUR) + WORKDAY_START_HOUR).padStart(2, "0")}:${String((candidate % SLOTS_PER_HOUR) * 15).padStart(2, "0")}`,
+        requestedTime: candidateTime,
         serviceName,
         mechanicCount,
+        openingTime,
+        closingTime,
       });
 
       if (canFit) {
-        const hour = Math.floor(candidate / SLOTS_PER_HOUR) + WORKDAY_START_HOUR;
-        const minute = (candidate % SLOTS_PER_HOUR) * 15;
-
-        return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        return candidateTime;
       }
     }
   }
-
   return null;
 }
