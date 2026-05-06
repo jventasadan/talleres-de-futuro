@@ -598,8 +598,8 @@ const Appointments = () => {
     if (data.date && data.time_slot && workshopId) {
       const mechanicCount = (mechanics ?? []).length;
       if (mechanicCount > 0) {
-        const openingTime = companySettings?.opening_time ?? "09:00";
-        const closingTime = companySettings?.closing_time ?? "18:00";
+        const openingTime = companySettings?.opening_time?.trim() || "09:00";
+        const closingTime = companySettings?.closing_time?.trim() || "18:00";
         const hasAvailability = hasMechanicAvailability({
           appointments: appointments ?? [],
           date: data.date,
