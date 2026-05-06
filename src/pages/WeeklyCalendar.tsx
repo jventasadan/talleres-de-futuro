@@ -54,8 +54,8 @@ const WeeklyCalendar = () => {
   const navigate = useNavigate();
   const today = new Date();
 
-  const openingTime = companySettings?.opening_time ?? "09:00";
-  const closingTime = companySettings?.closing_time ?? "18:00";
+  const openingTime = companySettings?.opening_time?.trim() || "09:00";
+  const closingTime = companySettings?.closing_time?.trim() || "18:00";
   const [openH] = openingTime.split(":").map(Number);
   const [closeH] = closingTime.split(":").map(Number);
   const HOURS = Array.from({ length: closeH - openH }, (_, i) => i + openH);
