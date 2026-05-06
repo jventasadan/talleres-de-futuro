@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
 import { useAllAppointments, useCreateAppointment, type Appointment } from "@/hooks/useAppointments";
 import { useMechanics } from "@/hooks/useMechanics";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { AppointmentDetailDialog } from "@/components/appointments/AppointmentDetailDialog";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { findNearestAvailableSlot, getServiceDurationSlots, getTimeSlotIndex, hasMechanicAvailability } from "@/lib/appointment-utils";
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
 const SLOTS_PER_HOUR = 4;
 
 const statusColors: Record<string, string> = {
@@ -47,13 +47,19 @@ const WeeklyCalendar = () => {
   const [receptionOpen, setReceptionOpen] = useState(false);
   const { data: allAppointments, isLoading } = useAllAppointments();
   const { data: mechanics } = useMechanics();
+  const { data: companySettings } = useCompanySettings();
   const createMutation = useCreateAppointment();
   const { user } = useAuth();
   const { workshopId } = useWorkshop();
   const navigate = useNavigate();
   const today = new Date();
 
-  // Filter out entregado/cancelado from calendar
+  const openingTime = companySettings?.opening_time ?? "09:00";
+  const closingTime = companySettings?.closing_time ?? "18:00";
+  const [openH] = openingTime.split(":").map(Number);
+  const [closeH] = closingTime.split(":").map(Number);
+  const HOURS = Array.from({ length: closeH - openH }, (_, i) => i + openH);
+
   const visibleAppointments = useMemo(() => {
     return (allAppointments ?? []).filter(a => !["entregado", "cancelado"].includes(a.status));
   }, [allAppointments]);
@@ -110,7 +116,7 @@ const WeeklyCalendar = () => {
   }, [mechanics, todayAppointments]);
 
   const getAppointmentSlot = (apt: Appointment): number => {
-    return getTimeSlotIndex(apt.time_slot);
+    return getTimeSlotIndex(apt.time_slot, openH);
   };
 
   const getAppointmentDuration = (apt: Appointment): number => {
@@ -144,7 +150,6 @@ const WeeklyCalendar = () => {
     setDetailOpen(true);
   };
 
-  // Find nearest available slot considering mechanic availability
   const findNearestSlot = useCallback((date: string, requestedTime: string, serviceName: string) => {
     return findNearestAvailableSlot({
       appointments: visibleAppointments,
@@ -152,17 +157,18 @@ const WeeklyCalendar = () => {
       requestedTime,
       serviceName,
       mechanicCount: (mechanics ?? []).length || 1,
+      openingTime,
+      closingTime,
     });
-  }, [mechanics, visibleAppointments]);
+  }, [mechanics, visibleAppointments, openingTime, closingTime]);
 
   const [pendingAppointment, setPendingAppointment] = useState<{ data: any; suggestedSlot: string } | null>(null);
 
   const handleCreateAppointment = async (data: any) => {
     if (!user || !workshopId) return;
 
-    // Smart scheduling: find nearest available slot
     const dateStr = data.date;
-    const requestedTime = data.time_slot || "09:00";
+    const requestedTime = data.time_slot || openingTime;
     const mechanicCount = (mechanics ?? []).length || 1;
 
     const hasAvailability = hasMechanicAvailability({
@@ -171,6 +177,8 @@ const WeeklyCalendar = () => {
       requestedTime,
       serviceName: data.service || "",
       mechanicCount,
+      openingTime,
+      closingTime,
     });
 
     if (!hasAvailability) {
@@ -179,7 +187,6 @@ const WeeklyCalendar = () => {
         toast.error("No hay huecos disponibles en esta fecha. Todos los mecánicos están ocupados.");
         return;
       }
-      // Ask user to confirm the alternative slot
       setPendingAppointment({ data, suggestedSlot: availableSlot });
       return;
     }
@@ -190,7 +197,6 @@ const WeeklyCalendar = () => {
   const confirmCreateAppointment = async (data: any, timeSlot: string) => {
     if (!user || !workshopId) return;
 
-    // Auto-create client if not exists
     if (data.client_name && data.license_plate) {
       try {
         const plate = data.license_plate.toUpperCase();
@@ -288,7 +294,7 @@ const WeeklyCalendar = () => {
                 Array.from({ length: SLOTS_PER_HOUR }, (_, slotIdx) => {
                   const minute = slotIdx * 15;
                   const timeStr = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-                  const slotIndex = (hour - 7) * SLOTS_PER_HOUR + slotIdx;
+                  const slotIndex = (hour - openH) * SLOTS_PER_HOUR + slotIdx;
                   const isHourStart = slotIdx === 0;
 
                   return (
@@ -447,14 +453,13 @@ const WeeklyCalendar = () => {
         defaultStatus="espera"
       />
 
-      {/* Slot conflict confirmation dialog */}
       <AlertDialog open={!!pendingAppointment} onOpenChange={(open) => !open && setPendingAppointment(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Horario no disponible</AlertDialogTitle>
             <AlertDialogDescription>
-              La hora solicitada está ocupada (todos los mecánicos tienen citas). 
-              El hueco libre más cercano es a las <strong>{pendingAppointment?.suggestedSlot}</strong>. 
+              La hora solicitada está ocupada (todos los mecánicos tienen citas).
+              El hueco libre más cercano es a las <strong>{pendingAppointment?.suggestedSlot}</strong>.
               ¿Deseas agendar la cita a esa hora?
             </AlertDialogDescription>
           </AlertDialogHeader>

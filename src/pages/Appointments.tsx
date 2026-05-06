@@ -26,13 +26,12 @@ import { useMechanics } from "@/hooks/useMechanics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OrderPartsDialog } from "@/components/appointments/OrderPartsDialog";
-import { getEstimatedMinutes } from "@/lib/serviceEstimates";
 import { ReceptionDialog } from "@/components/appointments/ReceptionDialog";
 import { LaborDialog } from "@/components/appointments/LaborDialog";
 import { PhotoGallery } from "@/components/appointments/PhotoGallery";
 import { KanbanQuoteDialog } from "@/components/appointments/KanbanQuoteDialog";
 import { SendEmailDialog } from "@/components/appointments/SendEmailDialog";
-import { buildKilometersPayload } from "@/lib/appointment-utils";
+import { buildKilometersPayload, hasMechanicAvailability } from "@/lib/appointment-utils";
 
 const KANBAN_COLUMNS = [
   { key: "recepcionado", label: "RECEPCIONADO", borderColor: "border-purple-500", bgGlow: "from-purple-500/5 to-transparent" },
@@ -127,11 +126,9 @@ const deleteAppointmentBundle = async (appointmentId: string) => {
       .from("quote_lines")
       .delete()
       .in("quote_id", quoteIds);
-
     if (quoteLinesError) throw quoteLinesError;
   }
 
-  // Delete photos and order_parts (ignore errors if table not in schema cache)
   await Promise.all([
     (supabase as any).from("appointment_photos").delete().eq("appointment_id", appointmentId).then(
       (res: any) => res,
@@ -149,7 +146,6 @@ const deleteAppointmentBundle = async (appointmentId: string) => {
   }
 
   if (workOrderIds.length > 0) {
-    // Delete invoices (and their lines) that reference these work orders
     const { data: linkedInvoices } = await (supabase as any)
       .from("invoices")
       .select("id")
@@ -194,7 +190,6 @@ const Appointments = () => {
   const { workshopId } = useWorkshop();
   const queryClient = useQueryClient();
 
-  // Fetch work_order map for all active appointments
   const fetchWorkOrderMap = useCallback(async () => {
     if (!workshopId || !appointments?.length) return;
     const activeIds = appointments
@@ -230,14 +225,10 @@ const Appointments = () => {
 
   const getQuoteStatusLabel = (status: string) => {
     switch (status) {
-      case "esperando_cliente":
-        return "A la espera del cliente";
-      case "aprobado":
-        return "Aceptado";
-      case "rechazado":
-        return "Cancelado";
-      default:
-        return status;
+      case "esperando_cliente": return "A la espera del cliente";
+      case "aprobado": return "Aceptado";
+      case "rechazado": return "Cancelado";
+      default: return status;
     }
   };
 
@@ -284,11 +275,9 @@ const Appointments = () => {
   const openPartsDialogForAppointment = useCallback(async (appointment: Appointment) => {
     try {
       let workOrderId = workOrderMap[appointment.id] ?? null;
-
       if (!workOrderId && ["en_reparacion", "esperando_piezas", "listo"].includes(appointment.status)) {
         workOrderId = await ensureWorkOrderForAppointment(appointment);
       }
-
       setPartsDialog({ appointmentId: appointment.id, workOrderId });
     } catch (error: any) {
       toast.error("No se pudieron cargar las piezas: " + (error?.message ?? "Error desconocido"));
@@ -332,7 +321,6 @@ const Appointments = () => {
         return;
       }
 
-      // Check mechanic isn't already repairing another car
       const mechId = appointment.mechanic_id;
       if (mechId) {
         const busyWithOther = (appointments ?? []).filter(
@@ -411,12 +399,10 @@ const Appointments = () => {
     }
 
     const { appointment, workOrderId } = laborDialogData;
-    const partsTotal = laborDialogData.partsTotal; // only parts, no labor
-    const laborFromItems = laborDialogData.laborFromItems; // labor already in work_order_items
+    const laborFromItems = laborDialogData.laborFromItems;
 
     updateStatus.mutate({ id: appointment.id, status: "listo" });
 
-    // Save comment to work order
     if (comment && workOrderId) {
       await (supabase as any)
         .from("work_orders")
@@ -425,12 +411,9 @@ const Appointments = () => {
     }
 
     const vatRate = companySettings?.default_vat ?? 21;
-
-    // Fetch all items from work order
     const { items: woItems } = workOrderId ? await fetchItemsFromWorkOrder(workOrderId) : { items: [] };
     const lines: Array<{ description: string; quantity: number; unit_price: number; total: number; line_type: string }> = [];
 
-    // Add all work_order_items (piezas + mano_obra)
     woItems.forEach((item: any) => {
       const desc = item.description ?? item.descripcion ?? "Concepto";
       const qty = Number(item.quantity ?? item.cantidad ?? 1);
@@ -438,7 +421,6 @@ const Appointments = () => {
       const discPct = Number(item.discount_percent ?? item.descuento ?? 0);
       const lineTotal = Number(item.total ?? 0);
       const itemType = item.item_type ?? item.tipo ?? "pieza";
-
       lines.push({
         description: discPct > 0 ? `${desc} (-${discPct}%)` : desc,
         quantity: qty,
@@ -448,7 +430,6 @@ const Appointments = () => {
       });
     });
 
-    // Add extra labor from dialog if not already covered by items
     const totalLaborFromItems = laborFromItems;
     if (laborCost > totalLaborFromItems) {
       const extraLabor = laborCost - totalLaborFromItems;
@@ -463,7 +444,6 @@ const Appointments = () => {
       }
     }
 
-    // Calculate correct totals from lines
     const actualPartsTotal = lines.filter(l => l.line_type === "part").reduce((s, l) => s + l.total, 0);
     const actualLaborTotal = lines.filter(l => l.line_type === "labor").reduce((s, l) => s + l.total, 0);
     const subtotal = actualPartsTotal + actualLaborTotal;
@@ -471,7 +451,6 @@ const Appointments = () => {
     const beforeTax = subtotal - discountAmount;
     const total = Number((beforeTax * (1 + vatRate / 100)).toFixed(2));
 
-    // Global discount from dialog
     if (discountAmount > 0) {
       lines.push({
         description: `Descuento (${discount}%)`,
@@ -512,14 +491,8 @@ const Appointments = () => {
 
         const workOrderId = await ensureWorkOrderForAppointment(appointment);
         const [{ data: quoteLines, error: quoteLinesError }, { data: currentItems, error: currentItemsError }] = await Promise.all([
-          (supabase as any)
-            .from("quote_lines")
-            .select("*")
-            .eq("quote_id", quoteId),
-          (supabase as any)
-            .from("work_order_items")
-            .select("*")
-            .eq("work_order_id", workOrderId),
+          (supabase as any).from("quote_lines").select("*").eq("quote_id", quoteId),
+          (supabase as any).from("work_order_items").select("*").eq("work_order_id", workOrderId),
         ]);
 
         if (quoteLinesError) throw quoteLinesError;
@@ -528,14 +501,10 @@ const Appointments = () => {
         const itemsToInsert = (quoteLines ?? [])
           .filter((line: any) => {
             return !(currentItems ?? []).some((item: any) => {
-              const currentDescription = item.description ?? item.descripcion ?? "";
-              const currentQuantity = Number(item.quantity ?? item.cantidad ?? 1);
-              const currentUnitPrice = Number(item.unit_price ?? item.precio_unitario ?? 0);
-
               return (
-                currentDescription === (line.description ?? "") &&
-                currentQuantity === Number(line.quantity ?? 1) &&
-                currentUnitPrice === Number(line.unit_price ?? 0)
+                (item.description ?? item.descripcion ?? "") === (line.description ?? "") &&
+                Number(item.quantity ?? item.cantidad ?? 1) === Number(line.quantity ?? 1) &&
+                Number(item.unit_price ?? item.precio_unitario ?? 0) === Number(line.unit_price ?? 0)
               );
             });
           })
@@ -552,10 +521,7 @@ const Appointments = () => {
           }));
 
         if (itemsToInsert.length > 0) {
-          const primaryInsert = await (supabase as any)
-            .from("work_order_items")
-            .insert(itemsToInsert);
-
+          const primaryInsert = await (supabase as any).from("work_order_items").insert(itemsToInsert);
           const insertMessage = String(primaryInsert.error?.message ?? "").toLowerCase();
           const insertDetails = String(primaryInsert.error?.details ?? "").toLowerCase();
           const needsLegacyColumns = ["descripcion", "cantidad", "precio_unitario", "descuento", "tipo"].some((term) =>
@@ -573,11 +539,7 @@ const Appointments = () => {
               descuento: item.discount_percent,
               tipo: item.item_type,
             }));
-
-            const { error: legacyInsertError } = await (supabase as any)
-              .from("work_order_items")
-              .insert(legacyItemsToInsert);
-
+            const { error: legacyInsertError } = await (supabase as any).from("work_order_items").insert(legacyItemsToInsert);
             if (legacyInsertError) throw legacyInsertError;
           }
         }
@@ -614,7 +576,6 @@ const Appointments = () => {
 
   const handleAssignMechanic = async (appointmentId: string, mechanic: { id: string; name: string }) => {
     try {
-      // Check if mechanic already has an active car in "en_reparacion"
       const activeWithMechanic = (appointments ?? []).filter(
         a => a.mechanic_id === mechanic.id && a.status === "en_reparacion" && a.id !== appointmentId
       );
@@ -634,33 +595,21 @@ const Appointments = () => {
   };
 
   const handleCreate = async (data: AnyRecord) => {
-    // Duration-aware capacity check (same logic as WeeklyCalendar)
     if (data.date && data.time_slot && workshopId) {
       const mechanicCount = (mechanics ?? []).length;
       if (mechanicCount > 0) {
-        const SLOTS_PER_HOUR = 4;
-        const dayAppts = (appointments ?? []).filter(
-          a => a.date === data.date && !["cancelado", "entregado"].includes(a.status)
-        );
-
-        const [reqH, reqM] = (data.time_slot as string).split(":").map(Number);
-        const requestedSlot = ((reqH - 7) * SLOTS_PER_HOUR) + Math.floor((reqM || 0) / 15);
-        const serviceDuration = Math.max(2, Math.ceil(getEstimatedMinutes(data.service || "") / 15));
-
-        let slotConflict = false;
-        for (let s = 0; s < serviceDuration; s++) {
-          const slotToCheck = requestedSlot + s;
-          const busyCount = dayAppts.filter(a => {
-            const time = a.time_slot || "09:00";
-            const [h, m] = time.split(":").map(Number);
-            const aptStart = ((h - 7) * SLOTS_PER_HOUR) + Math.floor((m || 0) / 15);
-            const aptDur = Math.max(2, Math.ceil(getEstimatedMinutes(a.service || "") / 15));
-            return slotToCheck >= aptStart && slotToCheck < aptStart + aptDur;
-          }).length;
-          if (busyCount >= mechanicCount) { slotConflict = true; break; }
-        }
-
-        if (slotConflict) {
+        const openingTime = companySettings?.opening_time ?? "09:00";
+        const closingTime = companySettings?.closing_time ?? "18:00";
+        const hasAvailability = hasMechanicAvailability({
+          appointments: appointments ?? [],
+          date: data.date,
+          requestedTime: data.time_slot,
+          serviceName: data.service || "",
+          mechanicCount,
+          openingTime,
+          closingTime,
+        });
+        if (!hasAvailability) {
           toast.error(`No hay mecánicos disponibles en esa franja horaria. Todos los mecánicos están ocupados teniendo en cuenta la duración del servicio.`);
           return;
         }
@@ -669,7 +618,6 @@ const Appointments = () => {
 
     if (user && data.client_name && data.license_plate) {
       try {
-        // Deduplicate by license_plate first, then phone
         const plate = data.license_plate.toUpperCase();
         const { data: existingByPlate } = await supabase
           .from("clients")
@@ -722,7 +670,6 @@ const Appointments = () => {
   return (
     <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de reparaciones del taller">
       <div className="space-y-5">
-
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -751,10 +698,7 @@ const Appointments = () => {
                                 size="icon"
                                 type="button"
                                 className="h-6 w-6 text-destructive hover:text-destructive"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setDeleteConfirm(apt.id);
-                                }}
+                                onClick={(event) => { event.stopPropagation(); setDeleteConfirm(apt.id); }}
                                 title="Eliminar"
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -779,7 +723,6 @@ const Appointments = () => {
                                   <span className="text-muted-foreground">· {[apt.brand, apt.model].filter(Boolean).join(" ")}</span>
                                 )}
                               </div>
-                              {/* Email field */}
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Mail className="h-3 w-3" />
                                 {apt.email ? (
@@ -795,7 +738,6 @@ const Appointments = () => {
                                       if (val) {
                                         try {
                                           await updateAppointmentWithFallback(apt.id, { email: val });
-                                          // Also update client email
                                           if (apt.license_plate) {
                                             const { data: clientData } = await supabase
                                               .from("clients")
@@ -827,28 +769,14 @@ const Appointments = () => {
                                 <div className="flex items-center gap-2">
                                   <FileText className="h-3 w-3 text-primary" />
                                   <span className="font-medium text-primary">Presupuesto: {Number(quote.total).toFixed(2)}€</span>
-                                  <Badge variant="outline" className="ml-auto h-4 text-[9px]">
-                                    {getQuoteStatusLabel(quote.status)}
-                                  </Badge>
+                                  <Badge variant="outline" className="ml-auto h-4 text-[9px]">{getQuoteStatusLabel(quote.status)}</Badge>
                                 </div>
                                 {quote.status === "esperando_cliente" && (
                                   <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-6 px-2 text-[10px]"
-                                      onClick={() => void handleQuoteDecision(apt, quote.id, "aprobado")}
-                                    >
-                                      Aceptar
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 px-2 text-[10px]"
-                                      onClick={() => void handleQuoteDecision(apt, quote.id, "rechazado")}
-                                    >
-                                      Cancelar
-                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "aprobado")}>Aceptar</Button>
+                                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]"
+                                      onClick={() => void handleQuoteDecision(apt, quote.id, "rechazado")}>Cancelar</Button>
                                   </div>
                                 )}
                               </div>
@@ -903,13 +831,8 @@ const Appointments = () => {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)}
-                                  title="Fotos"
-                                >
+                                <Button variant="ghost" size="icon" className="h-6 w-6"
+                                  onClick={() => setExpandedPhotos(expandedPhotos === apt.id ? null : apt.id)} title="Fotos">
                                   <Camera className="h-3 w-3" />
                                 </Button>
                                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -921,69 +844,39 @@ const Appointments = () => {
 
                             {apt.notes && <div className="text-[10px] text-muted-foreground italic line-clamp-2">{apt.notes}</div>}
 
-                            {/* Quick action buttons */}
                             <div className="flex items-center gap-1 pt-1 border-t border-border/20">
                               {NEXT_STATUS[apt.status] && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-[10px] px-2 text-primary hover:text-primary"
-                                  onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}
-                                >
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-primary hover:text-primary"
+                                  onClick={() => handleStatusChange(apt, NEXT_STATUS[apt.status])}>
                                   <ArrowRight className="mr-1 h-3 w-3" />
                                   {STATUS_LABELS[apt.status]}
                                 </Button>
                               )}
                               {["en_reparacion", "esperando_piezas", "listo"].includes(apt.status) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-[10px]"
-                                  onClick={() => void openPartsDialogForAppointment(apt)}
-                                >
-                                  <Wrench className="mr-1 h-3 w-3" />
-                                  Piezas
+                                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]"
+                                  onClick={() => void openPartsDialogForAppointment(apt)}>
+                                  <Wrench className="mr-1 h-3 w-3" />Piezas
                                 </Button>
                               )}
                               {apt.status === "en_reparacion" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-[10px] px-2"
-                                  onClick={() => void openQuoteDialogForAppointment(apt)}
-                                >
-                                  <FileText className="mr-1 h-3 w-3" />
-                                  Presupuesto
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2"
+                                  onClick={() => void openQuoteDialogForAppointment(apt)}>
+                                  <FileText className="mr-1 h-3 w-3" />Presupuesto
                                 </Button>
                               )}
                               {apt.status === "listo" && (
                                 <>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    className="h-6 text-[10px] px-2"
-                                    onClick={() => handleDeliverVehicle(apt)}
-                                  >
-                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                    Entregar vehículo
+                                  <Button variant="default" size="sm" className="h-6 text-[10px] px-2"
+                                    onClick={() => handleDeliverVehicle(apt)}>
+                                    <CheckCircle className="mr-1 h-3 w-3" />Entregar vehículo
                                   </Button>
                                   {apt.email && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-6 text-[10px] px-2"
-                                      onClick={() => setEmailAppointment(apt)}
-                                    >
-                                      <Mail className="mr-1 h-3 w-3" />
-                                      Enviar email
+                                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2"
+                                      onClick={() => setEmailAppointment(apt)}>
+                                      <Mail className="mr-1 h-3 w-3" />Enviar email
                                     </Button>
                                   )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-[10px] px-2"
-                                    title="Ver factura"
-                                  >
+                                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" title="Ver factura">
                                     <Receipt className="h-3 w-3" />
                                   </Button>
                                 </>
@@ -1002,8 +895,6 @@ const Appointments = () => {
           </div>
         )}
       </div>
-
-      {/* ReceptionDialog removed - new appointments created from Calendar */}
 
       {partsDialog && (
         <OrderPartsDialog

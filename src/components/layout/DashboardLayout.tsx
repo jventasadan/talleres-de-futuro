@@ -14,6 +14,7 @@ import { useCreateAppointment } from "@/hooks/useAppointments";
 import { useClients } from "@/hooks/useClients";
 import { useAllAppointments } from "@/hooks/useAppointments";
 import { useMechanics } from "@/hooks/useMechanics";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { findNearestAvailableSlot, hasMechanicAvailability } from "@/lib/appointment-utils";
 import { toast } from "sonner";
 
@@ -42,8 +43,12 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
   const { data: clients } = useClients();
   const { data: appointments } = useAllAppointments();
   const { data: mechanics } = useMechanics();
+  const { data: companySettings } = useCompanySettings();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const openingTime = companySettings?.opening_time ?? "09:00";
+  const closingTime = companySettings?.closing_time ?? "18:00";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -104,7 +109,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
   };
 
   const handleCreate = (data: any) => {
-    const requestedTime = data.time_slot || "09:00";
+    const requestedTime = data.time_slot || openingTime;
     const mechanicCount = (mechanics ?? []).length || 1;
 
     if (data.date && data.service) {
@@ -114,6 +119,8 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
         requestedTime,
         serviceName: data.service || "",
         mechanicCount,
+        openingTime,
+        closingTime,
       });
 
       if (!hasAvailability) {
@@ -123,6 +130,8 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           requestedTime,
           serviceName: data.service || "",
           mechanicCount,
+          openingTime,
+          closingTime,
         });
 
         if (!availableSlot) {
