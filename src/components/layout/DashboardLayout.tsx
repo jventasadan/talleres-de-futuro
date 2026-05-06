@@ -47,8 +47,8 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
   const navigate = useNavigate();
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const openingTime = companySettings?.opening_time ?? "09:00";
-  const closingTime = companySettings?.closing_time ?? "18:00";
+  const openingTime = companySettings?.opening_time?.trim() || "09:00";
+  const closingTime = companySettings?.closing_time?.trim() || "18:00";
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
