@@ -244,7 +244,7 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
       doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
       doc.text(discPct > 0 ? `${discPct}%` : "—", colX.discount + 1, y + 1);
       doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
+      doc.text(`${effectiveLineTotal(line).toFixed(2)} €`, colX.total, y + 1);
 
       y += 7;
     });
