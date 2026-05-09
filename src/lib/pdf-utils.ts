@@ -573,6 +573,43 @@ export async function generatePdfWithLogo(
   doc.text("TOTAL:", totalsX, y + 3);
   doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
 
+  // ── Fotos de la orden de trabajo ──
+  if (data.photos && data.photos.length > 0) {
+    doc.addPage();
+    let py = margin;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 30, 30);
+    doc.text("FOTOS DE LA REPARACIÓN", margin, py);
+    py += 8;
+
+    const photoW = (contentWidth - 5) / 2;
+    const photoH = 60;
+    let col = 0;
+    const pageH = doc.internal.pageSize.getHeight();
+
+    for (const url of data.photos) {
+      const img = await fetchLogoAsBase64(url);
+      if (!img) continue;
+      if (py + photoH > pageH - margin) {
+        doc.addPage();
+        py = margin;
+        col = 0;
+      }
+      const xPos = margin + col * (photoW + 5);
+      try {
+        doc.addImage(img.data, img.format, xPos, py, photoW, photoH);
+      } catch {
+        // Ignorar imagen que falla
+      }
+      col += 1;
+      if (col >= 2) {
+        col = 0;
+        py += photoH + 5;
+      }
+    }
+  }
+
   // ── Footer ──
   const footerY = doc.internal.pageSize.getHeight() - 20;
   doc.setDrawColor(200, 200, 200);
