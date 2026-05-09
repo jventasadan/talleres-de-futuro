@@ -38,6 +38,20 @@ export interface PdfDocumentData {
   extraHeaderRight?: string; // texto opcional arriba a la derecha (ej: estado del presupuesto)
   lines: PdfLine[];
   taxRate: number;
+  photos?: string[];      // URLs de fotos de la orden de trabajo a incluir al final
+}
+
+// Devuelve el total efectivo de una línea aplicando el descuento.
+// Si discount_percent > 0 lo recalcula desde quantity * unit_price para
+// asegurar que el descuento siempre se refleja en el total.
+function effectiveLineTotal(line: PdfLine): number {
+  const qty = Number(line.quantity ?? 1);
+  const price = Number(line.unit_price ?? 0);
+  const disc = Number(line.discount_percent ?? 0);
+  if (disc > 0) {
+    return Number((qty * price * (1 - disc / 100)).toFixed(2));
+  }
+  return Number(Number(line.total ?? qty * price).toFixed(2));
 }
 
 const safeStr = (value: unknown, fallback = ""): string =>
