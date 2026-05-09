@@ -28,8 +28,9 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   vehicleKm: string;
   clientPhone: string;
   clientEmail: string;
+  photos: string[];
 }> {
-  const empty = { lines: [], comment: "", vehicleInfo: "", vehicleKm: "", clientPhone: "", clientEmail: "" };
+  const empty = { lines: [], comment: "", vehicleInfo: "", vehicleKm: "", clientPhone: "", clientEmail: "", photos: [] };
   if (!workshopId) return empty;
 
   const [invoiceLinesResult, workOrderItemsResult, workOrderResult] = await Promise.all([
