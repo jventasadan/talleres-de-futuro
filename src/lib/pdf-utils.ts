@@ -38,6 +38,20 @@ export interface PdfDocumentData {
   extraHeaderRight?: string; // texto opcional arriba a la derecha (ej: estado del presupuesto)
   lines: PdfLine[];
   taxRate: number;
+  photos?: string[];      // URLs de fotos de la orden de trabajo a incluir al final
+}
+
+// Devuelve el total efectivo de una línea aplicando el descuento.
+// Si discount_percent > 0 lo recalcula desde quantity * unit_price para
+// asegurar que el descuento siempre se refleja en el total.
+function effectiveLineTotal(line: PdfLine): number {
+  const qty = Number(line.quantity ?? 1);
+  const price = Number(line.unit_price ?? 0);
+  const disc = Number(line.discount_percent ?? 0);
+  if (disc > 0) {
+    return Number((qty * price * (1 - disc / 100)).toFixed(2));
+  }
+  return Number(Number(line.total ?? qty * price).toFixed(2));
 }
 
 const safeStr = (value: unknown, fallback = ""): string =>
@@ -69,8 +83,8 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
   const discountLines = data.lines.filter((l) => l.line_type === "discount");
   const tableLines = data.lines.filter((l) => l.line_type !== "discount");
 
-  const partsNet = partLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
-  const laborNet = laborLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
+  const partsNet = partLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
+  const laborNet = laborLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
   const globalDiscount = Math.abs(discountLines.reduce((s, l) => s + Number(l.total ?? 0), 0));
 
   const taxableBase = Number((partsNet + laborNet - globalDiscount).toFixed(2));
@@ -230,7 +244,7 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
       doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
       doc.text(discPct > 0 ? `${discPct}%` : "—", colX.discount + 1, y + 1);
       doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
+      doc.text(`${effectiveLineTotal(line).toFixed(2)} €`, colX.total, y + 1);
 
       y += 7;
     });
@@ -338,8 +352,8 @@ export async function generatePdfWithLogo(
   const discountLines = data.lines.filter((l) => l.line_type === "discount");
   const tableLines = data.lines.filter((l) => l.line_type !== "discount");
 
-  const partsNet = partLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
-  const laborNet = laborLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
+  const partsNet = partLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
+  const laborNet = laborLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
   const globalDiscount = Math.abs(
     discountLines.reduce((s, l) => s + Number(l.total ?? 0), 0)
   );
@@ -513,7 +527,7 @@ export async function generatePdfWithLogo(
       doc.text(String(Number(line.quantity ?? 1)), colX.qty + 2, y + 1);
       doc.text(discPct > 0 ? `${discPct}%` : "—", colX.discount + 1, y + 1);
       doc.text(`${Number(line.unit_price ?? 0).toFixed(2)} €`, colX.price, y + 1);
-      doc.text(`${Number(line.total ?? 0).toFixed(2)} €`, colX.total, y + 1);
+      doc.text(`${effectiveLineTotal(line).toFixed(2)} €`, colX.total, y + 1);
 
       y += 7;
     });
@@ -558,6 +572,43 @@ export async function generatePdfWithLogo(
   doc.setTextColor(255, 255, 255);
   doc.text("TOTAL:", totalsX, y + 3);
   doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
+
+  // ── Fotos de la orden de trabajo ──
+  if (data.photos && data.photos.length > 0) {
+    doc.addPage();
+    let py = margin;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 30, 30);
+    doc.text("FOTOS DE LA REPARACIÓN", margin, py);
+    py += 8;
+
+    const photoW = (contentWidth - 5) / 2;
+    const photoH = 60;
+    let col = 0;
+    const pageH = doc.internal.pageSize.getHeight();
+
+    for (const url of data.photos) {
+      const img = await fetchLogoAsBase64(url);
+      if (!img) continue;
+      if (py + photoH > pageH - margin) {
+        doc.addPage();
+        py = margin;
+        col = 0;
+      }
+      const xPos = margin + col * (photoW + 5);
+      try {
+        doc.addImage(img.data, img.format, xPos, py, photoW, photoH);
+      } catch {
+        // Ignorar imagen que falla
+      }
+      col += 1;
+      if (col >= 2) {
+        col = 0;
+        py += photoH + 5;
+      }
+    }
+  }
 
   // ── Footer ──
   const footerY = doc.internal.pageSize.getHeight() - 20;
