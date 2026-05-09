@@ -107,11 +107,38 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
     ? invoiceLines.map((l: any) => mapLine(l, true))
     : workOrderItems.map((l: any) => mapLine(l, false));
 
-  return { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail };
+  // Cargar fotos asociadas a la cita / orden de trabajo
+  const photos: string[] = [];
+  if (resolvedAppointmentId) {
+    const photoResult = await db
+      .from("appointment_photos")
+      .select("photo_url")
+      .eq("appointment_id", resolvedAppointmentId)
+      .order("created_at", { ascending: true });
+    if (!photoResult.error && Array.isArray(photoResult.data)) {
+      photoResult.data.forEach((p: any) => {
+        if (p?.photo_url) photos.push(String(p.photo_url));
+      });
+    }
+    // Fallback: fotos guardadas dentro de work_orders.photos (jsonb)
+    if (photos.length === 0 && invoice.work_order_id) {
+      const woPhotos = await db
+        .from("work_orders")
+        .select("photos")
+        .eq("id", invoice.work_order_id)
+        .maybeSingle();
+      const arr = Array.isArray(woPhotos.data?.photos) ? woPhotos.data.photos : [];
+      arr.forEach((p: any) => {
+        if (p?.photo_url) photos.push(String(p.photo_url));
+      });
+    }
+  }
+
+  return { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail, photos };
 }
 
 async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: string | null) {
-  const { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail } =
+  const { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail, photos } =
     await fetchInvoicePdfData(invoice, workshopId);
 
   await generatePdfWithLogo({
@@ -128,6 +155,7 @@ async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: st
     comment: comment || undefined,
     lines,
     taxRate: Number(invoice.tax_rate ?? 21),
+    photos,
   }, { ...(settings ?? {}), logo_url: settings?.logo_url ?? undefined });
 }
 
