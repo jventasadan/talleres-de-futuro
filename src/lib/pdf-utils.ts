@@ -83,8 +83,8 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
   const discountLines = data.lines.filter((l) => l.line_type === "discount");
   const tableLines = data.lines.filter((l) => l.line_type !== "discount");
 
-  const partsNet = partLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
-  const laborNet = laborLines.reduce((s, l) => s + Number(l.total ?? 0), 0);
+  const partsNet = partLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
+  const laborNet = laborLines.reduce((s, l) => s + effectiveLineTotal(l), 0);
   const globalDiscount = Math.abs(discountLines.reduce((s, l) => s + Number(l.total ?? 0), 0));
 
   const taxableBase = Number((partsNet + laborNet - globalDiscount).toFixed(2));
