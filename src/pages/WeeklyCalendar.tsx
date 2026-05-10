@@ -106,14 +106,28 @@ const WeeklyCalendar = () => {
   }, [visibleAppointments, todayStr]);
 
   const mechanicNames = useMemo(() => {
-    const names = new Set<string>();
-    (mechanics ?? []).forEach((m) => names.add(m.name));
+    const names: string[] = [];
+    (mechanics ?? []).forEach((m) => { if (!names.includes(m.name)) names.push(m.name); });
     todayAppointments.forEach((a) => {
-      if (a.mechanic) names.add(a.mechanic);
+      const name = a.mechanic
+        || (a.mechanic_id ? (mechanics ?? []).find(m => m.id === a.mechanic_id)?.name : null)
+        || null;
+      if (name && !names.includes(name)) names.push(name);
     });
-    if (names.size === 0) names.add("Sin asignar");
-    return Array.from(names);
+    const hasUnassigned = todayAppointments.some((a) => {
+      const resolved = a.mechanic
+        || (a.mechanic_id ? (mechanics ?? []).find(m => m.id === a.mechanic_id)?.name : null);
+      return !resolved;
+    });
+    if (hasUnassigned || names.length === 0) names.push("Sin asignar");
+    return names;
   }, [mechanics, todayAppointments]);
+
+  const resolveAptMechanicName = (a: Appointment): string => {
+    return a.mechanic
+      || (a.mechanic_id ? (mechanics ?? []).find(m => m.id === a.mechanic_id)?.name : null)
+      || "Sin asignar";
+  };
 
   const getAppointmentSlot = (apt: Appointment): number => {
     return getTimeSlotIndex(apt.time_slot, openH);
