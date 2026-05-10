@@ -19,7 +19,8 @@ import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
 } from "@/hooks/useAppointments";
-import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
+import { useCreateInvoice, generateInvoiceNumber, useInvoices } from "@/hooks/useInvoices";
+import { generatePdfWithLogo, type PdfLine } from "@/lib/pdf-utils";
 import { useQuotes, useUpdateQuoteStatus } from "@/hooks/useQuotes";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
