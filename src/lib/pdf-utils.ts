@@ -573,7 +573,23 @@ export async function generatePdfWithLogo(
   doc.text("TOTAL:", totalsX, y + 3);
   doc.text(`${displayTotal.toFixed(2)} €`, valuesX, y + 3);
 
-  // ── Fotos de la orden de trabajo ──
+  // ── Footer (solo en la primera página, antes de las fotos) ──
+  const footerY = doc.internal.pageSize.getHeight() - 20;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(
+    [wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · "),
+    pageWidth / 2,
+    footerY,
+    { align: "center" }
+  );
+  doc.text("Gracias por confiar en nosotros", pageWidth / 2, footerY + 5, { align: "center" });
+
+  // ── Fotos de la orden de trabajo (en páginas separadas, sin pie de factura) ──
   if (data.photos && data.photos.length > 0) {
     doc.addPage();
     let py = margin;
@@ -609,22 +625,6 @@ export async function generatePdfWithLogo(
       }
     }
   }
-
-  // ── Footer ──
-  const footerY = doc.internal.pageSize.getHeight() - 20;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, footerY - 5, margin + contentWidth, footerY - 5);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text(
-    [wName, wCif ? `CIF: ${wCif}` : "", wAddress].filter(Boolean).join(" · "),
-    pageWidth / 2,
-    footerY,
-    { align: "center" }
-  );
-  doc.text("Gracias por confiar en nosotros", pageWidth / 2, footerY + 5, { align: "center" });
 
   doc.save(data.filename);
 }
