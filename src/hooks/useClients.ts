@@ -51,46 +51,79 @@ function mapRow(row: AnyRecord): Client {
 const insertClientWithFallback = async (payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
   let lastError: any;
+
   for (let i = 0; i < 12; i += 1) {
-    const { data, error } = await supabase.from("clients").insert(attemptPayload as any).select("*").maybeSingle();
+    const { data, error } = await supabase
+      .from("clients")
+      .insert(attemptPayload as any)
+      .select("*")
+      .maybeSingle();
+
     if (!error) return data as AnyRecord | null;
+
     lastError = error;
     const missingColumn = extractMissingColumn(error);
+
     if (!isSchemaMismatchError(error) || !missingColumn) break;
     if (!(missingColumn in attemptPayload)) break;
+
     delete attemptPayload[missingColumn];
   }
+
   throw lastError;
 };
 
 const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
   let lastError: any;
+
   for (let i = 0; i < 12; i += 1) {
-    const { data, error } = await supabase.from("clients").update(attemptPayload as any).eq("id", id).select("*").maybeSingle();
+    const { data, error } = await supabase
+      .from("clients")
+      .update(attemptPayload as any)
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+
     if (!error) return data as AnyRecord | null;
+
     lastError = error;
     const missingColumn = extractMissingColumn(error);
+
     if (!isSchemaMismatchError(error) || !missingColumn) break;
     if (!(missingColumn in attemptPayload)) break;
+
     delete attemptPayload[missingColumn];
   }
+
   throw lastError;
 };
 
 export function useClients() {
   const { workshopId } = useWorkshop();
+
   return useQuery({
     queryKey: ["clients", workshopId],
     queryFn: async () => {
       if (!workshopId) return [];
-      const { data, error } = await supabase.from("clients").select("*").eq("workshop_id", workshopId).order("created_at", { ascending: false });
+
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("workshop_id", workshopId)
+        .order("created_at", { ascending: false });
+
       if (!error) return (data ?? []).map(mapRow);
+
       if (isSchemaMismatchError(error)) {
-        const { data: d2, error: e2 } = await supabase.from("clients").select("*").order("created_at", { ascending: false });
+        const { data: d2, error: e2 } = await supabase
+          .from("clients")
+          .select("*")
+          .order("created_at", { ascending: false });
         if (e2) throw e2;
         return (d2 ?? []).map(mapRow);
       }
+
       throw error;
     },
     enabled: !!workshopId,
@@ -100,38 +133,80 @@ export function useClients() {
 export function useCreateClient() {
   const queryClient = useQueryClient();
   const { workshopId } = useWorkshop();
+
   return useMutation({
-    mutationFn: async (input: { name: string; phone: string | null; license_plate: string; brand: string | null; model: string | null; }) => {
-      const payload: AnyRecord = { name: input.name, phone: input.phone, license_plate: input.license_plate, brand: input.brand, model: input.model, workshop_id: workshopId };
+    mutationFn: async (input: {
+      name: string;
+      phone: string | null;
+      license_plate: string;
+      brand: string | null;
+      model: string | null;
+    }) => {
+      const payload: AnyRecord = {
+        name: input.name,
+        phone: input.phone,
+        license_plate: input.license_plate,
+        brand: input.brand,
+        model: input.model,
+        workshop_id: workshopId,
+      };
       return insertClientWithFallback(payload);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients", workshopId] }); toast.success("Cliente creado correctamente"); },
-    onError: (error: any) => { toast.error("Error al crear cliente: " + (error?.message ?? "")); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      toast.success("Cliente creado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error("Error al crear cliente: " + (error?.message ?? ""));
+    },
   });
 }
 
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   const { workshopId } = useWorkshop();
+
   return useMutation({
-    mutationFn: async (input: { id: string; name: string; phone: string | null; license_plate: string; brand: string | null; model: string | null; }) => {
+    mutationFn: async (input: {
+      id: string;
+      name: string;
+      phone: string | null;
+      license_plate: string;
+      brand: string | null;
+      model: string | null;
+    }) => {
       const { id, ...rest } = input;
-      return updateClientWithFallback(id, { ...rest, workshop_id: workshopId });
+      const payload: AnyRecord = {
+        ...rest,
+        workshop_id: workshopId,
+      };
+      return updateClientWithFallback(id, payload);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients", workshopId] }); toast.success("Cliente actualizado"); },
-    onError: (error: any) => { toast.error("Error al actualizar cliente: " + (error?.message ?? "")); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      toast.success("Cliente actualizado");
+    },
+    onError: (error: any) => {
+      toast.error("Error al actualizar cliente: " + (error?.message ?? ""));
+    },
   });
 }
 
 export function useDeleteClient() {
   const queryClient = useQueryClient();
   const { workshopId } = useWorkshop();
+
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("clients").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients", workshopId] }); toast.success("Cliente eliminado"); },
-    onError: (error: any) => { toast.error("Error al eliminar cliente: " + (error?.message ?? "")); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      toast.success("Cliente eliminado");
+    },
+    onError: (error: any) => {
+      toast.error("Error al eliminar cliente: " + (error?.message ?? ""));
+    },
   });
-    }
+}
