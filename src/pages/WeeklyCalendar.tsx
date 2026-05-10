@@ -325,14 +325,12 @@ const WeeklyCalendar = () => {
                       </div>
                       {mechanicNames.map((mechName) => {
                         const apt = todayAppointments.find((a) => {
-                          const aptMechanic = a.mechanic || "Sin asignar";
-                          if (aptMechanic !== mechName) return false;
+                          if (resolveAptMechanicName(a) !== mechName) return false;
                           return getAppointmentSlot(a) === slotIndex;
                         });
 
                         const occupyingApt = !apt ? todayAppointments.find((a) => {
-                          const aptMechanic = a.mechanic || "Sin asignar";
-                          if (aptMechanic !== mechName) return false;
+                          if (resolveAptMechanicName(a) !== mechName) return false;
                           const startSlot = getAppointmentSlot(a);
                           const duration = getAppointmentDuration(a);
                           return slotIndex > startSlot && slotIndex < startSlot + duration;
