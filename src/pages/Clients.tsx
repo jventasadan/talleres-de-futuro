@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, User, Phone, Loader2, Car, List, LayoutGrid, Upload } from "lucide-react";
+import { Plus, Search, User, Phone, Loader2, Car, ChevronLeft, Upload } from "lucide-react";
 import { useClients, useCreateClient, type Client } from "@/hooks/useClients";
 import { ClientDetailDialog } from "@/components/clients/ClientDetailDialog";
 import { useState, useEffect, useRef } from "react";
