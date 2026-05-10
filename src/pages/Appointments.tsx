@@ -183,6 +183,7 @@ const Appointments = () => {
   const { data: mechanics } = useMechanics();
   const { data: companySettings } = useCompanySettings();
   const { data: quotes } = useQuotes();
+  const { data: invoicesList } = useInvoices();
   const updateStatus = useUpdateAppointmentStatus();
   const updateQuoteStatus = useUpdateQuoteStatus();
   const createMutation = useCreateAppointment();
