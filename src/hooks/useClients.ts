@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export interface Client {
@@ -21,7 +22,13 @@ type AnyRecord = Record<string, any>;
 const isSchemaMismatchError = (error: any) => {
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "").toLowerCase();
-  return code === "42703" || code === "PGRST204" || message.includes("does not exist") || message.includes("schema cache");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    message.includes("does not exist") ||
+    message.includes("schema cache") ||
+    message.includes("could not find")
+  );
 };
 
 const extractMissingColumn = (error: any): string | null => {
@@ -51,32 +58,25 @@ function mapRow(row: AnyRecord): Client {
 const insertClientWithFallback = async (payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
   let lastError: any;
-
   for (let i = 0; i < 12; i += 1) {
     const { data, error } = await supabase
       .from("clients")
       .insert(attemptPayload as any)
       .select("*")
       .maybeSingle();
-
     if (!error) return data as AnyRecord | null;
-
     lastError = error;
     const missingColumn = extractMissingColumn(error);
-
     if (!isSchemaMismatchError(error) || !missingColumn) break;
     if (!(missingColumn in attemptPayload)) break;
-
     delete attemptPayload[missingColumn];
   }
-
   throw lastError;
 };
 
 const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
   let attemptPayload: AnyRecord = { ...payload };
   let lastError: any;
-
   for (let i = 0; i < 12; i += 1) {
     const { data, error } = await supabase
       .from("clients")
@@ -84,55 +84,61 @@ const updateClientWithFallback = async (id: string, payload: AnyRecord) => {
       .eq("id", id)
       .select("*")
       .maybeSingle();
-
     if (!error) return data as AnyRecord | null;
-
     lastError = error;
     const missingColumn = extractMissingColumn(error);
-
     if (!isSchemaMismatchError(error) || !missingColumn) break;
     if (!(missingColumn in attemptPayload)) break;
-
     delete attemptPayload[missingColumn];
   }
-
   throw lastError;
 };
 
 export function useClients() {
   const { workshopId } = useWorkshop();
+  const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["clients", workshopId],
+    queryKey: ["clients", workshopId, user?.id],
     queryFn: async () => {
-      if (!workshopId) return [];
+      // Strategy 1: filter by workshop_id
+      if (workshopId) {
+        const { data, error } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("workshop_id", workshopId)
+          .order("created_at", { ascending: false });
+        if (!error && (data ?? []).length > 0) return data!.map(mapRow);
+        if (error && !isSchemaMismatchError(error)) throw error;
+      }
 
+      // Strategy 2: filter by user_id (older records without workshop_id)
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        if (!error && (data ?? []).length > 0) return data!.map(mapRow);
+        if (error && !isSchemaMismatchError(error)) throw error;
+      }
+
+      // Strategy 3: fetch all (RLS handles permissions)
       const { data, error } = await supabase
         .from("clients")
         .select("*")
-        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
-
-      if (!error) return (data ?? []).map(mapRow);
-
-      if (isSchemaMismatchError(error)) {
-        const { data: d2, error: e2 } = await supabase
-          .from("clients")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (e2) throw e2;
-        return (d2 ?? []).map(mapRow);
-      }
-
-      throw error;
+      if (error) throw error;
+      return (data ?? []).map(mapRow);
     },
-    enabled: !!workshopId,
+    enabled: !!(workshopId || user?.id),
   });
 }
 
 export function useCreateClient() {
   const queryClient = useQueryClient();
   const { workshopId } = useWorkshop();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (input: {
@@ -149,11 +155,12 @@ export function useCreateClient() {
         brand: input.brand,
         model: input.model,
         workshop_id: workshopId,
+        user_id: user?.id,
       };
       return insertClientWithFallback(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Cliente creado correctamente");
     },
     onError: (error: any) => {
@@ -176,14 +183,11 @@ export function useUpdateClient() {
       model: string | null;
     }) => {
       const { id, ...rest } = input;
-      const payload: AnyRecord = {
-        ...rest,
-        workshop_id: workshopId,
-      };
+      const payload: AnyRecord = { ...rest, workshop_id: workshopId };
       return updateClientWithFallback(id, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Cliente actualizado");
     },
     onError: (error: any) => {
@@ -194,7 +198,6 @@ export function useUpdateClient() {
 
 export function useDeleteClient() {
   const queryClient = useQueryClient();
-  const { workshopId } = useWorkshop();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -202,7 +205,7 @@ export function useDeleteClient() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients", workshopId] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Cliente eliminado");
     },
     onError: (error: any) => {
