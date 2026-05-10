@@ -937,7 +937,8 @@ const Appointments = () => {
                                       <Mail className="mr-1 h-3 w-3" />Enviar email
                                     </Button>
                                   )}
-                                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" title="Ver factura">
+                                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" title="Ver factura"
+                                    onClick={() => void handleDownloadInvoice(apt)}>
                                     <Receipt className="h-3 w-3" />
                                   </Button>
                                 </>
