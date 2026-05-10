@@ -10,6 +10,7 @@ export interface CourtesyVehicle {
   model: string;
   km: string;
   assigned_client: string;
+  client_phone: string;
   delivery_date: string;
   return_date: string;
   status: string;
@@ -39,6 +40,7 @@ const normalizeCourtesyVehicle = (row: Record<string, any>): CourtesyVehicle => 
   model: String(row.model ?? ""),
   km: String(row.km ?? ""),
   assigned_client: String(row.assigned_client ?? ""),
+  client_phone: String(row.client_phone ?? ""),
   delivery_date: String(row.delivery_date ?? ""),
   return_date: String(row.return_date ?? ""),
   status: String(row.status ?? "disponible"),
