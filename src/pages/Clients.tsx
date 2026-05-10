@@ -54,14 +54,39 @@ function mapImportRow(row: Record<string, string>): { name: string; phone: strin
   return { name: name || "Sin nombre", phone, license_plate: plate || "SIN-MAT", brand, model };
 }
 
+interface ClientGroup {
+  key: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  vehicles: Client[];
+}
+
+function groupClients(clients: Client[]): ClientGroup[] {
+  const map = new Map<string, ClientGroup>();
+  for (const c of clients) {
+    const name = (c.name ?? "").trim() || "Sin nombre";
+    const phone = (c.phone ?? "").trim();
+    const key = `${name.toLowerCase()}|${phone}`;
+    let group = map.get(key);
+    if (!group) {
+      group = { key, name, phone: phone || null, email: c.email ?? null, vehicles: [] };
+      map.set(key, group);
+    }
+    if (!group.email && c.email) group.email = c.email;
+    group.vehicles.push(c);
+  }
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 const Clients = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<ClientGroup | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,19 +97,22 @@ const Clients = () => {
 
   useEffect(() => {
     const q = searchParams.get("search");
-    if (q) {
-      setSearch(q);
-    }
+    if (q) setSearch(q);
   }, [searchParams]);
 
-  const filtered = (clients ?? []).filter(
-    (c) =>
-      (c.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.phone ?? "").includes(search) ||
-      (c.license_plate ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.brand ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.model ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  const groups = groupClients(clients ?? []);
+  const filteredGroups = groups.filter((g) => {
+    const q = search.toLowerCase();
+    if (!q) return true;
+    if (g.name.toLowerCase().includes(q)) return true;
+    if ((g.phone ?? "").includes(search)) return true;
+    return g.vehicles.some(
+      (v) =>
+        (v.license_plate ?? "").toLowerCase().includes(q) ||
+        (v.brand ?? "").toLowerCase().includes(q) ||
+        (v.model ?? "").toLowerCase().includes(q)
+    );
+  });
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +122,11 @@ const Clients = () => {
     );
   };
 
-  const handleClientClick = (client: Client) => {
-    if (client.license_plate) {
-      navigate(`/vehicle-history?plate=${encodeURIComponent(client.license_plate)}`);
+  const handleVehicleClick = (vehicle: Client) => {
+    if (vehicle.license_plate) {
+      navigate(`/vehicle-history?plate=${encodeURIComponent(vehicle.license_plate)}`);
     } else {
-      setSelectedClient(client);
+      setSelectedClient(vehicle);
       setDetailOpen(true);
     }
   };
@@ -142,14 +170,12 @@ const Clients = () => {
       let skipped = 0;
 
       for (const client of mapped) {
-        // Check duplicate by plate
         const { data: existing } = await supabase
           .from("clients")
           .select("id")
           .eq("workshop_id", workshopId)
           .eq("license_plate", client.license_plate)
           .maybeSingle() as any;
-
         if (existing) { skipped++; continue; }
 
         await supabase.from("clients").insert({
@@ -173,19 +199,30 @@ const Clients = () => {
     }
   };
 
+  const subtitle = selectedGroup
+    ? `${selectedGroup.name} · ${selectedGroup.vehicles.length} vehículo${selectedGroup.vehicles.length !== 1 ? "s" : ""}`
+    : "Base de datos de clientes del taller";
+
   return (
-    <DashboardLayout title="Clientes" subtitle="Base de datos de clientes del taller">
+    <DashboardLayout title="Clientes" subtitle={subtitle}>
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={selectedGroup ? "Buscar matrícula o modelo..." : "Buscar por nombre, teléfono, matrícula..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-              <Button variant={viewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("grid")} className="h-7 w-7 p-0">
-                <LayoutGrid className="h-3.5 w-3.5" />
+            {selectedGroup && (
+              <Button variant="outline" onClick={() => setSelectedGroup(null)}>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Volver a clientes
               </Button>
-              <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")} className="h-7 w-7 p-0">
-                <List className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -208,72 +245,94 @@ const Clients = () => {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : !filtered.length ? (
+        ) : selectedGroup ? (
+          (() => {
+            const q = search.toLowerCase();
+            const vehicles = selectedGroup.vehicles.filter((v) => {
+              if (!q) return true;
+              return (
+                (v.license_plate ?? "").toLowerCase().includes(q) ||
+                (v.brand ?? "").toLowerCase().includes(q) ||
+                (v.model ?? "").toLowerCase().includes(q)
+              );
+            });
+            return (
+              <div className="space-y-4">
+                <Card>
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary font-display text-sm font-bold">
+                      {getInitials(selectedGroup.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="font-display text-lg font-bold truncate">{selectedGroup.name}</h2>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        {selectedGroup.phone && (
+                          <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{selectedGroup.phone}</span>
+                        )}
+                        {selectedGroup.email && (<span className="truncate">{selectedGroup.email}</span>)}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {!vehicles.length ? (
+                  <p className="text-center text-sm text-muted-foreground py-12">Este cliente no tiene vehículos.</p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {vehicles.map((v) => (
+                      <Card key={v.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => handleVehicleClick(v)}>
+                        <CardContent className="p-4 flex items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+                            <Car className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{[v.brand, v.model].filter(Boolean).join(" ") || "Vehículo sin marca"}</p>
+                            {v.license_plate && (
+                              <Badge variant="outline" className="mt-1 text-[10px] font-mono">{v.license_plate}</Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        ) : !filteredGroups.length ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <User className="h-10 w-10 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">No se encontraron clientes</p>
           </div>
-        ) : viewMode === "grid" ? (
+        ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((client, i) => (
-              <Card key={client.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => handleClientClick(client)}>
+            {filteredGroups.map((g, i) => (
+              <Card
+                key={g.key}
+                className="cursor-pointer transition-shadow hover:shadow-md"
+                onClick={() => setSelectedGroup(g)}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-xs font-bold ${avatarColors[i % avatarColors.length]}`}>
-                      {getInitials(client.name)}
+                      {getInitials(g.name)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-medium truncate">{client.name || "Sin nombre"}</h3>
-                      {client.phone && (
+                      <h3 className="font-medium truncate">{g.name}</h3>
+                      {g.phone && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />{client.phone}
+                          <Phone className="h-3 w-3" />{g.phone}
                         </p>
                       )}
-                      {(client.brand || client.model) && (
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                          <Car className="h-3 w-3" />{[client.brand, client.model].filter(Boolean).join(" ")}
-                        </p>
-                      )}
-                      {client.license_plate && (
-                        <Badge variant="outline" className="mt-1 text-[10px] font-mono">{client.license_plate}</Badge>
-                      )}
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <Car className="h-3 w-3" />
+                        {g.vehicles.length} vehículo{g.vehicles.length !== 1 ? "s" : ""}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-        ) : (
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs uppercase">Nombre</TableHead>
-                    <TableHead className="text-xs uppercase">Teléfono</TableHead>
-                    <TableHead className="text-xs uppercase">Matrícula</TableHead>
-                    <TableHead className="text-xs uppercase">Marca</TableHead>
-                    <TableHead className="text-xs uppercase">Modelo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((client) => (
-                    <TableRow
-                      key={client.id}
-                      className="cursor-pointer hover:bg-accent/50"
-                      onClick={() => handleClientClick(client)}
-                    >
-                      <TableCell className="font-medium">{client.name || "Sin nombre"}</TableCell>
-                      <TableCell className="text-muted-foreground">{client.phone || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{client.license_plate || "—"}</TableCell>
-                      <TableCell>{client.brand || "—"}</TableCell>
-                      <TableCell>{client.model || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         )}
       </div>
 
