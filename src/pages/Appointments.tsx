@@ -19,7 +19,8 @@ import {
   useAllAppointments, useCreateAppointment, useUpdateAppointmentStatus,
   type Appointment,
 } from "@/hooks/useAppointments";
-import { useCreateInvoice, generateInvoiceNumber } from "@/hooks/useInvoices";
+import { useCreateInvoice, generateInvoiceNumber, useInvoices } from "@/hooks/useInvoices";
+import { generatePdfWithLogo, type PdfLine } from "@/lib/pdf-utils";
 import { useQuotes, useUpdateQuoteStatus } from "@/hooks/useQuotes";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useMechanics } from "@/hooks/useMechanics";
@@ -182,6 +183,7 @@ const Appointments = () => {
   const { data: mechanics } = useMechanics();
   const { data: companySettings } = useCompanySettings();
   const { data: quotes } = useQuotes();
+  const { data: invoicesList } = useInvoices();
   const updateStatus = useUpdateAppointmentStatus();
   const updateQuoteStatus = useUpdateQuoteStatus();
   const createMutation = useCreateAppointment();
@@ -667,6 +669,65 @@ const Appointments = () => {
     return null;
   };
 
+  const handleDownloadInvoice = async (apt: Appointment) => {
+    if (!workshopId) return;
+    try {
+      const woId = workOrderMap[apt.id] ?? null;
+      let invoice = (invoicesList ?? []).find(
+        (inv) => (woId && inv.work_order_id === woId) || inv.appointment_id === apt.id
+      ) as any;
+      if (!invoice && woId) {
+        const { data } = await (supabase as any)
+          .from("invoices").select("*").eq("work_order_id", woId).maybeSingle();
+        invoice = data;
+      }
+      if (!invoice) {
+        toast.error("Aún no hay factura generada para esta orden");
+        return;
+      }
+
+      const [linesRes, woRes] = await Promise.all([
+        (supabase as any).from("invoice_lines").select("*").eq("invoice_id", invoice.id).order("created_at", { ascending: true }),
+        woId ? (supabase as any).from("work_orders").select("comentario_factura").eq("id", woId).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      const lines: PdfLine[] = (linesRes.data ?? []).map((l: any) => {
+        const descMatch = String(l.description ?? "").match(/\(-?(\d+(?:\.\d+)?)%\)\s*$/);
+        return {
+          description: String(l.description ?? "Concepto"),
+          quantity: Number(l.quantity ?? 1),
+          unit_price: Number(l.unit_price ?? 0),
+          total: Number(l.total ?? 0),
+          line_type: l.line_type === "labor" ? "labor" : l.line_type === "discount" ? "discount" : "part",
+          discount_percent: descMatch ? Number(descMatch[1]) : 0,
+        };
+      });
+
+      const photoRes = await (supabase as any)
+        .from("appointment_photos").select("photo_url").eq("appointment_id", apt.id)
+        .order("created_at", { ascending: true });
+      const photos = (photoRes.data ?? []).map((p: any) => String(p.photo_url)).filter(Boolean);
+
+      await generatePdfWithLogo({
+        title: `FACTURA ${invoice.invoice_number}`,
+        date: new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }),
+        filename: `${invoice.invoice_number}.pdf`,
+        clientName: invoice.client_name ?? apt.client_name,
+        licensePlate: invoice.license_plate ?? apt.license_plate,
+        service: invoice.service ?? apt.service,
+        vehicleInfo: [apt.brand, apt.model].filter(Boolean).join(" ") || undefined,
+        vehicleKm: apt.km ? String(apt.km) : undefined,
+        clientPhone: apt.phone || undefined,
+        clientEmail: apt.email || undefined,
+        comment: woRes.data?.comentario_factura || undefined,
+        lines,
+        taxRate: Number(invoice.tax_rate ?? 21),
+        photos,
+      }, { ...(companySettings ?? {}), logo_url: (companySettings as any)?.logo_url ?? undefined });
+    } catch (err: any) {
+      toast.error("No se pudo descargar la factura: " + (err?.message ?? ""));
+    }
+  };
+
   return (
     <DashboardLayout title="Órdenes de Trabajo" subtitle="Gestión de reparaciones del taller">
       <div className="space-y-5">
@@ -876,7 +937,8 @@ const Appointments = () => {
                                       <Mail className="mr-1 h-3 w-3" />Enviar email
                                     </Button>
                                   )}
-                                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" title="Ver factura">
+                                  <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" title="Ver factura"
+                                    onClick={() => void handleDownloadInvoice(apt)}>
                                     <Receipt className="h-3 w-3" />
                                   </Button>
                                 </>
