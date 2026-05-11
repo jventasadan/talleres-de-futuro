@@ -113,7 +113,7 @@ const VehicleHistory = () => {
         if (!plateMap[plate]) {
           plateMap[plate] = {
             license_plate: plate,
-            client_name: name,
+            client_name: name.trim(),
             email: apt.email || apt.Email || client?.email || null,
             brand: apt.brand || client?.brand || null,
             model: apt.model || client?.model || null,
@@ -219,7 +219,7 @@ const VehicleHistory = () => {
     filteredVehicles.forEach((v) => {
       const key = v.client_name.toLowerCase();
       if (!groups[key]) {
-        groups[key] = { client_name: v.client_name, email: v.email, vehicles: [] };
+        groups[key] = { client_name: (v.client_name || "Sin nombre").trim(), email: v.email, vehicles: [] };
       }
       if (!groups[key].email && v.email) groups[key].email = v.email;
       groups[key].vehicles.push(v);
