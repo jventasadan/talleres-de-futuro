@@ -118,6 +118,7 @@ const Clients = () => {
   const groups = useMemo(() => groupClients(clients ?? []), [clients]);
 
   // Handle URL params for deep-linking from global search
+  // Depends on 'clients' so it re-runs when Supabase data arrives (not just groups)
   useEffect(() => {
     const clientParam = searchParams.get("client");
     const plateParam = searchParams.get("plate");
@@ -125,17 +126,17 @@ const Clients = () => {
     if (!groups.length) return;
 
     if (plateParam) {
-      // Find vehicle by plate across all groups
+      // Find the group that owns this plate, show CLIENT view (all their cars)
       for (const g of groups) {
-        const v = g.vehicles.find((v) => v.license_plate?.toLowerCase() === plateParam.toLowerCase());
-        if (v) { setView({ type: "vehicle", group: g, vehicle: v }); return; }
+        const hasPlate = g.vehicles.some((v) => v.license_plate?.toLowerCase() === plateParam.toLowerCase());
+        if (hasPlate) { setView({ type: "client", group: g }); return; }
       }
     }
     if (clientParam) {
       const g = groups.find((g) => g.name.toLowerCase().includes(clientParam.toLowerCase()));
       if (g) { setView({ type: "client", group: g }); return; }
     }
-  }, [searchParams, groups]);
+  }, [searchParams, groups, clients]);
 
   // vehicle history for current vehicle view
   const vehicleHistory = useMemo(() => {
