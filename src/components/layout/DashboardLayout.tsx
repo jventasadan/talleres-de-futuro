@@ -76,7 +76,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           id: c.id,
           label: c.name || "Sin nombre",
           sub: [c.license_plate, c.brand, c.model].filter(Boolean).join(" · "),
-          url: `/vehicle-history?plate=${encodeURIComponent(c.license_plate || "")}`,
+          url: `/clients?plate=${encodeURIComponent(c.license_plate || "")}`,
         });
       }
     });
@@ -91,7 +91,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           id: a.id,
           label: `${a.client_name} · ${a.license_plate}`,
           sub: `${a.service} (${a.date})`,
-          url: `/vehicle-history?plate=${encodeURIComponent(a.license_plate || "")}`,
+          url: `/clients?plate=${encodeURIComponent(a.license_plate || "")}`,
         });
       }
     });
