@@ -79,7 +79,8 @@ function groupClients(clients: Client[]): ClientGroup[] {
   for (const c of clients) {
     const name = (c.name ?? "").trim() || "Sin nombre";
     const phone = (c.phone ?? "").trim();
-    const key = `${name.toLowerCase()}|${phone}`;
+    const normName = name.toLowerCase().trim().replace(/\s+/g, " ");
+    const key = `${normName}|${phone}`;
     if (!map.has(key)) {
       map.set(key, { key, name, phone: phone || null, email: c.email ?? null, colorIdx: idx++, vehicles: [] });
     }
@@ -133,7 +134,8 @@ const Clients = () => {
       }
     }
     if (clientParam) {
-      const g = groups.find((g) => g.name.toLowerCase().includes(clientParam.toLowerCase()));
+      const q = clientParam.toLowerCase().trim();
+      const g = groups.find((g) => g.name.toLowerCase().includes(q));
       if (g) { setView({ type: "client", group: g }); return; }
     }
   }, [searchParams, groups, clients]);
