@@ -9,8 +9,8 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Plus, Search, User, Phone, Loader2, Car, ChevronLeft, Upload,
-  Mail, Wrench, FileText, History, ChevronRight, Edit2, Trash2,
+  Plus, User, Phone, Loader2, Car, ChevronLeft, Upload,
+  Mail, Wrench, FileText, History, ChevronRight, Trash2,
 } from "lucide-react";
 import { useClients, useCreateClient, useDeleteClient, type Client } from "@/hooks/useClients";
 import { useAllAppointments } from "@/hooks/useAppointments";
@@ -33,12 +33,7 @@ const AVATAR_COLORS = [
 ];
 
 function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "??";
+  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";
 }
 
 function avatarColor(idx: number) {
@@ -49,15 +44,12 @@ function parseCSV(text: string): Array<Record<string, string>> {
   const lines = text.trim().split("\n");
   if (lines.length < 2) return [];
   const headers = lines[0].split(/[,;\t]/).map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
-  return lines
-    .slice(1)
-    .map((line) => {
-      const values = line.split(/[,;\t]/).map((v) => v.trim().replace(/^["']|["']$/g, ""));
-      const row: Record<string, string> = {};
-      headers.forEach((h, i) => { row[h] = values[i] ?? ""; });
-      return row;
-    })
-    .filter((r) => Object.values(r).some((v) => v));
+  return lines.slice(1).map((line) => {
+    const values = line.split(/[,;\t]/).map((v) => v.trim().replace(/^["']|["']$/g, ""));
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = values[i] ?? ""; });
+    return row;
+  }).filter((r) => Object.values(r).some((v) => v));
 }
 
 function mapImportRow(row: Record<string, string>) {
@@ -98,7 +90,7 @@ function groupClients(clients: Client[]): ClientGroup[] {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// ── sub-views ──────────────────────────────────────────────────────────────────
+// ── views ──────────────────────────────────────────────────────────────────────
 
 type View =
   | { type: "list" }
@@ -110,7 +102,6 @@ type View =
 const Clients = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
   const [view, setView] = useState<View>({ type: "list" });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
@@ -124,31 +115,27 @@ const Clients = () => {
   const { workshopId } = useWorkshop();
   const { user } = useAuth();
 
-  useEffect(() => {
-    const q = searchParams.get("search");
-    if (q) setSearch(q);
-  }, [searchParams]);
-
-  // Reset search when view changes
-  useEffect(() => { setSearch(""); }, [view.type]);
-
   const groups = useMemo(() => groupClients(clients ?? []), [clients]);
 
-  const filteredGroups = useMemo(() => {
-    const q = search.toLowerCase();
-    if (!q) return groups;
-    return groups.filter(
-      (g) =>
-        g.name.toLowerCase().includes(q) ||
-        (g.phone ?? "").includes(q) ||
-        g.vehicles.some(
-          (v) =>
-            (v.license_plate ?? "").toLowerCase().includes(q) ||
-            (v.brand ?? "").toLowerCase().includes(q) ||
-            (v.model ?? "").toLowerCase().includes(q)
-        )
-    );
-  }, [groups, search]);
+  // Handle URL params for deep-linking from global search
+  useEffect(() => {
+    const clientParam = searchParams.get("client");
+    const plateParam = searchParams.get("plate");
+
+    if (!groups.length) return;
+
+    if (plateParam) {
+      // Find vehicle by plate across all groups
+      for (const g of groups) {
+        const v = g.vehicles.find((v) => v.license_plate?.toLowerCase() === plateParam.toLowerCase());
+        if (v) { setView({ type: "vehicle", group: g, vehicle: v }); return; }
+      }
+    }
+    if (clientParam) {
+      const g = groups.find((g) => g.name.toLowerCase().includes(clientParam.toLowerCase()));
+      if (g) { setView({ type: "client", group: g }); return; }
+    }
+  }, [searchParams, groups]);
 
   // vehicle history for current vehicle view
   const vehicleHistory = useMemo(() => {
@@ -164,19 +151,8 @@ const Clients = () => {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     createClient.mutate(
-      {
-        name: form.name,
-        phone: form.phone || null,
-        license_plate: form.license_plate,
-        brand: form.brand || null,
-        model: form.model || null,
-      },
-      {
-        onSuccess: () => {
-          setDialogOpen(false);
-          setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" });
-        },
-      }
+      { name: form.name, phone: form.phone || null, license_plate: form.license_plate, brand: form.brand || null, model: form.model || null },
+      { onSuccess: () => { setDialogOpen(false); setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" }); } }
     );
   };
 
@@ -197,16 +173,13 @@ const Clients = () => {
           Object.entries(r).forEach(([k, v]) => { m[k.toLowerCase().trim()] = String(v ?? ""); });
           return m;
         });
-      } else {
-        toast.error("Formato no soportado. Usa CSV, TXT o Excel");
-        return;
-      }
+      } else { toast.error("Formato no soportado. Usa CSV, TXT o Excel"); return; }
+
       const mapped = rows.map(mapImportRow).filter(Boolean) as any[];
       if (!mapped.length) { toast.error("No se encontraron clientes válidos"); return; }
       let imported = 0, skipped = 0;
       for (const c of mapped) {
-        const { data: ex } = await (supabase as any)
-          .from("clients").select("id").eq("license_plate", c.license_plate).maybeSingle();
+        const { data: ex } = await (supabase as any).from("clients").select("id").eq("license_plate", c.license_plate).maybeSingle();
         if (ex) { skipped++; continue; }
         await (supabase as any).from("clients").insert({
           name: c.name, phone: c.phone || null, license_plate: c.license_plate,
@@ -225,8 +198,7 @@ const Clients = () => {
     }
   };
 
-  // ── breadcrumb title ─────────────────────────────────────────────────────────
-
+  // subtitle for DashboardLayout
   const subtitle =
     view.type === "vehicle"
       ? `${view.group.name} › ${[view.vehicle.brand, view.vehicle.model].filter(Boolean).join(" ") || view.vehicle.license_plate}`
@@ -234,43 +206,24 @@ const Clients = () => {
       ? `${view.group.name} · ${view.group.vehicles.length} vehículo${view.group.vehicles.length !== 1 ? "s" : ""}`
       : `${groups.length} cliente${groups.length !== 1 ? "s" : ""}`;
 
-  // ── render ───────────────────────────────────────────────────────────────────
-
   return (
     <DashboardLayout title="Clientes" subtitle={subtitle}>
       <div className="space-y-4">
 
         {/* ── toolbar ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {view.type !== "list" && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() =>
-                  setView(view.type === "vehicle" ? { type: "client", group: view.group } : { type: "list" })
-                }
+                onClick={() => setView(view.type === "vehicle" ? { type: "client", group: view.group } : { type: "list" })}
                 className="shrink-0"
               >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 {view.type === "vehicle" ? view.group.name : "Clientes"}
               </Button>
             )}
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={
-                  view.type === "vehicle"
-                    ? "Buscar en historial…"
-                    : view.type === "client"
-                    ? "Buscar matrícula o modelo…"
-                    : "Buscar por nombre, teléfono, matrícula…"
-                }
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
           </div>
 
           {view.type === "list" && (
@@ -288,47 +241,34 @@ const Clients = () => {
           )}
         </div>
 
-        {/* ── loading ── */}
+        {/* ── content ── */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
           </div>
 
-        /* ── VEHICLE detail view ── */
         ) : view.type === "vehicle" ? (
           <VehicleDetail
             vehicle={view.vehicle}
             group={view.group}
             history={vehicleHistory}
-            search={search}
             onNavigate={(plate) => navigate(`/vehicle-history?plate=${encodeURIComponent(plate)}`)}
             onNavigateInvoices={(plate) => navigate(`/invoices?plate=${encodeURIComponent(plate)}`)}
-            onDelete={(id) => {
-              deleteClient.mutate(id, {
-                onSuccess: () => setView({ type: "client", group: view.group }),
-              });
-            }}
+            onDelete={(id) => { deleteClient.mutate(id, { onSuccess: () => setView({ type: "client", group: view.group }) }); }}
           />
 
-        /* ── CLIENT vehicles view ── */
         ) : view.type === "client" ? (
           <ClientVehiclesView
             group={view.group}
-            search={search}
             onSelectVehicle={(v) => setView({ type: "vehicle", group: view.group, vehicle: v })}
           />
 
-        /* ── LIST view ── */
-        ) : filteredGroups.length === 0 ? (
-          <EmptyState onAdd={() => setDialogOpen(true)} hasSearch={!!search} />
+        ) : groups.length === 0 ? (
+          <EmptyState onAdd={() => setDialogOpen(true)} />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredGroups.map((g) => (
-              <ClientCard
-                key={g.key}
-                group={g}
-                onClick={() => setView({ type: "client", group: g })}
-              />
+            {groups.map((g) => (
+              <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
             ))}
           </div>
         )}
@@ -345,45 +285,23 @@ const Clients = () => {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label>Nombre *</Label>
-                <Input
-                  placeholder="Ej: Carlos García"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  required
-                />
+                <Input placeholder="Ej: Carlos García" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
               </div>
               <div className="space-y-2">
                 <Label>Teléfono</Label>
-                <Input
-                  placeholder="656 232 325"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                />
+                <Input placeholder="656 232 325" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Matrícula *</Label>
-                <Input
-                  placeholder="5454 TRT"
-                  value={form.license_plate}
-                  onChange={(e) => setForm((f) => ({ ...f, license_plate: e.target.value.toUpperCase() }))}
-                  required
-                />
+                <Input placeholder="5454 TRT" value={form.license_plate} onChange={(e) => setForm((f) => ({ ...f, license_plate: e.target.value.toUpperCase() }))} required />
               </div>
               <div className="space-y-2">
                 <Label>Marca</Label>
-                <Input
-                  placeholder="Volkswagen"
-                  value={form.brand}
-                  onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
-                />
+                <Input placeholder="Volkswagen" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Modelo</Label>
-                <Input
-                  placeholder="Golf GTI"
-                  value={form.model}
-                  onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                />
+                <Input placeholder="Golf GTI" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
               </div>
             </div>
             <DialogFooter>
@@ -411,38 +329,30 @@ function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => voi
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${color.bg} ${color.text}`}
-          >
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${color.bg} ${color.text}`}>
             {getInitials(group.name)}
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold truncate">{group.name}</h3>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               {group.phone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="h-3 w-3" />{group.phone}
-                </span>
+                <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{group.phone}</span>
               )}
               <span className="flex items-center gap-1">
                 <Car className="h-3 w-3" />
                 {group.vehicles.length} vehículo{group.vehicles.length !== 1 ? "s" : ""}
               </span>
             </div>
-            {group.vehicles.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {group.vehicles.slice(0, 3).map((v) => (
-                  <Badge key={v.id} variant="secondary" className="text-[10px] font-mono px-1.5">
-                    {v.license_plate || "—"}
-                  </Badge>
-                ))}
-                {group.vehicles.length > 3 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5">
-                    +{group.vehicles.length - 3}
-                  </Badge>
-                )}
-              </div>
-            )}
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {group.vehicles.slice(0, 3).map((v) => (
+                <Badge key={v.id} variant="secondary" className="text-[10px] font-mono px-1.5">
+                  {v.license_plate || "—"}
+                </Badge>
+              ))}
+              {group.vehicles.length > 3 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5">+{group.vehicles.length - 3}</Badge>
+              )}
+            </div>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
         </div>
@@ -453,28 +363,10 @@ function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => voi
 
 // ── CLIENT VEHICLES VIEW ───────────────────────────────────────────────────────
 
-function ClientVehiclesView({
-  group,
-  search,
-  onSelectVehicle,
-}: {
-  group: ClientGroup;
-  search: string;
-  onSelectVehicle: (v: Client) => void;
-}) {
+function ClientVehiclesView({ group, onSelectVehicle }: { group: ClientGroup; onSelectVehicle: (v: Client) => void }) {
   const color = avatarColor(group.colorIdx);
-  const q = search.toLowerCase();
-  const vehicles = group.vehicles.filter(
-    (v) =>
-      !q ||
-      (v.license_plate ?? "").toLowerCase().includes(q) ||
-      (v.brand ?? "").toLowerCase().includes(q) ||
-      (v.model ?? "").toLowerCase().includes(q)
-  );
-
   return (
     <div className="space-y-4">
-      {/* Client header card */}
       <Card className="border-border/60">
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
@@ -484,55 +376,37 @@ function ClientVehiclesView({
             <div className="min-w-0">
               <h2 className="font-display text-xl font-bold">{group.name}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {group.phone && (
-                  <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{group.phone}</span>
-                )}
-                {group.email && (
-                  <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{group.email}</span>
-                )}
+                {group.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{group.phone}</span>}
+                {group.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{group.email}</span>}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Vehicles */}
-      <div>
-        <p className="mb-3 text-sm font-medium text-muted-foreground">
-          Selecciona un vehículo para ver su historial y facturas
-        </p>
-        {vehicles.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-8">No hay vehículos.</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {vehicles.map((v) => (
-              <Card
-                key={v.id}
-                className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
-                onClick={() => onSelectVehicle(v)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Car className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">
-                        {[v.brand, v.model].filter(Boolean).join(" ") || "Vehículo sin marca"}
-                      </p>
-                      {v.license_plate && (
-                        <Badge variant="outline" className="mt-1 text-[10px] font-mono">
-                          {v.license_plate}
-                        </Badge>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      <p className="text-sm font-medium text-muted-foreground">Selecciona un vehículo para ver su historial y facturas</p>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {group.vehicles.map((v) => (
+          <Card
+            key={v.id}
+            className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
+            onClick={() => onSelectVehicle(v)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Car className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">{[v.brand, v.model].filter(Boolean).join(" ") || "Vehículo sin marca"}</p>
+                  {v.license_plate && <Badge variant="outline" className="mt-1 text-[10px] font-mono">{v.license_plate}</Badge>}
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
@@ -540,36 +414,18 @@ function ClientVehiclesView({
 
 // ── VEHICLE DETAIL VIEW ────────────────────────────────────────────────────────
 
-function VehicleDetail({
-  vehicle,
-  group,
-  history,
-  search,
-  onNavigate,
-  onNavigateInvoices,
-  onDelete,
-}: {
+function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices, onDelete }: {
   vehicle: Client;
   group: ClientGroup;
   history: any[];
-  search: string;
   onNavigate: (plate: string) => void;
   onNavigateInvoices: (plate: string) => void;
   onDelete: (id: string) => void;
 }) {
   const color = avatarColor(group.colorIdx);
-  const q = search.toLowerCase();
-
-  const filteredHistory = history.filter(
-    (a) =>
-      !q ||
-      (a.service ?? "").toLowerCase().includes(q) ||
-      (a.status ?? "").toLowerCase().includes(q)
-  );
 
   return (
     <div className="space-y-4">
-      {/* Vehicle header */}
       <Card className="border-border/60">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3">
@@ -582,27 +438,17 @@ function VehicleDetail({
                   {[vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Vehículo"}
                 </h2>
                 {vehicle.license_plate && (
-                  <Badge variant="outline" className="mt-1 font-mono text-sm">
-                    {vehicle.license_plate}
-                  </Badge>
+                  <Badge variant="outline" className="mt-1 font-mono text-sm">{vehicle.license_plate}</Badge>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => onDelete(vehicle.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(vehicle.id)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
 
           <Separator className="my-4" />
 
-          {/* Owner info */}
           <div className="flex items-center gap-3">
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${color.bg} ${color.text}`}>
               {getInitials(group.name)}
@@ -615,29 +461,19 @@ function VehicleDetail({
         </CardContent>
       </Card>
 
-      {/* Quick actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-1.5"
-          onClick={() => vehicle.license_plate && onNavigate(vehicle.license_plate)}
-          disabled={!vehicle.license_plate}
-        >
+        <Button variant="outline" className="h-auto py-3 flex-col gap-1.5"
+          onClick={() => vehicle.license_plate && onNavigate(vehicle.license_plate)} disabled={!vehicle.license_plate}>
           <History className="h-5 w-5 text-primary" />
           <span className="text-xs font-medium">Ver historial completo</span>
         </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-3 flex-col gap-1.5"
-          onClick={() => vehicle.license_plate && onNavigateInvoices(vehicle.license_plate)}
-          disabled={!vehicle.license_plate}
-        >
+        <Button variant="outline" className="h-auto py-3 flex-col gap-1.5"
+          onClick={() => vehicle.license_plate && onNavigateInvoices(vehicle.license_plate)} disabled={!vehicle.license_plate}>
           <FileText className="h-5 w-5 text-primary" />
           <span className="text-xs font-medium">Ver facturas</span>
         </Button>
       </div>
 
-      {/* Recent repairs */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
@@ -651,18 +487,16 @@ function VehicleDetail({
           )}
         </div>
 
-        {filteredHistory.length === 0 ? (
+        {history.length === 0 ? (
           <Card className="border-dashed border-border/40">
             <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
               <Wrench className="h-8 w-8 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">
-                {search ? "No hay resultados para esa búsqueda" : "Sin reparaciones registradas"}
-              </p>
+              <p className="text-sm text-muted-foreground">Sin reparaciones registradas</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-2">
-            {filteredHistory.slice(0, 5).map((apt) => (
+            {history.slice(0, 5).map((apt) => (
               <Card key={apt.id} className="border-border/40">
                 <CardContent className="p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -674,16 +508,11 @@ function VehicleDetail({
                     )}
                   </div>
                   {apt.status && (
-                    <Badge
-                      variant="outline"
-                      className={`shrink-0 text-[10px] capitalize ${
-                        apt.status === "completada"
-                          ? "border-emerald-500/30 text-emerald-400"
-                          : apt.status === "pendiente"
-                          ? "border-orange-500/30 text-orange-400"
-                          : "border-border"
-                      }`}
-                    >
+                    <Badge variant="outline" className={`shrink-0 text-[10px] capitalize ${
+                      apt.status === "completada" ? "border-emerald-500/30 text-emerald-400"
+                      : apt.status === "pendiente" ? "border-orange-500/30 text-orange-400"
+                      : "border-border"
+                    }`}>
                       {apt.status}
                     </Badge>
                   )}
@@ -704,24 +533,17 @@ function VehicleDetail({
 
 // ── EMPTY STATE ────────────────────────────────────────────────────────────────
 
-function EmptyState({ onAdd, hasSearch }: { onAdd: () => void; hasSearch: boolean }) {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/40 mb-4">
         <User className="h-8 w-8 text-muted-foreground/50" />
       </div>
-      <p className="font-semibold">{hasSearch ? "Sin resultados" : "No hay clientes aún"}</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {hasSearch
-          ? "Prueba con otro nombre, teléfono o matrícula"
-          : "Añade tu primer cliente o importa desde un CSV"}
-      </p>
-      {!hasSearch && (
-        <Button className="mt-4" onClick={onAdd}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo cliente
-        </Button>
-      )}
+      <p className="font-semibold">No hay clientes aún</p>
+      <p className="mt-1 text-sm text-muted-foreground">Añade tu primer cliente o importa desde un CSV</p>
+      <Button className="mt-4" onClick={onAdd}>
+        <Plus className="mr-2 h-4 w-4" />Nuevo cliente
+      </Button>
     </div>
   );
 }
