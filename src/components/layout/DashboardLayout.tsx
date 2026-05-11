@@ -76,7 +76,7 @@ export function DashboardLayout({ children, title, subtitle, showSearch = true, 
           id: c.id,
           label: c.name || "Sin nombre",
           sub: [c.license_plate, c.brand, c.model].filter(Boolean).join(" · "),
-          url: `/clients?plate=${encodeURIComponent(c.license_plate || "")}`,
+          url: `/clients?client=${encodeURIComponent(c.name || "")}`,
         });
       }
     });
