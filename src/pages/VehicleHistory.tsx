@@ -50,7 +50,8 @@ interface HistoryEntry {
 const db = supabase as any;
 
 const VehicleHistory = () => {
-    const [searchText, setSearchText] = useState("");
+    const [searchParams] = useSearchParams();
+  const [searchText, setSearchText] = useState("");
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
