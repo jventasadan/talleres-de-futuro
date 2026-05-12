@@ -1,3 +1,5 @@
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,21 +11,53 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Plus, User, Phone, Loader2, Car, ChevronLeft, Upload,
-  Mail, Wrench, FileText, History, ChevronRight, Trash2,
+  Plus, User, Phone, Loader2, Car, ChevronLeft,
+  Upload, Mail, Wrench, FileText, History, ChevronRight, Trash2,
 } from "lucide-react";
-import { useClients, useCreateClient, useDeleteClient, type Client } from "@/hooks/useClients";
-import { useAllAppointments } from "@/hooks/useAppointments";
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+
+// ── types ──────────────────────────────────────────────────────────────────────
+
+interface Vehicle {
+  id: string;
+  license_plate: string;
+  brand: string | null;
+  model: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+interface ClientGroup {
+  key: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  colorIdx: number;
+  vehicles: Vehicle[];
+}
+
+interface HistoryEntry {
+  id: string;
+  date: string;
+  order_number: string;
+  service: string;
+  status: string;
+  km: string;
+  total: number;
+  invoice_number: string | null;
+}
+
+type View =
+  | { type: "list" }
+  | { type: "client"; group: ClientGroup }
+  | { type: "vehicle"; group: ClientGroup; vehicle: Vehicle };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = [
+const COLORS = [
   { bg: "bg-blue-500/20", text: "text-blue-400" },
   { bg: "bg-emerald-500/20", text: "text-emerald-400" },
   { bg: "bg-violet-500/20", text: "text-violet-400" },
@@ -32,13 +66,13 @@ const AVATAR_COLORS = [
   { bg: "bg-cyan-500/20", text: "text-cyan-400" },
 ];
 
-function getInitials(name: string): string {
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";
-}
+const color = (idx: number) => COLORS[idx % COLORS.length];
 
-function avatarColor(idx: number) {
-  return AVATAR_COLORS[idx % AVATAR_COLORS.length];
-}
+const initials = (name: string) =>
+  name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";
+
+const norm = (s: string) =>
+  (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
 function parseCSV(text: string): Array<Record<string, string>> {
   const lines = text.trim().split("\n");
@@ -62,104 +96,238 @@ function mapImportRow(row: Record<string, string>) {
   return { name: name || "Sin nombre", phone, license_plate: plate || "SIN-MAT", brand, model };
 }
 
-// ── types ──────────────────────────────────────────────────────────────────────
-
-interface ClientGroup {
-  key: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  colorIdx: number;
-  vehicles: Client[];
-}
-
-function groupClients(clients: Client[]): ClientGroup[] {
-  const map = new Map<string, ClientGroup>();
-  let idx = 0;
-  for (const c of clients) {
-    const name = (c.name ?? "").trim() || "Sin nombre";
-    const phone = (c.phone ?? "").trim();
-    const normName = name.toLowerCase().trim().replace(/\s+/g, " ");
-    const key = `${normName}|${phone}`;
-    if (!map.has(key)) {
-      map.set(key, { key, name, phone: phone || null, email: c.email ?? null, colorIdx: idx++, vehicles: [] });
-    }
-    const group = map.get(key)!;
-    if (!group.email && c.email) group.email = c.email;
-    group.vehicles.push(c);
-  }
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// ── views ──────────────────────────────────────────────────────────────────────
-
-type View =
-  | { type: "list" }
-  | { type: "client"; group: ClientGroup }
-  | { type: "vehicle"; group: ClientGroup; vehicle: Client };
-
 // ── component ──────────────────────────────────────────────────────────────────
 
 const Clients = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [view, setView] = useState<View>({ type: "list" });
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { data: clients, isLoading } = useClients();
-  const { data: appointments } = useAllAppointments();
-  const createClient = useCreateClient();
-  const deleteClient = useDeleteClient();
   const { workshopId } = useWorkshop();
   const { user } = useAuth();
 
-  const groups = useMemo(() => groupClients(clients ?? []), [clients]);
+  const [groups, setGroups] = useState<ClientGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<View>({ type: "list" });
 
-  // Handle URL params for deep-linking from global search
-  // Depends on 'clients' so it re-runs when Supabase data arrives (not just groups)
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+  const [saving, setSaving] = useState(false);
+
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
+  // ── Load data exactly like VehicleHistory ────────────────────────────────────
+  const loadData = async () => {
+    if (!workshopId) return;
+    setLoading(true);
+    try {
+      // 1. clients table (trusted source of truth)
+      const { data: clientsRaw } = await (supabase as any)
+        .from("clients")
+        .select("*")
+        .eq("workshop_id", workshopId)
+        .order("created_at", { ascending: false });
+
+      // 2. appointments (for vehicles that may not be in clients table)
+      const { data: aptsRaw } = await (supabase as any)
+        .from("appointments")
+        .select("id,license_plate,client_name,name,phone,email,brand,model")
+        .eq("workshop_id", workshopId)
+        .order("created_at", { ascending: false });
+
+      // Build groups: norm(name) -> ClientGroup
+      const groupMap = new Map<string, ClientGroup>();
+      let idx = 0;
+
+      const getOrCreate = (rawName: string, phone: string | null, email: string | null) => {
+        const key = norm(rawName) || "sin nombre";
+        if (!groupMap.has(key)) {
+          groupMap.set(key, { key, name: rawName.trim() || "Sin nombre", phone: phone || null, email: email || null, colorIdx: idx++, vehicles: [] });
+        }
+        const g = groupMap.get(key)!;
+        if (!g.phone && phone) g.phone = phone;
+        if (!g.email && email) g.email = email;
+        return g;
+      };
+
+      // Process clients table
+      const platesSeen = new Set<string>();
+      for (const c of clientsRaw ?? []) {
+        const name = (c.full_name || c.name || "").trim() || "Sin nombre";
+        const plate = (c.license_plate || "").toUpperCase();
+        const g = getOrCreate(name, c.phone || null, c.email || null);
+        const plateKey = plate || `client-${c.id}`;
+        if (!platesSeen.has(plateKey)) {
+          platesSeen.add(plateKey);
+          g.vehicles.push({
+            id: c.id,
+            license_plate: plate,
+            brand: c.brand || null,
+            model: c.model || null,
+            phone: c.phone || null,
+            email: c.email || null,
+          });
+        }
+      }
+
+      // Process appointments — add vehicles not already in clients
+      for (const a of aptsRaw ?? []) {
+        const plate = (a.license_plate || "").toUpperCase();
+        if (!plate || platesSeen.has(plate)) continue;
+        const name = (a.client_name || a.name || "").trim() || "Sin nombre";
+        const g = getOrCreate(name, a.phone || null, a.email || null);
+        platesSeen.add(plate);
+        g.vehicles.push({
+          id: `apt-${a.id}`,
+          license_plate: plate,
+          brand: a.brand || null,
+          model: a.model || null,
+          phone: a.phone || null,
+          email: a.email || null,
+        });
+      }
+
+      const sorted = Array.from(groupMap.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, "es")
+      );
+      setGroups(sorted);
+    } catch (e) {
+      console.error("Error loading clients:", e);
+      toast.error("Error al cargar clientes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, [workshopId]);
+
+  // Deep-link from global search: ?plate= or ?client=
   useEffect(() => {
-    const clientParam = searchParams.get("client");
-    const plateParam = searchParams.get("plate");
-
     if (!groups.length) return;
-
+    const plateParam = searchParams.get("plate");
+    const clientParam = searchParams.get("client");
     if (plateParam) {
-      // Find the group that owns this plate, show CLIENT view (all their cars)
+      const p = plateParam.toUpperCase();
       for (const g of groups) {
-        const hasPlate = g.vehicles.some((v) => v.license_plate?.toLowerCase() === plateParam.toLowerCase());
-        if (hasPlate) { setView({ type: "client", group: g }); return; }
+        const v = g.vehicles.find((v) => v.license_plate === p);
+        if (v) { setView({ type: "client", group: g }); return; }
       }
     }
     if (clientParam) {
-      const q = clientParam.toLowerCase().trim();
-      const g = groups.find((g) => g.name.toLowerCase().includes(q));
-      if (g) { setView({ type: "client", group: g }); return; }
+      const q = norm(clientParam);
+      const g = groups.find((g) => norm(g.name).includes(q));
+      if (g) { setView({ type: "client", group: g }); }
     }
-  }, [searchParams, groups, clients]);
+  }, [searchParams, groups]);
 
-  // vehicle history for current vehicle view
-  const vehicleHistory = useMemo(() => {
-    if (view.type !== "vehicle") return [];
-    const v = view.vehicle;
-    return (appointments ?? []).filter(
-      (a) =>
-        (v.license_plate && a.license_plate === v.license_plate) ||
-        (v.name && a.client_name === v.name)
-    );
-  }, [view, appointments]);
+  // Load history for a vehicle
+  const loadHistory = async (plate: string) => {
+    if (!workshopId || !plate) return;
+    setHistLoading(true);
+    try {
+      const { data: apts } = await (supabase as any)
+        .from("appointments")
+        .select("*")
+        .eq("workshop_id", workshopId)
+        .ilike("license_plate", plate)
+        .order("created_at", { ascending: false });
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    createClient.mutate(
-      { name: form.name, phone: form.phone || null, license_plate: form.license_plate, brand: form.brand || null, model: form.model || null },
-      { onSuccess: () => { setDialogOpen(false); setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" }); } }
-    );
+      if (!apts?.length) { setHistory([]); return; }
+
+      const aptIds = apts.map((a: any) => a.id);
+      const { data: wos } = await (supabase as any)
+        .from("work_orders").select("*").eq("workshop_id", workshopId).in("appointment_id", aptIds);
+      const woMap: Record<string, any> = {};
+      (wos ?? []).forEach((wo: any) => { woMap[wo.appointment_id] = wo; });
+
+      const woIds = (wos ?? []).map((wo: any) => wo.id);
+      let invMap: Record<string, any> = {};
+      if (woIds.length) {
+        const { data: invs } = await (supabase as any)
+          .from("invoices").select("*").eq("workshop_id", workshopId).in("work_order_id", woIds);
+        (invs ?? []).forEach((inv: any) => { if (inv.work_order_id) invMap[inv.work_order_id] = inv; });
+      }
+
+      setHistory(apts.map((apt: any) => {
+        const wo = woMap[apt.id];
+        const inv = wo ? invMap[wo.id] : null;
+        return {
+          id: apt.id,
+          date: apt.date || apt.created_at?.slice(0, 10) || "",
+          order_number: `ORD-${apt.id.slice(0, 4).toUpperCase()}`,
+          service: apt.service || apt.service_type || "Sin servicio",
+          status: apt.status || "pendiente",
+          km: apt.km || "",
+          total: inv ? Number(inv.total) : 0,
+          invoice_number: inv?.invoice_number ?? null,
+        };
+      }));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setHistLoading(false);
+    }
   };
 
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // When entering vehicle view, load history
+  useEffect(() => {
+    if (view.type === "vehicle" && view.vehicle.license_plate) {
+      loadHistory(view.vehicle.license_plate);
+    } else {
+      setHistory([]);
+    }
+  }, [view]);
+
+  // Delete vehicle (client record)
+  const handleDelete = async (vehicle: Vehicle) => {
+    if (vehicle.id.startsWith("apt-")) { toast.error("Este vehículo viene de una cita, no se puede eliminar aquí"); return; }
+    try {
+      await (supabase as any).from("clients").delete().eq("id", vehicle.id);
+      toast.success("Vehículo eliminado");
+      if (view.type === "vehicle") setView({ type: "client", group: view.group });
+      loadData();
+    } catch (e) {
+      toast.error("Error al eliminar");
+    }
+  };
+
+  // Create client
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload: any = {
+        name: form.name,
+        phone: form.phone || null,
+        license_plate: form.license_plate.toUpperCase(),
+        brand: form.brand || null,
+        model: form.model || null,
+        workshop_id: workshopId,
+        user_id: user?.id,
+      };
+      let { error } = await (supabase as any).from("clients").insert(payload);
+      if (error?.code === "42703" || error?.message?.toLowerCase().includes("does not exist")) {
+        delete payload.workshop_id;
+        const res = await (supabase as any).from("clients").insert(payload);
+        error = res.error;
+      }
+      if (error) throw error;
+      toast.success("Cliente creado");
+      setDialogOpen(false);
+      setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+      loadData();
+    } catch (err: any) {
+      toast.error("Error: " + (err?.message ?? ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Import CSV/Excel
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setImporting(true);
@@ -176,32 +344,39 @@ const Clients = () => {
           Object.entries(r).forEach(([k, v]) => { m[k.toLowerCase().trim()] = String(v ?? ""); });
           return m;
         });
-      } else { toast.error("Formato no soportado. Usa CSV, TXT o Excel"); return; }
+      } else { toast.error("Formato no soportado"); return; }
 
       const mapped = rows.map(mapImportRow).filter(Boolean) as any[];
-      if (!mapped.length) { toast.error("No se encontraron clientes válidos"); return; }
+      if (!mapped.length) { toast.error("Sin clientes válidos"); return; }
       let imported = 0, skipped = 0;
       for (const c of mapped) {
         const { data: ex } = await (supabase as any).from("clients").select("id").eq("license_plate", c.license_plate).maybeSingle();
         if (ex) { skipped++; continue; }
-        await (supabase as any).from("clients").insert({
-          name: c.name, phone: c.phone || null, license_plate: c.license_plate,
-          brand: c.brand || null, model: c.model || null,
-          user_id: user.id, workshop_id: workshopId,
-        });
+        const payload: any = { name: c.name, phone: c.phone || null, license_plate: c.license_plate, brand: c.brand || null, model: c.model || null, user_id: user.id, workshop_id: workshopId };
+        let { error } = await (supabase as any).from("clients").insert(payload);
+        if (error?.code === "42703") { delete payload.workshop_id; await (supabase as any).from("clients").insert(payload); }
         imported++;
       }
-      toast.success(`${imported} clientes importados, ${skipped} duplicados omitidos`);
-      window.location.reload();
-    } catch (err: any) {
-      toast.error("Error al importar: " + (err?.message ?? ""));
-    } finally {
-      setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+      toast.success(`${imported} importados, ${skipped} duplicados omitidos`);
+      loadData();
+    } catch (err: any) { toast.error("Error al importar: " + (err?.message ?? "")); }
+    finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
-  // subtitle for DashboardLayout
+  const filtered = useMemo(() => {
+    const q = norm(search);
+    if (!q) return groups;
+    return groups.filter((g) =>
+      norm(g.name).includes(q) ||
+      (g.phone ?? "").includes(q) ||
+      g.vehicles.some((v) =>
+        v.license_plate.toLowerCase().includes(q) ||
+        norm(v.brand ?? "").includes(q) ||
+        norm(v.model ?? "").includes(q)
+      )
+    );
+  }, [groups, search]);
+
   const subtitle =
     view.type === "vehicle"
       ? `${view.group.name} › ${[view.vehicle.brand, view.vehicle.model].filter(Boolean).join(" ") || view.vehicle.license_plate}`
@@ -212,72 +387,66 @@ const Clients = () => {
   return (
     <DashboardLayout title="Clientes" subtitle={subtitle}>
       <div className="space-y-4">
-
-        {/* ── toolbar ── */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {view.type !== "list" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setView(view.type === "vehicle" ? { type: "client", group: view.group } : { type: "list" })}
-                className="shrink-0"
-              >
+              <Button variant="ghost" size="sm" className="shrink-0"
+                onClick={() => setView(view.type === "vehicle" ? { type: "client", group: view.group } : { type: "list" })}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 {view.type === "vehicle" ? view.group.name : "Clientes"}
               </Button>
             )}
           </div>
-
           {view.type === "list" && (
             <div className="flex items-center gap-2">
-              <input ref={fileInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={handleImportFile} />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-                <Upload className="mr-2 h-4 w-4" />
-                {importing ? "Importando…" : "Importar"}
+              <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={handleImport} />
+              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={importing}>
+                <Upload className="mr-2 h-4 w-4" />{importing ? "Importando…." : "Importar"}
               </Button>
               <Button size="sm" onClick={() => setDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo cliente
+                <Plus className="mr-2 h-4 w-4" />Nuevo cliente
               </Button>
             </div>
           )}
         </div>
 
-        {/* ── content ── */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
-          </div>
-
+        {loading ? (
+          <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
         ) : view.type === "vehicle" ? (
-          <VehicleDetail
+          <VehicleView
             vehicle={view.vehicle}
             group={view.group}
-            history={vehicleHistory}
-            onNavigate={(plate) => navigate(`/vehicle-history?plate=${encodeURIComponent(plate)}`)}
-            onNavigateInvoices={(plate) => navigate(`/invoices?plate=${encodeURIComponent(plate)}`)}
-            onDelete={(id) => { deleteClient.mutate(id, { onSuccess: () => setView({ type: "client", group: view.group }) }); }}
+            history={history}
+            histLoading={histLoading}
+            onNavigateHistory={(p) => navigate(`/vehicle-history?plate=${encodeURIComponent(p)}`)}
+            onNavigateInvoices={(p) => navigate(`/invoices?plate=${encodeURIComponent(p)}`)}
+            onDelete={handleDelete}
           />
-
         ) : view.type === "client" ? (
-          <ClientVehiclesView
-            group={view.group}
-            onSelectVehicle={(v) => setView({ type: "vehicle", group: view.group, vehicle: v })}
-          />
-
-        ) : groups.length === 0 ? (
-          <EmptyState onAdd={() => setDialogOpen(true)} />
+          <ClientView group={view.group} onSelectVehicle={(v) => setView({ type: "vehicle", group: view.group, vehicle: v })} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {groups.map((g) => (
-              <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
-            ))}
-          </div>
-        )}
+          <>
+            <div className="relative max-w-sm">
+              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, teléfono, matrícula…."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {filtered.length === 0 ? (
+              <EmptyState hasSearch={!!search} onAdd={() => setDialogOpen(true)} />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((g) => (
+                  <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
+                ))}
+              </div>
+            )}
+          </>
+         )}
       </div>
-
-      {/* ── New client dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -309,9 +478,8 @@ const Clients = () => {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createClient.isPending}>
-                {createClient.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Crear cliente
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crear cliente
               </Button>
             </DialogFooter>
           </form>
@@ -321,40 +489,26 @@ const Clients = () => {
   );
 };
 
-// ── CLIENT CARD ────────────────────────────────────────────────────────────────
-
 function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => void }) {
-  const color = avatarColor(group.colorIdx);
+  const c = color(group.colorIdx);
   return (
-    <Card
-      className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
-      onClick={onClick}
-    >
+    <Card className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5" onClick={onClick}>
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${color.bg} ${color.text}`}>
-            {getInitials(group.name)}
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${c.bg} ${c.text}`}>
+            {initials(group.name)}
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold truncate">{group.name}</h3>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-              {group.phone && (
-                <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{group.phone}</span>
-              )}
-              <span className="flex items-center gap-1">
-                <Car className="h-3 w-3" />
-                {group.vehicles.length} vehículo{group.vehicles.length !== 1 ? "s" : ""}
-              </span>
+              {group.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{group.phone}</span>}
+              <span className="flex items-center gap-1"><Car className="h-3 w-3" />{group.vehicles.length} vehículo{group.vehicles.length !== 1 ? "s" : ""}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
               {group.vehicles.slice(0, 3).map((v) => (
-                <Badge key={v.id} variant="secondary" className="text-[10px] font-mono px-1.5">
-                  {v.license_plate || "—"}
-                </Badge>
+                <Badge key={v.id} variant="secondary" className="text-[10px] font-mono px-1.5">{v.license_plate || "—"}</Badge>
               ))}
-              {group.vehicles.length > 3 && (
-                <Badge variant="secondary" className="text-[10px] px-1.5">+{group.vehicles.length - 3}</Badge>
-              )}
+              {group.vehicles.length > 3 && <Badge variant="secondary" className="text-[10px] px-1.5">+{group.vehicles.length - 3}</Badge>}
             </div>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
@@ -364,17 +518,15 @@ function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => voi
   );
 }
 
-// ── CLIENT VEHICLES VIEW ───────────────────────────────────────────────────────
-
-function ClientVehiclesView({ group, onSelectVehicle }: { group: ClientGroup; onSelectVehicle: (v: Client) => void }) {
-  const color = avatarColor(group.colorIdx);
+function ClientView({ group, onSelectVehicle }: { group: ClientGroup; onSelectVehicle: (v: Vehicle) => void }) {
+  const c = color(group.colorIdx);
   return (
     <div className="space-y-4">
       <Card className="border-border/60">
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
-            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full font-display text-lg font-bold ${color.bg} ${color.text}`}>
-              {getInitials(group.name)}
+            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full font-display text-lg font-bold ${c.bg} ${c.text}`}>
+              {initials(group.name)}
             </div>
             <div className="min-w-0">
               <h2 className="font-display text-xl font-bold">{group.name}</h2>
@@ -386,16 +538,10 @@ function ClientVehiclesView({ group, onSelectVehicle }: { group: ClientGroup; on
           </div>
         </CardContent>
       </Card>
-
       <p className="text-sm font-medium text-muted-foreground">Selecciona un vehículo para ver su historial y facturas</p>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {group.vehicles.map((v) => (
-          <Card
-            key={v.id}
-            className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
-            onClick={() => onSelectVehicle(v)}
-          >
+          <Card key={v.id} className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5" onClick={() => onSelectVehicle(v)}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -415,18 +561,11 @@ function ClientVehiclesView({ group, onSelectVehicle }: { group: ClientGroup; on
   );
 }
 
-// ── VEHICLE DETAIL VIEW ────────────────────────────────────────────────────────
-
-function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices, onDelete }: {
-  vehicle: Client;
-  group: ClientGroup;
-  history: any[];
-  onNavigate: (plate: string) => void;
-  onNavigateInvoices: (plate: string) => void;
-  onDelete: (id: string) => void;
+function VehicleView({ vehicle, group, history, histLoading, onNavigateHistory, onNavigateInvoices, onDelete }: {
+  vehicle: Vehicle; group: ClientGroup; history: HistoryEntry[]; histLoading: boolean;
+  onNavigateHistory: (p: string) => void; onNavigateInvoices: (p: string) => void; onDelete: (v: Vehicle) => void;
 }) {
-  const color = avatarColor(group.colorIdx);
-
+  const c = color(group.colorIdx);
   return (
     <div className="space-y-4">
       <Card className="border-border/60">
@@ -440,21 +579,17 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
                 <h2 className="font-display text-xl font-bold">
                   {[vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "Vehículo"}
                 </h2>
-                {vehicle.license_plate && (
-                  <Badge variant="outline" className="mt-1 font-mono text-sm">{vehicle.license_plate}</Badge>
-                )}
+                {vehicle.license_plate && <Badge variant="outline" className="mt-1 font-mono text-sm">{vehicle.license_plate}</Badge>}
               </div>
             </div>
-            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(vehicle.id)}>
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(vehicle)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-
           <Separator className="my-4" />
-
           <div className="flex items-center gap-3">
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${color.bg} ${color.text}`}>
-              {getInitials(group.name)}
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${c.bg} ${c.text}`}>
+              {initials(group.name)}
             </div>
             <div className="text-sm">
               <p className="font-medium">{group.name}</p>
@@ -463,10 +598,9 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
           </div>
         </CardContent>
       </Card>
-
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" className="h-auto py-3 flex-col gap-1.5"
-          onClick={() => vehicle.license_plate && onNavigate(vehicle.license_plate)} disabled={!vehicle.license_plate}>
+          onClick={() => vehicle.license_plate && onNavigateHistory(vehicle.license_plate)} disabled={!vehicle.license_plate}>
           <History className="h-5 w-5 text-primary" />
           <span className="text-xs font-medium">Ver historial completo</span>
         </Button>
@@ -476,7 +610,6 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
           <span className="text-xs font-medium">Ver facturas</span>
         </Button>
       </div>
-
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
@@ -484,13 +617,12 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
             Reparaciones recientes ({history.length})
           </h3>
           {vehicle.license_plate && history.length > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs" onClick={() => onNavigate(vehicle.license_plate!)}>
-              Ver todas
-            </Button>
+            <Button variant="ghost" size="sm" className="text-xs" onClick={() => onNavigateHistory(vehicle.license_plate!)}>Ver todas</Button>
           )}
         </div>
-
-        {history.length === 0 ? (
+        {histLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : history.length === 0 ? (
           <Card className="border-dashed border-border/40">
             <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
               <Wrench className="h-8 w-8 text-muted-foreground/30" />
@@ -499,33 +631,26 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
           </Card>
         ) : (
           <div className="space-y-2">
-            {history.slice(0, 5).map((apt) => (
-              <Card key={apt.id} className="border-border/40">
+            {history.slice(0, 5).map((h) => (
+              <Card key={h.id} className="border-border/40">
                 <CardContent className="p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{apt.service || "Sin servicio"}</p>
-                    {apt.scheduled_date && (
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(apt.scheduled_date).toLocaleDateString("es-ES")}
-                      </p>
-                    )}
+                    <p className="text-sm font-medium truncate">{h.service}</p>
+                    {h.date && <p className="text-xs text-muted-foreground">{new Date(h.date).toLocaleDateString("es-ES")}</p>}
                   </div>
-                  {apt.status && (
-                    <Badge variant="outline" className={`shrink-0 text-[10px] capitalize ${
-                      apt.status === "completada" ? "border-emerald-500/30 text-emerald-400"
-                      : apt.status === "pendiente" ? "border-orange-500/30 text-orange-400"
+                  <div className="flex items-center gap-2 shrink-0">
+                    {h.total > 0 && <span className="text-xs font-mono font-semibold">{h.total.toFixed(2)} €</span>}
+                    <Badge variant="outline" className={`text-[10px] capitalize ${
+                      h.status === "completada" || h.status === "entregado" ? "border-emerald-500/30 text-emerald-400"
+                      : h.status === "pendiente" ? "border-orange-500/30 text-orange-400"
                       : "border-border"
-                    }`}>
-                      {apt.status}
-                    </Badge>
-                  )}
+                    }`}>{h.status}</Badge>
+                  </div>
                 </CardContent>
               </Card>
             ))}
             {history.length > 5 && (
-              <p className="text-center text-xs text-muted-foreground pt-1">
-                +{history.length - 5} más — usa «Ver historial completo»
-              </p>
+              <p className="text-center text-xs text-muted-foreground pt-1">+{history.length - 5} más — usa «Ver historial completo»</p>
             )}
           </div>
         )}
@@ -534,19 +659,19 @@ function VehicleDetail({ vehicle, group, history, onNavigate, onNavigateInvoices
   );
 }
 
-// ── EMPTY STATE ────────────────────────────────────────────────────────────────
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+function EmptyState({ hasSearch, onAdd }: { hasSearch: boolean; onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/40 mb-4">
         <User className="h-8 w-8 text-muted-foreground/50" />
       </div>
-      <p className="font-semibold">No hay clientes aún</p>
-      <p className="mt-1 text-sm text-muted-foreground">Añade tu primer cliente o importa desde un CSV</p>
-      <Button className="mt-4" onClick={onAdd}>
-        <Plus className="mr-2 h-4 w-4" />Nuevo cliente
-      </Button>
+      <p className="font-semibold">{hasSearch ? "Sin resultados" : "No hay clientes aún"}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {hasSearch ? "Prueba con otro nombre, teléfono o matrícula" : "Añade tu primer cliente o importa desde un CSV"}
+      </p>
+      {!hasSearch && (
+        <Button className="mt-4" onClick={onAdd}><Plus className="mr-2 h-4 w-4" />Nuevo cliente</Button>
+      )}
     </div>
   );
 }
