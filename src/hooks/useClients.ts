@@ -149,7 +149,7 @@ export function useCreateClient() {
       model: string | null;
     }) => {
       const payload: AnyRecord = {
-        name: input.name,
+        full_name: input.name,
         phone: input.phone,
         license_plate: input.license_plate,
         brand: input.brand,
@@ -182,8 +182,8 @@ export function useUpdateClient() {
       brand: string | null;
       model: string | null;
     }) => {
-      const { id, ...rest } = input;
-      const payload: AnyRecord = { ...rest, workshop_id: workshopId };
+      const { id, name, ...rest } = input;
+      const payload: AnyRecord = { full_name: name, ...rest, workshop_id: workshopId };
       return updateClientWithFallback(id, payload);
     },
     onSuccess: () => {
