@@ -125,18 +125,13 @@ const Clients = () => {
     setLoading(true);
     try {
       // 1. clients table (trusted source of truth)
-      // Fetch clients - try workshop_id first, fall back to all accessible
-      let clientsRaw: any[] = [];
-      const { data: c1 } = await (supabase as any)
-        .from("clients").select("*").eq("workshop_id", workshopId).order("created_at", { ascending: false });
-      if ((c1 ?? []).length > 0) {
-        clientsRaw = c1;
-      } else {
-        // Fallback: clients without workshop_id (older records)
-        const { data: c2 } = await (supabase as any)
-          .from("clients").select("*").order("created_at", { ascending: false });
-        clientsRaw = c2 ?? [];
-      }
+      // Fetch ALL accessible clients (RLS handles permissions)
+      // Don't filter by workshop_id - clients table may not have it populated yet
+      // New appointments will auto-populate clients via syncClientFromAppointment
+      const { data: clientsRaw = [] } = await (supabase as any)
+        .from("clients")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       // 2. appointments (for vehicles that may not be in clients table)
       const { data: aptsRaw } = await (supabase as any)
@@ -144,6 +139,43 @@ const Clients = () => {
         .select("id,license_plate,client_name,name,phone,email,brand,model")
         .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
+
+      // If clients table is empty, auto-populate it from appointments (one-time backfill)
+      if ((clientsRaw ?? []).length === 0 && (aptsRaw ?? []).length > 0) {
+        const plateMap: Record<string, any> = {};
+        for (const apt of aptsRaw) {
+          const plate = (apt.license_plate || "").toUpperCase();
+          const name = (apt.client_name || apt.name || "").trim();
+          if (!plate || !name || plateMap[plate]) continue;
+          plateMap[plate] = {
+            name,
+            license_plate: plate,
+            phone: apt.phone || null,
+            email: apt.email || null,
+            brand: apt.brand || null,
+            model: apt.model || null,
+            workshop_id: workshopId,
+          };
+        }
+        const toInsert = Object.values(plateMap);
+        if (toInsert.length > 0) {
+          // Insert in batches of 20
+          for (let i = 0; i < toInsert.length; i += 20) {
+            const batch = toInsert.slice(i, i + 20);
+            const { error } = await (supabase as any).from("clients").insert(batch);
+            if (error?.code === "42703") {
+              const batchNoWid = batch.map((r: any) => { const c = {...r}; delete c.workshop_id; return c; });
+              await (supabase as any).from("clients").insert(batchNoWid);
+            }
+          }
+          // Re-fetch clients after backfill
+          const { data: refetched } = await (supabase as any).from("clients").select("*").order("created_at", { ascending: false });
+          if ((refetched ?? []).length > 0) {
+            // Use refetched data below by reassigning
+            (clientsRaw as any[]).push(...(refetched ?? []));
+          }
+        }
+      }
 
       // Build groups: norm(name) -> ClientGroup
       const groupMap = new Map<string, ClientGroup>();
