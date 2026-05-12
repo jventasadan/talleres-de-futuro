@@ -221,6 +221,50 @@ const updateAppointmentWithFallback = async (id: string, payload: AnyRecord) => 
   throw lastError;
 };
 
+
+// ── Sync client record whenever an appointment is created or updated ──────────
+const syncClientFromAppointment = async (apt: AnyRecord, workshopId: string) => {
+  try {
+    const plate = (apt.license_plate || "").toUpperCase();
+    const name = (apt.client_name || apt.name || "").trim();
+    if (!plate || !name) return;
+
+    const { data: existing } = await (supabase as any)
+      .from("clients")
+      .select("id, name, phone, brand, model, email")
+      .eq("license_plate", plate)
+      .maybeSingle();
+
+    const now = new Date().toISOString();
+
+    if (existing) {
+      const updates: AnyRecord = { name, updated_at: now };
+      if (!existing.phone && apt.phone) updates.phone = apt.phone;
+      if (!existing.email && (apt.email || apt.Email)) updates.email = apt.email || apt.Email;
+      if (!existing.brand && apt.brand) updates.brand = apt.brand;
+      if (!existing.model && apt.model) updates.model = apt.model;
+      await (supabase as any).from("clients").update(updates).eq("id", existing.id);
+    } else {
+      let payload: AnyRecord = {
+        name,
+        license_plate: plate,
+        workshop_id: workshopId,
+        phone: apt.phone || null,
+        email: apt.email || apt.Email || null,
+        brand: apt.brand || null,
+        model: apt.model || null,
+      };
+      const { error } = await (supabase as any).from("clients").insert(payload);
+      if (error?.code === "42703" || error?.message?.toLowerCase().includes("does not exist")) {
+        delete payload.workshop_id;
+        await (supabase as any).from("clients").insert(payload);
+      }
+    }
+  } catch (e) {
+    console.warn("syncClientFromAppointment:", e);
+  }
+};
+
 export function useAppointments(dateFilter?: string) {
   const { workshopId } = useWorkshop();
 
@@ -293,6 +337,7 @@ export function useCreateAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Orden creada correctamente");
     },
     onError: (error: any) => {
