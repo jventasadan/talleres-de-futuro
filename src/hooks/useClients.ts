@@ -155,7 +155,7 @@ export function useCreateClient() {
         brand: input.brand,
         model: input.model,
         workshop_id: workshopId,
-        user_id: user?.id,
+        id: user?.id,
       };
       return insertClientWithFallback(payload);
     },
