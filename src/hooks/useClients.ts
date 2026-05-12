@@ -12,7 +12,7 @@ export interface Client {
   license_plate: string;
   brand: string | null;
   model: string | null;
-  email: string | null;
+  email: string | null;.
   created_at: string;
   updated_at: string;
 }
