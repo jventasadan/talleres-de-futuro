@@ -226,7 +226,7 @@ const CourtesyVehicles = () => {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout title="Vehículos de Cortesía">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
