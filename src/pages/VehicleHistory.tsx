@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,8 +49,7 @@ interface HistoryEntry {
 const db = supabase as any;
 
 const VehicleHistory = () => {
-  const [searchParams] = useSearchParams();
-  const [searchText, setSearchText] = useState("");
+    const [searchText, setSearchText] = useState("");
   const [vehicles, setVehicles] = useState<VehicleRecord[]>([]);
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
