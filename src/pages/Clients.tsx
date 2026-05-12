@@ -347,25 +347,60 @@ const Clients = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload: any = {
-        name: form.name,
+      const plate = form.license_plate.toUpperCase().trim();
+
+      // Pre-check de matrícula duplicada
+      if (plate) {
+        const { data: existing } = await (supabase as any)
+          .from("clients")
+          .select("id")
+          .eq("license_plate", plate)
+          .maybeSingle();
+        if (existing) {
+          toast.error(`Ya existe un cliente con la matrícula ${plate}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      const basePayload: any = {
+        id: (globalThis.crypto as any)?.randomUUID?.() ?? undefined,
+        name: form.name.trim(),
         phone: form.phone || null,
-        license_plate: form.license_plate.toUpperCase(),
+        email: form.email || null,
+        nif: form.nif || null,
+        address: form.address || null,
+        city: form.city || null,
+        postal_code: form.postal_code || null,
+        province: form.province || null,
+        license_plate: plate,
         brand: form.brand || null,
         model: form.model || null,
         workshop_id: workshopId,
         user_id: user?.id,
       };
-      let { error } = await (supabase as any).from("clients").insert(payload);
-      if (error?.code === "42703" || error?.message?.toLowerCase().includes("does not exist")) {
-        delete payload.workshop_id;
-        const res = await (supabase as any).from("clients").insert(payload);
-        error = res.error;
+
+      // Inserta y elimina columnas que no existan en el esquema (fallback)
+      let payload = { ...basePayload };
+      let lastError: any = null;
+      for (let i = 0; i < 12; i += 1) {
+        const { error } = await (supabase as any).from("clients").insert(payload);
+        if (!error) { lastError = null; break; }
+        lastError = error;
+        const msg = String(error?.message ?? "").toLowerCase();
+        const code = String(error?.code ?? "");
+        const isSchema = code === "42703" || code === "PGRST204" || msg.includes("does not exist") || msg.includes("schema cache");
+        if (!isSchema) break;
+        const m = msg.match(/'([a-z0-9_]+)' column/i) || msg.match(/column\s+[\w.]+\.([a-z0-9_]+)\s+does not exist/i);
+        const col = m?.[1];
+        if (!col || !(col in payload)) break;
+        delete payload[col];
       }
-      if (error) throw error;
+      if (lastError) throw lastError;
+
       toast.success("Cliente creado");
       setDialogOpen(false);
-      setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+      setForm({ name: "", phone: "", email: "", nif: "", address: "", city: "", postal_code: "", province: "", license_plate: "", brand: "", model: "" });
       loadData();
     } catch (err: any) {
       toast.error("Error: " + (err?.message ?? ""));
@@ -373,6 +408,7 @@ const Clients = () => {
       setSaving(false);
     }
   };
+
 
   // Import CSV/Excel
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
