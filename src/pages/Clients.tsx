@@ -125,11 +125,18 @@ const Clients = () => {
     setLoading(true);
     try {
       // 1. clients table (trusted source of truth)
-      const { data: clientsRaw } = await (supabase as any)
-        .from("clients")
-        .select("*")
-        .eq("workshop_id", workshopId)
-        .order("created_at", { ascending: false });
+      // Fetch clients - try workshop_id first, fall back to all accessible
+      let clientsRaw: any[] = [];
+      const { data: c1 } = await (supabase as any)
+        .from("clients").select("*").eq("workshop_id", workshopId).order("created_at", { ascending: false });
+      if ((c1 ?? []).length > 0) {
+        clientsRaw = c1;
+      } else {
+        // Fallback: clients without workshop_id (older records)
+        const { data: c2 } = await (supabase as any)
+          .from("clients").select("*").order("created_at", { ascending: false });
+        clientsRaw = c2 ?? [];
+      }
 
       // 2. appointments (for vehicles that may not be in clients table)
       const { data: aptsRaw } = await (supabase as any)
@@ -205,6 +212,15 @@ const Clients = () => {
   useEffect(() => { loadData(); }, [workshopId]);
 
   // Deep-link from global search: ?plate= or ?client=
+  // Pre-fill search so results appear as soon as data loads
+  useEffect(() => {
+    const plateParam = searchParams.get("plate");
+    const clientParam = searchParams.get("client");
+    if (plateParam) setSearch(plateParam.toUpperCase());
+    else if (clientParam) setSearch(clientParam);
+  }, [searchParams]);
+
+  // Once groups load, auto-open the matching group
   useEffect(() => {
     if (!groups.length) return;
     const plateParam = searchParams.get("plate");
@@ -221,7 +237,7 @@ const Clients = () => {
       const g = groups.find((g) => norm(g.name).includes(q));
       if (g) { setView({ type: "client", group: g }); }
     }
-  }, [searchParams, groups]);
+  }, [groups]);
 
   // Load history for a vehicle
   const loadHistory = async (plate: string) => {
