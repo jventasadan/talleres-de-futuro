@@ -139,40 +139,55 @@ export type Database = {
       }
       clients: {
         Row: {
+          address: string | null
           brand: string | null
+          city: string | null
           created_at: string
           email: string | null
           id: string
           license_plate: string
           model: string | null
           name: string
+          nif: string | null
           phone: string | null
+          postal_code: string | null
+          province: string | null
           updated_at: string
           user_id: string
           workshop_id: string | null
         }
         Insert: {
+          address?: string | null
           brand?: string | null
+          city?: string | null
           created_at?: string
           email?: string | null
           id?: string
           license_plate: string
           model?: string | null
           name: string
+          nif?: string | null
           phone?: string | null
+          postal_code?: string | null
+          province?: string | null
           updated_at?: string
           user_id: string
           workshop_id?: string | null
         }
         Update: {
+          address?: string | null
           brand?: string | null
+          city?: string | null
           created_at?: string
           email?: string | null
           id?: string
           license_plate?: string
           model?: string | null
           name?: string
+          nif?: string | null
           phone?: string | null
+          postal_code?: string | null
+          province?: string | null
           updated_at?: string
           user_id?: string
           workshop_id?: string | null

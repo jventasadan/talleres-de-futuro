@@ -347,25 +347,60 @@ const Clients = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload: any = {
-        name: form.name,
+      const plate = form.license_plate.toUpperCase().trim();
+
+      // Pre-check de matrícula duplicada
+      if (plate) {
+        const { data: existing } = await (supabase as any)
+          .from("clients")
+          .select("id")
+          .eq("license_plate", plate)
+          .maybeSingle();
+        if (existing) {
+          toast.error(`Ya existe un cliente con la matrícula ${plate}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      const basePayload: any = {
+        id: (globalThis.crypto as any)?.randomUUID?.() ?? undefined,
+        name: form.name.trim(),
         phone: form.phone || null,
-        license_plate: form.license_plate.toUpperCase(),
+        email: form.email || null,
+        nif: form.nif || null,
+        address: form.address || null,
+        city: form.city || null,
+        postal_code: form.postal_code || null,
+        province: form.province || null,
+        license_plate: plate,
         brand: form.brand || null,
         model: form.model || null,
         workshop_id: workshopId,
         user_id: user?.id,
       };
-      let { error } = await (supabase as any).from("clients").insert(payload);
-      if (error?.code === "42703" || error?.message?.toLowerCase().includes("does not exist")) {
-        delete payload.workshop_id;
-        const res = await (supabase as any).from("clients").insert(payload);
-        error = res.error;
+
+      // Inserta y elimina columnas que no existan en el esquema (fallback)
+      let payload = { ...basePayload };
+      let lastError: any = null;
+      for (let i = 0; i < 12; i += 1) {
+        const { error } = await (supabase as any).from("clients").insert(payload);
+        if (!error) { lastError = null; break; }
+        lastError = error;
+        const msg = String(error?.message ?? "").toLowerCase();
+        const code = String(error?.code ?? "");
+        const isSchema = code === "42703" || code === "PGRST204" || msg.includes("does not exist") || msg.includes("schema cache");
+        if (!isSchema) break;
+        const m = msg.match(/'([a-z0-9_]+)' column/i) || msg.match(/column\s+[\w.]+\.([a-z0-9_]+)\s+does not exist/i);
+        const col = m?.[1];
+        if (!col || !(col in payload)) break;
+        delete payload[col];
       }
-      if (error) throw error;
+      if (lastError) throw lastError;
+
       toast.success("Cliente creado");
       setDialogOpen(false);
-      setForm({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+      setForm({ name: "", phone: "", email: "", nif: "", address: "", city: "", postal_code: "", province: "", license_plate: "", brand: "", model: "" });
       loadData();
     } catch (err: any) {
       toast.error("Error: " + (err?.message ?? ""));
@@ -373,6 +408,7 @@ const Clients = () => {
       setSaving(false);
     }
   };
+
 
   // Import CSV/Excel
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -509,7 +545,31 @@ const Clients = () => {
               </div>
               <div className="space-y-2">
                 <Label>Teléfono</Label>
-                <Input placeholder="656 232 325" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                  <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Provincia</Label>                  <Input placeholder="Madrid" value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                  <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Provincia</Label>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                  <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />                </div>                <div className="space-y-2">                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                  <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />                </div>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                  <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Código Postal</Label>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                  <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Ciudad</Label>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                  <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                  <Label>Dirección</Label>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2 sm:col-span-2">                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                  <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>NIF</Label>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                </div>                <div className="space-y-2">                  <Label>Email</Label>                  <Input placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />                </div>                <div className="space-y-2">                  <Label>Email</Label>                </div>                <div className="space-y-2">                </div>
+                <Input placeholder="656 232 325" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>NIF</Label>
+                <Input placeholder="12345678A" value={form.nif} onChange={(e) => setForm((f) => ({ ...f, nif: e.target.value }))} />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Dirección</Label>
+                <Input placeholder="Calle Mayor 1" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Ciudad</Label>
+                <Input placeholder="Madrid" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Código Postal</Label>
+                <Input placeholder="28001" value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Provincia</Label>
+                <Input placeholder="Madrid" value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} />
               </div>
               <div className="space-y-2">
                 <Label>Matrícula *</Label>
@@ -519,7 +579,7 @@ const Clients = () => {
                 <Label>Marca</Label>
                 <Input placeholder="Volkswagen" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>Modelo</Label>
                 <Input placeholder="Golf GTI" value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} />
               </div>
