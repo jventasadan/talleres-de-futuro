@@ -364,7 +364,6 @@ const Clients = () => {
       }
 
       const basePayload: any = {
-        id: (globalThis.crypto as any)?.randomUUID?.() ?? undefined,
         name: form.name.trim(),
         phone: form.phone || null,
         email: form.email || null,
