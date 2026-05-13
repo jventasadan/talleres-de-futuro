@@ -798,7 +798,7 @@ const Appointments = () => {
                                       const val = e.target.value.trim();
                                       if (val) {
                                         try {
-                                          await updateAppointmentWithFallback(apt.id, { email: val });
+                                          await updateAppointmentWithFallback(apt.id, { email: val, Email: val });
                                           if (apt.license_plate) {
                                             const { data: clientData } = await supabase
                                               .from("clients")
