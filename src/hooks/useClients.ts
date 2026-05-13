@@ -149,12 +149,12 @@ export function useCreateClient() {
       model: string | null;
     }) => {
       const payload: AnyRecord = {
-        full_name: input.name,
+        name: input.name,
         phone: input.phone,
         license_plate: input.license_plate,
         brand: input.brand,
         model: input.model,
-        workshop_id: workshopId,
+        workshop_id: workshopId,        user_id: user?.id,
       };
       return insertClientWithFallback(payload);
     },

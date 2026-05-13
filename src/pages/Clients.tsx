@@ -387,7 +387,6 @@ const Clients = () => {
         brand: form.brand || null,
         model: form.model || null,
         workshop_id: workshopId,
-        user_id: user?.id,
       };
 
       // Inserta y elimina columnas que no existan en el esquema (fallback)
