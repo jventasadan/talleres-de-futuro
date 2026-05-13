@@ -520,40 +520,37 @@ const Clients = () => {
           <ClientView group={view.group} onSelectVehicle={(v) => setView({ type: "vehicle", group: view.group, vehicle: v })} />
         ) : (
           <>
-            <div className="flex items-center gap-2 flex-1"><div className="relative flex-1">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre, teléfono, matrícula…."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 max-w-sm">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre, teléfono, matrícula…."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex items-center rounded-md border border-border/60 p-0.5">
+                <Button variant={listMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("grid")} title="Vista cuadrícula">
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant={listMode === "list" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("list")} title="Vista lista">
+                  <List className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
-            </div>
-<div className="flex items-center rounded-md border border-border/60 p-0.5">
-<Button variant={listMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("grid")} title="Vista cuadrícula">
-<LayoutGrid className="h-3.5 w-3.5" />
-</Button>
-<Button variant={listMode === "list" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("list")} title="Vista lista">
-<List className="h-3.5 w-3.5" />
-</Button>
-</div>
-</div>
-{filtered.length === 0 ? (
+            {filtered.length === 0 ? (
               <EmptyState hasSearch={!!search} onAdd={() => setDialogOpen(true)} />
-            ) : (
-              {listMode === "grid" ? (<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            ) : listMode === "grid" ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((g) => (
                   <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} listMode={listMode} />
-))}
-</div>
-) : (
-<div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 overflow-hidden">
-{filtered.map((g) => (
-<ClientRow key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
-))}
-</div>
-)}
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 overflow-hidden">
+                {filtered.map((g) => (
+                  <ClientRow key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
                 ))}
               </div>
             )}
