@@ -74,6 +74,14 @@ const initials = (name: string) =>
 const norm = (s: string) =>
   (s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const createClientId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random()}`;
+};
+
 function parseCSV(text: string): Array<Record<string, string>> {
   const lines = text.trim().split("\n");
   if (lines.length < 2) return [];
@@ -98,6 +106,7 @@ function mapImportRow(row: Record<string, string>) {
 
 // ── component ──────────────────────────────────────────────────────────────────
 
+const Clients = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { workshopId } = useWorkshop();
@@ -109,7 +118,7 @@ function mapImportRow(row: Record<string, string>) {
   const [view, setView] = useState<View>({ type: "list" });
 
   const [dialogOpen, setDialogOpen] = useState(false);
-    const [form, setForm] = useState({ name: "", phone: "", email: "", nif: "", address: "", city: "", postal_code: "", province: "", license_plate: "", brand: "", model: "" });
+  const [form, setForm] = useState({ name: "", phone: "", email: "", nif: "", address: "", city: "", postal_code: "", province: "", license_plate: "", brand: "", model: "" });
   const [saving, setSaving] = useState(false);
 
   const [importing, setImporting] = useState(false);
@@ -363,6 +372,7 @@ function mapImportRow(row: Record<string, string>) {
       }
 
       const basePayload: any = {
+        id: createClientId(),
         name: form.name.trim(),
         phone: form.phone || null,
         email: form.email || null,
