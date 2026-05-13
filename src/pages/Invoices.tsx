@@ -161,7 +161,7 @@ async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: st
 
 const Invoices = () => {
   const [urlParams] = useSearchParams();
-  const [search, setSearch] = useState(urlParams.get("search") || "");
+  const [search, setSearch] = useState(urlParams.get("plate") || urlParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState<"all" | "emitida" | "pagada">("all");
   const { data: invoices, isLoading } = useInvoices();
   const { data: settings } = useCompanySettings();
