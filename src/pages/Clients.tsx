@@ -98,7 +98,6 @@ function mapImportRow(row: Record<string, string>) {
 
 // ── component ──────────────────────────────────────────────────────────────────
 
-const Clients = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { workshopId } = useWorkshop();
