@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Plus, User, Phone, Loader2, Car, ChevronLeft,
-  Upload, Mail, Wrench, FileText, History, ChevronRight, Trash2,
+  Upload, Mail, Wrench, FileText, History, ChevronRight, Trash2, LayoutGrid, List,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
@@ -117,6 +117,7 @@ const Clients = () => {
   const [groups, setGroups] = useState<ClientGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [listMode, setListMode] = useState<"grid" | "list">("grid");
   const [view, setView] = useState<View>({ type: "list" });
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -519,7 +520,7 @@ const Clients = () => {
           <ClientView group={view.group} onSelectVehicle={(v) => setView({ type: "vehicle", group: view.group, vehicle: v })} />
         ) : (
           <>
-            <div className="relative max-w-sm">
+            <div className="flex items-center gap-2 flex-1"><div className="relative flex-1">
               <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre, teléfono, matrícula…."
@@ -528,12 +529,31 @@ const Clients = () => {
                 className="pl-9"
               />
             </div>
-            {filtered.length === 0 ? (
+            </div>
+<div className="flex items-center rounded-md border border-border/60 p-0.5">
+<Button variant={listMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("grid")} title="Vista cuadrícula">
+<LayoutGrid className="h-3.5 w-3.5" />
+</Button>
+<Button variant={listMode === "list" ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={() => setListMode("list")} title="Vista lista">
+<List className="h-3.5 w-3.5" />
+</Button>
+</div>
+</div>
+{filtered.length === 0 ? (
               <EmptyState hasSearch={!!search} onAdd={() => setDialogOpen(true)} />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {listMode === "grid" ? (<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((g) => (
-                  <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
+                  <ClientCard key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} listMode={listMode} />
+))}
+</div>
+) : (
+<div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 overflow-hidden">
+{filtered.map((g) => (
+<ClientRow key={g.key} group={g} onClick={() => setView({ type: "client", group: g })} />
+))}
+</div>
+)}
                 ))}
               </div>
             )}
@@ -606,7 +626,7 @@ const Clients = () => {
   );
 };
 
-function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => void }) {
+function ClientCard({ group, onClick }: { group: ClientGroup; onClick: () => void; listMode?: "grid" | "list" }) {
   const c = color(group.colorIdx);
   return (
     <Card className="cursor-pointer border border-border/60 transition-all hover:border-primary/40 hover:shadow-md hover:shadow-primary/5" onClick={onClick}>
@@ -789,6 +809,28 @@ function EmptyState({ hasSearch, onAdd }: { hasSearch: boolean; onAdd: () => voi
       {!hasSearch && (
         <Button className="mt-4" onClick={onAdd}><Plus className="mr-2 h-4 w-4" />Nuevo cliente</Button>
       )}
+    </div>
+  );
+}
+
+function ClientRow({ group, onClick }: { group: ClientGroup; onClick: () => void }) {
+  const c = color(group.colorIdx);
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors" onClick={onClick}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-display text-xs font-bold ${c.bg} ${c.text}`}>
+        {initials(group.name)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <span className="font-semibold text-sm truncate block">{group.name}</span>
+        {group.phone && <span className="text-xs text-muted-foreground">{group.phone}</span>}
+      </div>
+      <div className="flex gap-1 shrink-0">
+        {group.vehicles.slice(0, 2).map((v) => (
+          <Badge key={v.id} variant="secondary" className="text-[10px] font-mono px-1.5">{v.license_plate || "—"}</Badge>
+        ))}
+        {group.vehicles.length > 2 && <Badge variant="secondary" className="text-[10px] px-1.5">+{group.vehicles.length - 2}</Badge>}
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
     </div>
   );
 }
