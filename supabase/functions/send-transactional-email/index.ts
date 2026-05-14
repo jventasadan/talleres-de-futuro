@@ -5,7 +5,7 @@ import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
 // Resend configuration
 const SITE_NAME = "Talleres de Futuro"
-const FROM_EMAIL = "noreply@send.talleres-de-futuro.es"
+const FROM_EMAIL = "noreply@talleres-de-futuro.es"
 const RESEND_API_URL = "https://api.resend.com/emails"
 
 const corsHeaders = {
