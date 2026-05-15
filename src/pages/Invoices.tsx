@@ -28,9 +28,19 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   vehicleKm: string;
   clientPhone: string;
   clientEmail: string;
+  clientNif: string;
+  clientAddress: string;
+  clientCity: string;
+  clientPostalCode: string;
+  clientProvince: string;
   photos: string[];
 }> {
-  const empty = { lines: [], comment: "", vehicleInfo: "", vehicleKm: "", clientPhone: "", clientEmail: "", photos: [] };
+  const empty = {
+    lines: [], comment: "", vehicleInfo: "", vehicleKm: "",
+    clientPhone: "", clientEmail: "",
+    clientNif: "", clientAddress: "", clientCity: "", clientPostalCode: "", clientProvince: "",
+    photos: [],
+  };
   if (!workshopId) return empty;
 
   const [invoiceLinesResult, workOrderItemsResult, workOrderResult] = await Promise.all([
@@ -52,11 +62,20 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
   let vehicleKm = "";
   let clientPhone = "";
   let clientEmail = "";
+  let clientNif = "";
+  let clientAddress = "";
+  let clientCity = "";
+  let clientPostalCode = "";
+  let clientProvince = "";
 
   const resolvedAppointmentId = invoice.appointment_id ?? workOrderResult.data?.appointment_id ?? null;
 
   const [clientResult, appointmentResult] = await Promise.all([
-    db.from("clients").select("brand, model, phone, email, license_plate").eq("workshop_id", workshopId).ilike("license_plate", invoice.license_plate).maybeSingle(),
+    db.from("clients")
+      .select("brand, model, phone, email, license_plate, nif, address, city, postal_code, province")
+      .eq("workshop_id", workshopId)
+      .ilike("license_plate", invoice.license_plate)
+      .maybeSingle(),
     resolvedAppointmentId
       ? db.from("appointments").select("km, email, brand, model").eq("id", resolvedAppointmentId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -71,6 +90,11 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
     vehicleModel = safeText(clientResult.data.model);
     clientPhone = safeText(clientResult.data.phone);
     clientEmail = safeText(clientResult.data.email);
+    clientNif = safeText(clientResult.data.nif);
+    clientAddress = safeText(clientResult.data.address);
+    clientCity = safeText(clientResult.data.city);
+    clientPostalCode = safeText(clientResult.data.postal_code);
+    clientProvince = safeText(clientResult.data.province);
   }
   if (appointmentResult?.data) {
     vehicleKm = safeText(appointmentResult.data.km);
@@ -134,12 +158,21 @@ async function fetchInvoicePdfData(invoice: Invoice, workshopId: string | null):
     }
   }
 
-  return { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail, photos };
+  return {
+    lines, comment, vehicleInfo, vehicleKm,
+    clientPhone, clientEmail,
+    clientNif, clientAddress, clientCity, clientPostalCode, clientProvince,
+    photos,
+  };
 }
 
 async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: string | null) {
-  const { lines, comment, vehicleInfo, vehicleKm, clientPhone, clientEmail, photos } =
-    await fetchInvoicePdfData(invoice, workshopId);
+  const {
+    lines, comment, vehicleInfo, vehicleKm,
+    clientPhone, clientEmail,
+    clientNif, clientAddress, clientCity, clientPostalCode, clientProvince,
+    photos,
+  } = await fetchInvoicePdfData(invoice, workshopId);
 
   await generatePdfWithLogo({
     title: `FACTURA ${invoice.invoice_number}`,
@@ -152,6 +185,11 @@ async function handleDownloadPdf(invoice: Invoice, settings: any, workshopId: st
     vehicleKm: vehicleKm || undefined,
     clientPhone: clientPhone || undefined,
     clientEmail: clientEmail || undefined,
+    clientNif: clientNif || undefined,
+    clientAddress: clientAddress || undefined,
+    clientCity: clientCity || undefined,
+    clientPostalCode: clientPostalCode || undefined,
+    clientProvince: clientProvince || undefined,
     comment: comment || undefined,
     lines,
     taxRate: Number(invoice.tax_rate ?? 21),
