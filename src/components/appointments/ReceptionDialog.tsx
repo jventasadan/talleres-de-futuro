@@ -171,7 +171,11 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
                                                             <Select value={form.service} onValueChange={(v) => setForm(f => ({ ...f, service: v }))}>
                                                                             <SelectTrigger><SelectValue placeholder="Selecciona servicio" /></SelectTrigger>SelectTrigger>
                                                                             <SelectContent>
-                                                                              {SERVICES.map(s => <SelectItem key={s} value={s}>{s} ({formatDuration(getEstimatedMinutes(s))})</SelectItem>SelectItem>)}
+                                                                              {SERVICES.map(s => {
+  const dur = formatDuration(getEstimatedMinutes(s));
+  return <SelectItem key={s} value={s}>{s} - {dur}</SelectItem>;
+})}
+
                                                                             </SelectContent>SelectContent>
                                                             </Select>Select>
                                                 {estimatedTime && <p className="text-[10px] text-muted-foreground">Tiempo estimado: {estimatedTime}</p>p>}
