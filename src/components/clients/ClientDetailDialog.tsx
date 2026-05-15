@@ -109,8 +109,16 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
               <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="space-y-2">
+              <Label>NIF / DNI</Label>
+              <Input value={form.nif} onChange={(e) => setForm(f => ({ ...f, nif: e.target.value.toUpperCase() }))} />
+            </div>
+            <div className="space-y-2">
               <Label>Teléfono</Label>
               <Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Matrícula</Label>
@@ -123,6 +131,22 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
             <div className="space-y-2 sm:col-span-2">
               <Label>Modelo</Label>
               <Input value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Dirección</Label>
+              <Input value={form.address} onChange={(e) => setForm(f => ({ ...f, address: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Ciudad</Label>
+              <Input value={form.city} onChange={(e) => setForm(f => ({ ...f, city: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Código Postal</Label>
+              <Input value={form.postal_code} onChange={(e) => setForm(f => ({ ...f, postal_code: e.target.value }))} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Provincia</Label>
+              <Input value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} />
             </div>
           </div>
 
