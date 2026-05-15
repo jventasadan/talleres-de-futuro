@@ -113,11 +113,14 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${SITE_NAME} <${FROM_EMAIL}>`,
+        from: `${(templateData.workshopName as string)?.trim() || SITE_NAME} <${FROM_EMAIL}>`,
         to: [effectiveRecipient],
         subject: resolvedSubject,
         html,
         text: plainText,
+        ...((templateData.workshopEmail as string)?.trim()
+          ? { reply_to: (templateData.workshopEmail as string).trim() }
+          : {}),
       }),
     })
 
