@@ -34,6 +34,11 @@ export interface PdfDocumentData {
   vehicleKm?: string;
   clientPhone?: string;
   clientEmail?: string;
+  clientNif?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  clientPostalCode?: string;
+  clientProvince?: string;
   comment?: string;
   extraHeaderRight?: string; // texto opcional arriba a la derecha (ej: estado del presupuesto)
   lines: PdfLine[];
