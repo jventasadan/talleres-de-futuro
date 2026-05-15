@@ -686,9 +686,14 @@ const Appointments = () => {
         return;
       }
 
-      const [linesRes, woRes] = await Promise.all([
+      const [linesRes, woRes, clientRes] = await Promise.all([
         (supabase as any).from("invoice_lines").select("*").eq("invoice_id", invoice.id).order("created_at", { ascending: true }),
         woId ? (supabase as any).from("work_orders").select("comentario_factura").eq("id", woId).maybeSingle() : Promise.resolve({ data: null }),
+        (supabase as any).from("clients")
+          .select("nif, address, city, postal_code, province, email, phone")
+          .eq("workshop_id", workshopId)
+          .ilike("license_plate", apt.license_plate)
+          .maybeSingle(),
       ]);
       const lines: PdfLine[] = (linesRes.data ?? []).map((l: any) => {
         const descMatch = String(l.description ?? "").match(/\(-?(\d+(?:\.\d+)?)%\)\s*$/);
@@ -707,6 +712,8 @@ const Appointments = () => {
         .order("created_at", { ascending: true });
       const photos = (photoRes.data ?? []).map((p: any) => String(p.photo_url)).filter(Boolean);
 
+      const cli = clientRes.data ?? {};
+
       await generatePdfWithLogo({
         title: `FACTURA ${invoice.invoice_number}`,
         date: new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }),
@@ -716,8 +723,13 @@ const Appointments = () => {
         service: invoice.service ?? apt.service,
         vehicleInfo: [apt.brand, apt.model].filter(Boolean).join(" ") || undefined,
         vehicleKm: apt.km ? String(apt.km) : undefined,
-        clientPhone: apt.phone || undefined,
-        clientEmail: apt.email || undefined,
+        clientPhone: cli.phone || apt.phone || undefined,
+        clientEmail: cli.email || apt.email || undefined,
+        clientNif: cli.nif || undefined,
+        clientAddress: cli.address || undefined,
+        clientCity: cli.city || undefined,
+        clientPostalCode: cli.postal_code || undefined,
+        clientProvince: cli.province || undefined,
         comment: woRes.data?.comentario_factura || undefined,
         lines,
         taxRate: Number(invoice.tax_rate ?? 21),
