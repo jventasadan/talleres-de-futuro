@@ -123,7 +123,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
               <Input placeholder="Madrid" value={form.province} onChange={(e) => setForm(f => ({ ...f, province: e.target.value }))} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2​​​​​​​​​​​​​​​​
+          <div className="grid gap-4 sm:grid-cols-2">
+
           <div className="space-y-2">
               <Label>Matricula</Label>
               <Input placeholder="5454TRT" value={form.license_plate} onChange={(e) => setForm(f => ({ ...f, license_plate: e.target.value.toUpperCase() }))} required />
