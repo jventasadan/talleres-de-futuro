@@ -23,7 +23,19 @@ interface Props {
 }
 
 export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
-  const [form, setForm] = useState({ name: "", phone: "", license_plate: "", brand: "", model: "" });
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    nif: "",
+    license_plate: "",
+    brand: "",
+    model: "",
+    address: "",
+    city: "",
+    postal_code: "",
+    province: "",
+  });
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
   const { data: appointments } = useAllAppointments();
@@ -34,9 +46,15 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
       setForm({
         name: client.name ?? "",
         phone: client.phone ?? "",
+        email: client.email ?? "",
+        nif: client.nif ?? "",
         license_plate: client.license_plate ?? "",
         brand: client.brand ?? "",
         model: client.model ?? "",
+        address: client.address ?? "",
+        city: client.city ?? "",
+        postal_code: client.postal_code ?? "",
+        province: client.province ?? "",
       });
     }
   }, [client]);
@@ -49,7 +67,20 @@ export function ClientDetailDialog({ client, open, onOpenChange }: Props) {
 
   const handleSave = () => {
     updateClient.mutate(
-      { id: client.id, name: form.name, phone: form.phone || null, license_plate: form.license_plate, brand: form.brand || null, model: form.model || null },
+      {
+        id: client.id,
+        name: form.name,
+        phone: form.phone || null,
+        email: form.email || null,
+        nif: form.nif || null,
+        license_plate: form.license_plate,
+        brand: form.brand || null,
+        model: form.model || null,
+        address: form.address || null,
+        city: form.city || null,
+        postal_code: form.postal_code || null,
+        province: form.province || null,
+      },
       { onSuccess: () => onOpenChange(false) }
     );
   };
