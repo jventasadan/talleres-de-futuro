@@ -34,6 +34,11 @@ export interface PdfDocumentData {
   vehicleKm?: string;
   clientPhone?: string;
   clientEmail?: string;
+  clientNif?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  clientPostalCode?: string;
+  clientProvince?: string;
   comment?: string;
   extraHeaderRight?: string; // texto opcional arriba a la derecha (ej: estado del presupuesto)
   lines: PdfLine[];
@@ -140,12 +145,21 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
   const hasVehicleInfo = !!data.vehicleInfo;
   const hasKm = !!data.vehicleKm;
   const hasContact = !!(data.clientPhone || data.clientEmail);
+  const hasNif = !!data.clientNif;
+  const fullAddress = [
+    data.clientAddress,
+    [data.clientPostalCode, data.clientCity].filter(Boolean).join(" "),
+    data.clientProvince,
+  ].filter(Boolean).join(", ");
+  const hasAddress = !!fullAddress;
   const hasComment = !!data.comment;
 
   let clientBoxLines = 3;
+  if (hasNif) clientBoxLines += 1;
   if (hasVehicleInfo) clientBoxLines += 1;
   if (hasKm) clientBoxLines += 1;
   if (hasContact) clientBoxLines += 1;
+  if (hasAddress) clientBoxLines += 1;
   if (hasComment) clientBoxLines += 2;
   const clientBoxH = 10 + clientBoxLines * 5;
 
@@ -163,12 +177,22 @@ export function generatePdf(data: PdfDocumentData, settings: PdfSettings): void 
   doc.setTextColor(60, 60, 60);
   doc.text(`Cliente: ${safeStr(data.clientName)}`, margin + 5, y);
 
+  if (hasNif) {
+    y += 5;
+    doc.text(`NIF/DNI: ${safeStr(data.clientNif)}`, margin + 5, y);
+  }
+
   if (hasContact) {
     y += 5;
     const contactParts = [];
     if (data.clientPhone) contactParts.push(`Tlf: ${data.clientPhone}`);
     if (data.clientEmail) contactParts.push(`Email: ${data.clientEmail}`);
     doc.text(contactParts.join("  |  "), margin + 5, y);
+  }
+
+  if (hasAddress) {
+    y += 5;
+    doc.text(`Dirección: ${safeStr(fullAddress)}`, margin + 5, y);
   }
 
   y += 5;
@@ -423,12 +447,21 @@ export async function generatePdfWithLogo(
   const hasVehicleInfo = !!data.vehicleInfo;
   const hasKm = !!data.vehicleKm;
   const hasContact = !!(data.clientPhone || data.clientEmail);
+  const hasNif = !!data.clientNif;
+  const fullAddress = [
+    data.clientAddress,
+    [data.clientPostalCode, data.clientCity].filter(Boolean).join(" "),
+    data.clientProvince,
+  ].filter(Boolean).join(", ");
+  const hasAddress = !!fullAddress;
   const hasComment = !!data.comment;
 
   let clientBoxLines = 3;
+  if (hasNif) clientBoxLines += 1;
   if (hasVehicleInfo) clientBoxLines += 1;
   if (hasKm) clientBoxLines += 1;
   if (hasContact) clientBoxLines += 1;
+  if (hasAddress) clientBoxLines += 1;
   if (hasComment) clientBoxLines += 2;
   const clientBoxH = 10 + clientBoxLines * 5;
 
@@ -446,12 +479,22 @@ export async function generatePdfWithLogo(
   doc.setTextColor(60, 60, 60);
   doc.text(`Cliente: ${safeStr(data.clientName)}`, margin + 5, y);
 
+  if (hasNif) {
+    y += 5;
+    doc.text(`NIF/DNI: ${safeStr(data.clientNif)}`, margin + 5, y);
+  }
+
   if (hasContact) {
     y += 5;
     const contactParts = [];
     if (data.clientPhone) contactParts.push(`Tlf: ${data.clientPhone}`);
     if (data.clientEmail) contactParts.push(`Email: ${data.clientEmail}`);
     doc.text(contactParts.join("  |  "), margin + 5, y);
+  }
+
+  if (hasAddress) {
+    y += 5;
+    doc.text(`Dirección: ${safeStr(fullAddress)}`, margin + 5, y);
   }
 
   y += 5;
