@@ -157,6 +157,12 @@ export function useCreateClient() {
       license_plate: string;
       brand: string | null;
       model: string | null;
+      email?: string | null;
+      nif?: string | null;
+      address?: string | null;
+      city?: string | null;
+      postal_code?: string | null;
+      province?: string | null;
     }) => {
       const payload: AnyRecord = {
         name: input.name,
@@ -164,7 +170,14 @@ export function useCreateClient() {
         license_plate: input.license_plate,
         brand: input.brand,
         model: input.model,
-        workshop_id: workshopId,        user_id: user?.id,
+        email: input.email ?? null,
+        nif: input.nif ?? null,
+        address: input.address ?? null,
+        city: input.city ?? null,
+        postal_code: input.postal_code ?? null,
+        province: input.province ?? null,
+        workshop_id: workshopId,
+        user_id: user?.id,
       };
       return insertClientWithFallback(payload);
     },
@@ -190,9 +203,15 @@ export function useUpdateClient() {
       license_plate: string;
       brand: string | null;
       model: string | null;
+      email?: string | null;
+      nif?: string | null;
+      address?: string | null;
+      city?: string | null;
+      postal_code?: string | null;
+      province?: string | null;
     }) => {
       const { id, name, ...rest } = input;
-      const payload: AnyRecord = { full_name: name, ...rest, workshop_id: workshopId };
+      const payload: AnyRecord = { full_name: name, name, ...rest, workshop_id: workshopId };
       return updateClientWithFallback(id, payload);
     },
     onSuccess: () => {
