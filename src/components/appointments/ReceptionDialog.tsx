@@ -173,7 +173,8 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
                                                                             <SelectContent>
                                                                               {SERVICES.map(s => {
   const dur = formatDuration(getEstimatedMinutes(s));
-  return <SelectItem key={s} value={s}>{s} - {dur}</SelectItem>;
+  return <SelectItem key={s} value={s}>{`${s} - ${dur}`}</SelectItem>;
+
 })}
 
                                                                             </SelectContent>SelectContent>
