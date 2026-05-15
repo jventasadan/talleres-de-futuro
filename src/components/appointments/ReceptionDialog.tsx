@@ -124,3 +124,77 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2​​​​​​​​​​​​​​​​
+          <div className="space-y-2">
+              <Label>Matricula</Label>
+              <Input placeholder="5454TRT" value={form.license_plate} onChange={(e) => setForm(f => ({ ...f, license_plate: e.target.value.toUpperCase() }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Marca</Label>
+              <Input placeholder="Volkswagen" value={form.brand} onChange={(e) => setForm(f => ({ ...f, brand: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Modelo</Label>
+              <Input placeholder="Golf GTI" value={form.model} onChange={(e) => setForm(f => ({ ...f, model: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Kilometros</Label>
+              <Input placeholder="125000" value={form.km} onChange={(e) => setForm(f => ({ ...f, km: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Servicio</Label>
+              <Select value={form.service} onValueChange={(v) => setForm(f => ({ ...f, service: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona servicio" /></SelectTrigger>
+                <SelectContent>
+                  {SERVICES.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Descripcion del problema</Label>
+            <Textarea placeholder="Describe que le pasa al vehiculo..." value={form.problem} onChange={(e) => setForm(f => ({ ...f, problem: e.target.value }))} rows={2} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Fecha</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(dateObj, "PPP", { locale: es })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateObj} onSelect={(d) => d && setDateObj(d)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Hora</Label>
+              <Select value={form.time_slot} onValueChange={(v) => setForm(f => ({ ...f, time_slot: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona hora" /></SelectTrigger>
+                <SelectContent>
+                  {TIME_SLOTS.map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Notas adicionales</Label>
+            <Textarea placeholder="Notas adicionales..." value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Agendar cita"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
