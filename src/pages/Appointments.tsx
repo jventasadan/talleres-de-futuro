@@ -644,7 +644,12 @@ const Appointments = () => {
             await insertClientWithFallback({
               name: data.client_name,
               phone: data.phone ?? null,
-              email: data.email ?? null,
+              email: data.email ?? null,              nif: data.nif ?? null,
+              address: data.address ?? null,
+              city: data.city ?? null,
+              postal_code: data.postal_code ?? null,
+              province: data.province ?? null,
+
               license_plate: plate,
               brand: data.brand ?? null,
               model: data.model ?? null,
