@@ -38,7 +38,7 @@ async function ensureClientFromAppointment(params: {
       if (!existing.brand && params.brand) updates.brand = params.brand;
       if (!existing.model && params.model) updates.model = params.model;
       if (Object.keys(updates).length > 0) {
-        await supabase.from("clients").update(updates).eq("id", existing.id);
+        await (supabase as any).from("clients").update(updates).eq("id", existing.id);
       }
       return;
     }
@@ -55,7 +55,7 @@ async function ensureClientFromAppointment(params: {
       user_id: params.userId,
     };
 
-    let { error } = await supabase.from("clients").insert(insertPayload as any);
+    let { error } = await (supabase as any).from("clients").insert(insertPayload);
     if (error) {
       // Fallback: quitar columnas no existentes
       const msg = String(error.message ?? "");
@@ -63,7 +63,7 @@ async function ensureClientFromAppointment(params: {
         ?? msg.match(/column\s+[\w.]+\.([a-zA-Z0-9_]+)\s+does not exist/i)?.[1];
       if (missing && missing in insertPayload) {
         delete insertPayload[missing];
-        await supabase.from("clients").insert(insertPayload as any);
+        await (supabase as any).from("clients").insert(insertPayload);
       }
     }
   } catch (e) {
