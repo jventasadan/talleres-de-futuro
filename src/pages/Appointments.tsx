@@ -621,6 +621,22 @@ const Appointments = () => {
     if (user && data.client_name && data.license_plate) {
       try {
         const plate = data.license_plate.toUpperCase();
+        const clientPayload = {
+          name: data.client_name,
+          phone: data.phone ?? null,
+          email: data.email ?? null,
+          nif: data.nif ?? null,
+          address: data.address ?? null,
+          city: data.city ?? null,
+          postal_code: data.postal_code ?? null,
+          province: data.province ?? null,
+          license_plate: plate,
+          brand: data.brand ?? null,
+          model: data.model ?? null,
+          user_id: user.id,
+          workshop_id: workshopId,
+        };
+
         const { data: existingByPlate } = await supabase
           .from("clients")
           .select("id")
@@ -628,35 +644,25 @@ const Appointments = () => {
           .eq("license_plate", plate)
           .maybeSingle() as any;
 
-        if (!existingByPlate) {
-          let existingByPhone = null;
-          if (data.phone) {
-            const { data: phoneMatch } = await supabase
-              .from("clients")
-              .select("id")
-              .eq("workshop_id", workshopId)
-              .eq("phone", data.phone)
-              .maybeSingle() as any;
-            existingByPhone = phoneMatch;
+        if (existingByPlate?.id) {
+          // Cliente ya existe: actualizar con los datos más recientes
+          const updateFields: AnyRecord = {};
+          if (clientPayload.name) updateFields.name = clientPayload.name;
+          if (clientPayload.phone) updateFields.phone = clientPayload.phone;
+          if (clientPayload.email) updateFields.email = clientPayload.email;
+          if (clientPayload.nif) updateFields.nif = clientPayload.nif;
+          if (clientPayload.address) updateFields.address = clientPayload.address;
+          if (clientPayload.city) updateFields.city = clientPayload.city;
+          if (clientPayload.postal_code) updateFields.postal_code = clientPayload.postal_code;
+          if (clientPayload.province) updateFields.province = clientPayload.province;
+          if (clientPayload.brand) updateFields.brand = clientPayload.brand;
+          if (clientPayload.model) updateFields.model = clientPayload.model;
+          if (Object.keys(updateFields).length > 0) {
+            await supabase.from("clients").update(updateFields as any).eq("id", existingByPlate.id);
           }
-
-          if (!existingByPhone) {
-            await insertClientWithFallback({
-              name: data.client_name,
-              phone: data.phone ?? null,
-              email: data.email ?? null,            
-              nif: data.nif ?? null,
-              address: data.address ?? null,
-              city: data.city ?? null,
-              postal_code: data.postal_code ?? null,
-              province: data.province ?? null,
-              license_plate: plate,
-              brand: data.brand ?? null,
-              model: data.model ?? null,
-              user_id: user.id,
-              workshop_id: workshopId,
-            });
-          }
+        } else {
+          // Cliente nuevo: crear registro completo
+          await insertClientWithFallback(clientPayload);
         }
       } catch (_) { /* best effort */ }
     }
