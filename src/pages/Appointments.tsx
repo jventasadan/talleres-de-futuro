@@ -672,7 +672,9 @@ delete appointmentData.address;
 delete appointmentData.city;
 delete appointmentData.postal_code;
 delete appointmentData.province;
-createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
+delete appointmentData.email;
+    delete appointmentData.phone;
+    createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
   };
 
   const orderNumber = (id: string) => `ORD-${id.slice(0, 4).toUpperCase()}`;
