@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   Plus, User, Phone, Loader2, Car, ChevronLeft,
-  Upload, Mail, Wrench, FileText, History, ChevronRight, Trash2, LayoutGrid, List,
+    Upload, Mail, Wrench, FileText, History, ChevronRight, Trash2, LayoutGrid, List, MapPin, CreditCard,
+
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
@@ -208,12 +209,7 @@ const Clients = () => {
         if (!g.postal_code && postal_code) g.postal_code = postal_code;
         if (!g.province && province) g.province = province;
 
-        if (!g.email && email) g.email = email;if (!g.nif && nif) g.nif = nif;
-if (!g.address && address) g.address = address;
-if (!g.city && city) g.city = city;
-if (!g.postal_code && postal_code) g.postal_code = postal_code;
-if (!g.province && province) g.province = province;
-
+      
         return g;
       };
 
