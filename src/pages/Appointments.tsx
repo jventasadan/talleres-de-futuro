@@ -633,7 +633,6 @@ const Appointments = () => {
           license_plate: plate,
           brand: data.brand ?? null,
           model: data.model ?? null,
-          user_id: user.id,
           workshop_id: workshopId,
         };
 
