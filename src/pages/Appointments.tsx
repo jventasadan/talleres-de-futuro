@@ -660,7 +660,13 @@ const Appointments = () => {
         }
       } catch (_) { /* best effort */ }
     }
-    createMutation.mutate(data, { onSuccess: () => setReceptionOpen(false) });
+   const appointmentData = { ...data };
+delete appointmentData.nif;
+delete appointmentData.address;
+delete appointmentData.city;
+delete appointmentData.postal_code;
+delete appointmentData.province;
+createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
   };
 
   const orderNumber = (id: string) => `ORD-${id.slice(0, 4).toUpperCase()}`;
