@@ -399,9 +399,20 @@ export function useCreateAppointment() {
         // workshop_id is set automatically by DB trigger
       };
 
-      
+
       const data = await insertAppointmentWithFallback(payload);
-      
+
+      await ensureClientFromAppointment({
+        workshopId,
+        userId: user?.id ?? null,
+        name: String(payload.client_name ?? "").trim(),
+        phone: payload.phone ?? null,
+        email: payload.email ?? null,
+        license_plate: String(payload.license_plate ?? ""),
+        brand: payload.brand ?? null,
+        model: payload.model ?? null,
+      });
+
       return mapAppointmentRow((data ?? payload) as AnyRecord);
     },
     onSuccess: () => {
