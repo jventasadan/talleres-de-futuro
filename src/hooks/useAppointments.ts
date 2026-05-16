@@ -1,8 +1,75 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkshop } from "@/contexts/WorkshopContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { buildKilometersPayload } from "@/lib/appointment-utils";
 import { toast } from "sonner";
+
+/**
+ * Garantiza que exista una fila en `clients` para esta recepción.
+ * Busca por workshop_id + matrícula (case-insensitive). Si no existe, la crea.
+ * Si existe pero le faltan datos (teléfono, email, marca, modelo), los completa.
+ */
+async function ensureClientFromAppointment(params: {
+  workshopId: string | null | undefined;
+  userId: string | null | undefined;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  license_plate: string;
+  brand: string | null;
+  model: string | null;
+}) {
+  const plate = (params.license_plate ?? "").toUpperCase().trim();
+  if (!params.workshopId || !plate || !params.name) return;
+
+  try {
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id, phone, email, brand, model, name")
+      .eq("workshop_id", params.workshopId)
+      .ilike("license_plate", plate)
+      .maybeSingle();
+
+    if (existing) {
+      const updates: Record<string, any> = {};
+      if (!existing.phone && params.phone) updates.phone = params.phone;
+      if (!existing.email && params.email) updates.email = params.email;
+      if (!existing.brand && params.brand) updates.brand = params.brand;
+      if (!existing.model && params.model) updates.model = params.model;
+      if (Object.keys(updates).length > 0) {
+        await (supabase as any).from("clients").update(updates).eq("id", existing.id);
+      }
+      return;
+    }
+
+    const insertPayload: Record<string, any> = {
+      name: params.name,
+      full_name: params.name,
+      phone: params.phone,
+      email: params.email,
+      license_plate: plate,
+      brand: params.brand,
+      model: params.model,
+      workshop_id: params.workshopId,
+      user_id: params.userId,
+    };
+
+    let { error } = await (supabase as any).from("clients").insert(insertPayload);
+    if (error) {
+      // Fallback: quitar columnas no existentes
+      const msg = String(error.message ?? "");
+      const missing = msg.match(/'([^']+)' column/i)?.[1]
+        ?? msg.match(/column\s+[\w.]+\.([a-zA-Z0-9_]+)\s+does not exist/i)?.[1];
+      if (missing && missing in insertPayload) {
+        delete insertPayload[missing];
+        await (supabase as any).from("clients").insert(insertPayload);
+      }
+    }
+  } catch (e) {
+    console.warn("ensureClientFromAppointment failed:", e);
+  }
+}
 
 export interface Appointment {
   id: string;
@@ -295,6 +362,8 @@ export function useAllAppointments() {
 
 export function useCreateAppointment() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (appointment: Partial<Appointment> & AnyRecord) => {
@@ -330,9 +399,20 @@ export function useCreateAppointment() {
         // workshop_id is set automatically by DB trigger
       };
 
-      
+
       const data = await insertAppointmentWithFallback(payload);
-      
+
+      await ensureClientFromAppointment({
+        workshopId,
+        userId: user?.id ?? null,
+        name: String(payload.client_name ?? "").trim(),
+        phone: payload.phone ?? null,
+        email: payload.email ?? null,
+        license_plate: String(payload.license_plate ?? ""),
+        brand: payload.brand ?? null,
+        model: payload.model ?? null,
+      });
+
       return mapAppointmentRow((data ?? payload) as AnyRecord);
     },
     onSuccess: () => {
