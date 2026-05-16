@@ -362,6 +362,8 @@ export function useAllAppointments() {
 
 export function useCreateAppointment() {
   const queryClient = useQueryClient();
+  const { workshopId } = useWorkshop();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (appointment: Partial<Appointment> & AnyRecord) => {
