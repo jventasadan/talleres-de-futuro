@@ -667,6 +667,14 @@ function ClientView({ group, onSelectVehicle }: { group: ClientGroup; onSelectVe
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {group.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{group.phone}</span>}
                 {group.email && <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{group.email}</span>}
+                {group.nif && <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" />{group.nif}</span>}
+{(group.address || group.city) && (
+  <span className="flex items-center gap-1.5">
+    <MapPin className="h-3.5 w-3.5" />
+    {[group.address, group.postal_code, group.city, group.province].filter(Boolean).join(", ")}
+  </span>
+)}
+
               </div>
             </div>
           </div>
