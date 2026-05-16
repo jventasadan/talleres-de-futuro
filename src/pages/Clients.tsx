@@ -196,11 +196,18 @@ const Clients = () => {
 
         const key = norm(rawName) || "sin nombre";
         if (!groupMap.has(key)) {
-          groupMap.set(key, { key, name: rawName.trim() || "Sin nombre", phone: phone || null, email: email || null, colorIdx: idx++, vehicles: [] });groupMap.set(key, { key, name: rawName.trim() || "Sin nombre", phone: phone || null, email: email || null, nif: nif || null, address: address || null, city: city || null, postal_code: postal_code || null, province: province || null, colorIdx: idx++, vehicles: [] });
+                    groupMap.set(key, { key, name: rawName.trim() || "Sin nombre", phone: phone || null, email: email || null, nif: nif || null, address: address || null, city: city || null, postal_code: postal_code || null, province: province || null, colorIdx: idx++, vehicles: [] });
+
 
         }
         const g = groupMap.get(key)!;
-        if (!g.phone && phone) g.phone = phone;
+                if (!g.email && email) g.email = email;
+        if (!g.nif && nif) g.nif = nif;
+        if (!g.address && address) g.address = address;
+        if (!g.city && city) g.city = city;
+        if (!g.postal_code && postal_code) g.postal_code = postal_code;
+        if (!g.province && province) g.province = province;
+
         if (!g.email && email) g.email = email;if (!g.nif && nif) g.nif = nif;
 if (!g.address && address) g.address = address;
 if (!g.city && city) g.city = city;
