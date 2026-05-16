@@ -192,7 +192,8 @@ const Clients = () => {
       const groupMap = new Map<string, ClientGroup>();
       let idx = 0;
 
-      const getOrCreate = (rawName: string, phone: string | null, email: string | null) => {
+      const getOrCreate = (rawName: string, phone: string | null, email: string | null, nif: string | null = null, address: string | null = null, city: string | null = null, postal_code: string | null = null, province: string | null = null) => {
+
         const key = norm(rawName) || "sin nombre";
         if (!groupMap.has(key)) {
           groupMap.set(key, { key, name: rawName.trim() || "Sin nombre", phone: phone || null, email: email || null, colorIdx: idx++, vehicles: [] });
@@ -208,7 +209,8 @@ const Clients = () => {
       for (const c of clientsRaw ?? []) {
         const name = (c.full_name || c.name || "").trim() || "Sin nombre";
         const plate = (c.license_plate || "").toUpperCase();
-        const g = getOrCreate(name, c.phone || null, c.email || null);
+        const g = getOrCreate(name, c.phone || null, c.email || null, c.nif || null, c.address || null, c.city || null, c.postal_code || null, c.province || null);
+
         const plateKey = plate || `client-${c.id}`;
         if (!platesSeen.has(plateKey)) {
           platesSeen.add(plateKey);
