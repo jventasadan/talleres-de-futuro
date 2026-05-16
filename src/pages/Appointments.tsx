@@ -649,7 +649,7 @@ const Appointments = () => {
               address: data.address ?? null,
               city: data.city ?? null,
               postal_code: data.postal_code ?? null,
-              province: data.province ?? nulllicense_plate: plate,
+              province: data.province ?? null,
               license_plate: plate,
               brand: data.brand ?? null,
               model: data.model ?? null,
