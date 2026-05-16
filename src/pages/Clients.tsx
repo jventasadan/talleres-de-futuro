@@ -143,6 +143,7 @@ const Clients = () => {
       const { data: clientsRaw = [] } = await (supabase as any)
         .from("clients")
         .select("*")
+        .eq("workshop_id", workshopId)
         .order("created_at", { ascending: false });
 
       // 2. appointments (for vehicles that may not be in clients table)
