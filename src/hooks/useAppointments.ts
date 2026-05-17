@@ -20,11 +20,10 @@ async function ensureClientFromAppointment(params: {
   brand: string | null;
   model: string | null;
   nif: string | null;
-address: string | null;
-city: string | null;
-postal_code: string | null;
-province: string | null;
-
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  province: string | null;
 }) {
   const plate = (params.license_plate ?? "").toUpperCase().trim();
   if (!params.workshopId || !plate || !params.name) return;
