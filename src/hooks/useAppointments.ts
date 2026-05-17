@@ -31,7 +31,7 @@ async function ensureClientFromAppointment(params: {
   try {
     const { data: existing } = await supabase
       .from("clients")
-      .select("id, phone, email, brand, model, name")
+      .select("id, phone, email, brand, model, name, nif, address, city, postal_code, province")
       .eq("workshop_id", params.workshopId)
       .ilike("license_plate", plate) un
       .maybeSingle();
@@ -42,6 +42,12 @@ async function ensureClientFromAppointment(params: {
       if (!existing.email && params.email) updates.email = params.email;
       if (!existing.brand && params.brand) updates.brand = params.brand;
       if (!existing.model && params.model) updates.model = params.model;
+      if (!existing.nif && params.nif) updates.nif = params.nif;
+      if (!existing.address && params.address) updates.address = params.address;
+      if (!existing.city && params.city) updates.city = params.city;
+      if (!existing.postal_code && params.postal_code) updates.postal_code = params.postal_code;
+      if (!existing.province && params.province) updates.province = params.province;
+
       if (Object.keys(updates).length > 0) {
         await (supabase as any).from("clients").update(updates).eq("id", existing.id);
       }
