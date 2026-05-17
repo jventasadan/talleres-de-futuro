@@ -661,7 +661,7 @@ const Appointments = () => {
           }
         } else {
           // Cliente nuevo: crear registro completo
-          await insertClientWithFallback(clientPayload);
+          await supabase.from("clients").insert(clientPayload);
         }
       } catch (_) { /* best effort */ }
     }
