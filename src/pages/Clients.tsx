@@ -36,6 +36,11 @@ interface ClientGroup {
   name: string;
   phone: string | null;
   email: string | null;
+  nif: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  province: string | null;
   colorIdx: number;
   vehicles: Vehicle[];
 }
