@@ -618,11 +618,11 @@ const Appointments = () => {
       }
     }
 
-    if (user && data.client_name && data.license_plate) {
-      try {
+    if (user && (data.client_name || data.name) && data.license_plate) {
+     try {
         const plate = data.license_plate.toUpperCase();
         const clientPayload = {
-          name: data.client_name,
+          name: data.client_name ?? data.name,
           phone: data.phone ?? null,
           email: data.email ?? null,
           nif: data.nif ?? null,
@@ -663,7 +663,8 @@ const Appointments = () => {
           // Cliente nuevo: crear registro completo
           await supabase.from("clients").insert(clientPayload);
         }
-      } catch (_) { /* best effort */ }
+      } catch (e: any) { console.error("Error cliente:", e?.message); }
+
     }
    const appointmentData = { ...data };
 delete appointmentData.nif;
@@ -672,6 +673,7 @@ delete appointmentData.city;
 delete appointmentData.postal_code;
 delete appointmentData.province;
 delete appointmentData.email;
+    delete appointmentData.client_name;
     delete appointmentData.phone;
     createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
   };
