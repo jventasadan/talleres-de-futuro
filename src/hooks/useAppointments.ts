@@ -19,6 +19,12 @@ async function ensureClientFromAppointment(params: {
   license_plate: string;
   brand: string | null;
   model: string | null;
+  nif: string | null;
+address: string | null;
+city: string | null;
+postal_code: string | null;
+province: string | null;
+
 }) {
   const plate = (params.license_plate ?? "").toUpperCase().trim();
   if (!params.workshopId || !plate || !params.name) return;
@@ -28,7 +34,7 @@ async function ensureClientFromAppointment(params: {
       .from("clients")
       .select("id, phone, email, brand, model, name")
       .eq("workshop_id", params.workshopId)
-      .ilike("license_plate", plate)
+      .ilike("license_plate", plate) un
       .maybeSingle();
 
     if (existing) {
