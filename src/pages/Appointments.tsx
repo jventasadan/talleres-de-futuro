@@ -675,6 +675,12 @@ delete appointmentData.province;
 delete appointmentData.email;
     delete appointmentData.client_name;
     delete appointmentData.phone;
+    delete appointmentData.date;
+    delete appointmentData.time_slot;
+    delete appointmentData.service;
+    delete appointmentData.km;
+    delete appointmentData.mechanic_id;
+    delete appointmentData.created_by;
     createMutation.mutate(appointmentData, { onSuccess: () => setReceptionOpen(false) });
   };
 
