@@ -50,14 +50,20 @@ province: string | null;
     }
 
     const insertPayload: Record<string, any> = {
-      name: params.name,
-      phone: params.phone,
-      email: params.email,
-      license_plate: plate,
-      brand: params.brand,
-      model: params.model,
-      workshop_id: params.workshopId,
-    };
+  name: params.name,
+  phone: params.phone,
+  email: params.email,
+  nif: params.nif ?? null,
+  address: params.address ?? null,
+  city: params.city ?? null,
+  postal_code: params.postal_code ?? null,
+  province: params.province ?? null,
+  license_plate: plate,
+  brand: params.brand,
+  model: params.model,
+  workshop_id: params.workshopId,
+};
+
 
     let { error } = await (supabase as any).from("clients").insert(insertPayload);
     if (error) {
