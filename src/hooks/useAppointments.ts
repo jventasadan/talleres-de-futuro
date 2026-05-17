@@ -392,6 +392,7 @@ export function useCreateAppointment() {
         email: appointment.email ?? null,
         ...buildKilometersPayload(appointment.km),
         vehicle_id: appointment.vehicle_id ?? null,
+        user_id: user?.id ?? null,
         // workshop_id is set automatically by DB trigger
       };
 

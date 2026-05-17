@@ -68,7 +68,7 @@ export type Database = {
           status: string
           time_slot: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           workshop_id: string | null
         }
         Insert: {
@@ -89,7 +89,7 @@ export type Database = {
           status?: string
           time_slot: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           workshop_id?: string | null
         }
         Update: {
@@ -110,7 +110,7 @@ export type Database = {
           status?: string
           time_slot?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           workshop_id?: string | null
         }
         Relationships: [
@@ -153,7 +153,7 @@ export type Database = {
           postal_code: string | null
           province: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           workshop_id: string | null
         }
         Insert: {
@@ -171,7 +171,7 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           workshop_id?: string | null
         }
         Update: {
@@ -189,7 +189,7 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           workshop_id?: string | null
         }
         Relationships: [
