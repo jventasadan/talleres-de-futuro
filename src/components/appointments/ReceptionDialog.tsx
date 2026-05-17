@@ -53,7 +53,6 @@ export function ReceptionDialog({ open, onOpenChange, onSubmit, isLoading, defau
       time_slot: form.time_slot || "09:00",
       status: defaultStatus ?? "espera",
       notes: [form.problem, form.notes].filter(Boolean).join(" | ") || null,
-      created_by: "manual",
     });
   };
 
