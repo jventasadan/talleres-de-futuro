@@ -45,14 +45,12 @@ async function ensureClientFromAppointment(params: {
 
     const insertPayload: Record<string, any> = {
       name: params.name,
-      full_name: params.name,
       phone: params.phone,
       email: params.email,
       license_plate: plate,
       brand: params.brand,
       model: params.model,
       workshop_id: params.workshopId,
-      user_id: params.userId,
     };
 
     let { error } = await (supabase as any).from("clients").insert(insertPayload);
