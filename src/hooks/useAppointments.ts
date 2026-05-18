@@ -33,7 +33,7 @@ async function ensureClientFromAppointment(params: {
       .from("clients")
       .select("id, phone, email, brand, model, name, nif, address, city, postal_code, province")
       .eq("workshop_id", params.workshopId)
-      .ilike("license_plate", plate) un
+      .ilike("license_plate", plate)
       .maybeSingle();
 
     if (existing) {
