@@ -431,6 +431,11 @@ export function useCreateAppointment() {
         license_plate: String(payload.license_plate ?? ""),
         brand: payload.brand ?? null,
         model: payload.model ?? null,
+        nif: payload.nif ?? null,
+        address: payload.address ?? null,
+        city: payload.city ?? null,
+        postal_code: payload.postal_code ?? null,
+        province: payload.province ?? null,
       });
 
       return mapAppointmentRow((data ?? payload) as AnyRecord);
