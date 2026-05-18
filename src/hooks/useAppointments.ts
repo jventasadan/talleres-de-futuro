@@ -407,6 +407,12 @@ export function useCreateAppointment() {
         brand: appointment.brand ?? null,
         model: appointment.model ?? null,
         email: appointment.email ?? null,
+        nif: appointment.nif ?? null,
+        address: appointment.address ?? null,
+        city: appointment.city ?? null,
+        postal_code: appointment.postal_code ?? null,
+        province: appointment.province ?? null,
+
         ...buildKilometersPayload(appointment.km),
         vehicle_id: appointment.vehicle_id ?? null,
         user_id: user?.id ?? null,
