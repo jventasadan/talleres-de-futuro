@@ -83,6 +83,7 @@ async function ensureClientFromAppointment(params: {
     }
   } catch (e) {
     console.warn("ensureClientFromAppointment failed:", e);
+    toast.error("Error cliente: " + String(e?.message ?? e));
   }
 }
 
